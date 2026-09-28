@@ -82,7 +82,8 @@ namespace Spinnenspiel.EditorTools
             }
 
             string fbxTarget = TargetFbx(id, res);
-            bool hasAlpha = File.Exists(Path.Combine(SourceRoot, id, "textures", id + "_alpha_" + res + ".png"));
+            string alphaSource = AlphaSourcePath(id, res);
+            string albedoTarget = TargetAlbedo(id);
 
             if (AssetDatabase.LoadMainAssetAtPath(fbxTarget) == null)
             {
@@ -91,18 +92,27 @@ namespace Spinnenspiel.EditorTools
                 File.Copy(Path.Combine(SourceRoot, id, "textures", id + "_diff_" + res + ".jpg"), TargetDiff(id, res), true);
                 File.Copy(Path.Combine(SourceRoot, id, "textures", id + "_nor_gl_" + res + ".exr"), TargetNormal(id, res), true);
 
-                if (hasAlpha)
-                {
-                    File.WriteAllBytes(TargetAlbedo(id), MergeAlpha(id, res));
-                }
-
                 AssetDatabase.ImportAsset(fbxTarget, ImportAssetOptions.ForceUpdate);
                 AssetDatabase.ImportAsset(TargetDiff(id, res), ImportAssetOptions.ForceUpdate);
                 AssetDatabase.ImportAsset(TargetNormal(id, res), ImportAssetOptions.ForceUpdate);
-                if (hasAlpha)
+            }
+
+            // Albedo (diff + Alpha/Opacity) bei jedem Import neu bauen, damit ältere Importe
+            // ohne Alpha (z. B. periwinkle_plant mit _opacity_ statt _alpha_) korrigiert werden.
+            if (alphaSource != null)
+            {
+                if (AssetDatabase.LoadAssetAtPath<Object>(albedoTarget) != null)
                 {
-                    AssetDatabase.ImportAsset(TargetAlbedo(id), ImportAssetOptions.ForceUpdate);
+                    AssetDatabase.DeleteAsset(albedoTarget);
                 }
+
+                if (File.Exists(albedoTarget))
+                {
+                    File.Delete(albedoTarget);
+                }
+
+                File.WriteAllBytes(albedoTarget, MergeAlpha(id, res, alphaSource));
+                AssetDatabase.ImportAsset(albedoTarget, ImportAssetOptions.ForceUpdate);
             }
 
             // Import-Einstellungen immer (neu) anwenden, damit geänderte Werte
@@ -122,9 +132,9 @@ namespace Spinnenspiel.EditorTools
 
             ConfigureTextureImporter(TargetDiff(id, res), srgb: true, normalMap: false, alphaTransparency: false);
             ConfigureTextureImporter(TargetNormal(id, res), srgb: false, normalMap: true, alphaTransparency: false);
-            if (hasAlpha)
+            if (alphaSource != null)
             {
-                ConfigureTextureImporter(TargetAlbedo(id), srgb: true, normalMap: false, alphaTransparency: true);
+                ConfigureTextureImporter(albedoTarget, srgb: true, normalMap: false, alphaTransparency: true);
             }
 
             AssetDatabase.SaveAssets();
@@ -292,12 +302,28 @@ namespace Spinnenspiel.EditorTools
             AssetDatabase.SaveAssets();
         }
 
-        /// <summary>True, wenn im Quellordner eine alpha-Textur existiert (Pflanze → Foliage-Material).</summary>
+        /// <summary>True, wenn im Quellordner eine Alpha-/Opacity-Textur existiert (Pflanze → Foliage-Material).</summary>
         private static bool HasAlphaSource(string id)
         {
             string res = ResolveResolution(id);
-            return res != null
-                && File.Exists(Path.Combine(SourceRoot, id, "textures", id + "_alpha_" + res + ".png"));
+            return res != null && AlphaSourcePath(id, res) != null;
+        }
+
+        /// <summary>
+        /// Pfad der Alpha-Quelle im Quellordner: <c>_alpha_&lt;res&gt;.png</c> oder, falls diese
+        /// fehlt, <c>_opacity_&lt;res&gt;.png</c> (z. B. periwinkle_plant). Null, wenn keine existiert.
+        /// </summary>
+        private static string AlphaSourcePath(string id, string res)
+        {
+            string dir = Path.Combine(SourceRoot, id, "textures");
+            string alpha = Path.Combine(dir, id + "_alpha_" + res + ".png");
+            if (File.Exists(alpha))
+            {
+                return alpha;
+            }
+
+            string opacity = Path.Combine(dir, id + "_opacity_" + res + ".png");
+            return File.Exists(opacity) ? opacity : null;
         }
 
         /// <summary>Lädt die diffuse (oder Albedo, falls vorhanden) des Modells als Texture2D.</summary>
@@ -333,12 +359,12 @@ namespace Spinnenspiel.EditorTools
             throw new FileNotFoundException("[Spinnenspiel] Importierte Textur fehlt: " + id + " (" + kind + ")");
         }
 
-        /// <summary>Verschmilzt diff (RGB) und alpha (Graustufe → A) zu einem RGBA32-PNG. Liefert die PNG-Bytes.</summary>
-        private static byte[] MergeAlpha(string id, string res)
+        /// <summary>Verschmilzt diff (RGB) und alpha/opacity (Graustufe → A) zu einem RGBA32-PNG. Liefert die PNG-Bytes.</summary>
+        private static byte[] MergeAlpha(string id, string res, string alphaFile)
         {
             string dir = Path.Combine(SourceRoot, id, "textures");
             Color[] diff = LoadPixels(Path.Combine(dir, id + "_diff_" + res + ".jpg"), out int width, out int height);
-            Color[] alpha = LoadPixels(Path.Combine(dir, id + "_alpha_" + res + ".png"), out int aw, out int ah);
+            Color[] alpha = LoadPixels(alphaFile, out int aw, out int ah);
 
             Color[] pixels;
             if (aw != width || ah != height)

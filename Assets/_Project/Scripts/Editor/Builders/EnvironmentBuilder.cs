@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Spinnenspiel.EditorTools
 {
@@ -18,11 +20,19 @@ namespace Spinnenspiel.EditorTools
         private static Material _barkMaterial;
         private static Terrain _terrain;
         private static System.Random _random;
+        private static int _rockToggle;
+        private static int _trunkToggle;
+        private static int _stumpToggle;
+        private static readonly string[] SmallStoneIds = { "rock_07", "rock_09", "stone_01" };
+        private static readonly Dictionary<string, Material> _scanMaterials = new Dictionary<string, Material>();
 
         public static void Build(Terrain terrain, int seed)
         {
             _terrain = terrain;
             _random = new System.Random(seed);
+            _rockToggle = 0;
+            _trunkToggle = 0;
+            _stumpToggle = 0;
             CreateSharedAssets();
 
             Transform root = new GameObject("Environment").transform;
@@ -31,12 +41,12 @@ namespace Spinnenspiel.EditorTools
 
             BuildTestCourse(rocks, wood);
 
-            Scatter(12, p => WorldLayout.ForestFactor(p.x, p.y) > 0.6f && ClearOfWater(p, 2.5f), p => PlaceRock(rocks, p, Range(0.6f, 1.4f), true));
-            Scatter(80, p => ClearOfWater(p, 0.2f), p => PlaceRock(rocks, p, Range(0.05f, 0.22f), false));
-            Scatter(25, p => WorldLayout.DistanceToStream(p.x, p.y) < 2.4f && ClearOfWater(p, 0.1f), p => PlaceRock(rocks, p, Range(0.08f, 0.3f), false));
-            Scatter(10, p => WorldLayout.ForestFactor(p.x, p.y) > 0.5f && ClearOfWater(p, 2f), p => PlaceLog(wood, p, Range(1.6f, 3.4f), Range(0.07f, 0.16f), Range(0f, 360f), "Log"));
+            Scatter(12, p => WorldLayout.ForestFactor(p.x, p.y) > 0.6f && ClearOfWater(p, 2.5f), p => PlaceRockScan(rocks, p));
+            Scatter(80, p => ClearOfWater(p, 0.2f), p => PlaceStoneScan(rocks, p, 0.05f, 0.22f));
+            Scatter(25, p => WorldLayout.DistanceToStream(p.x, p.y) < 2.4f && ClearOfWater(p, 0.1f), p => PlaceStoneScan(rocks, p, 0.08f, 0.3f));
+            Scatter(10, p => WorldLayout.ForestFactor(p.x, p.y) > 0.5f && ClearOfWater(p, 2f), p => PlaceTrunkScan(wood, p));
             Scatter(70, p => (WorldLayout.ForestFactor(p.x, p.y) > 0.3f || Chance(0.15f)) && ClearOfWater(p, 0.5f), p => PlaceLog(wood, p, Range(0.3f, 1.1f), Range(0.008f, 0.022f), Range(0f, 360f), "Branch"));
-            Scatter(5, p => WorldLayout.ForestFactor(p.x, p.y) > 0.8f && ClearOfWater(p, 2f), p => PlaceStump(wood, p, Range(0.14f, 0.24f), Range(0.18f, 0.4f)));
+            Scatter(5, p => WorldLayout.ForestFactor(p.x, p.y) > 0.8f && ClearOfWater(p, 2f), p => PlaceStumpScan(wood, p));
 
             AssetUtil.SetStaticRecursive(root.gameObject);
         }
@@ -173,11 +183,125 @@ namespace Spinnenspiel.EditorTools
             go.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Wood;
         }
 
+        /// <summary>
+        /// Platziert eine zufällige Variante eines Scan-Modells auf Bodenhöhe (leicht eingesenkt,
+        /// 3 % der Höhe) mit zufälliger Y-Drehung, MeshCollider (nicht konvex) und SurfaceTag.
+        /// </summary>
+        private static void PlaceScan(Transform parent, string id, Vector2 p, float scale, SurfaceType surface, string name)
+        {
+            Mesh[] variants = ScanModels.LoadVariants(id);
+            if (variants.Length == 0)
+            {
+                throw new InvalidOperationException("[Spinnenspiel] Keine Scan-Meshes verfügbar: " + id);
+            }
+
+            Mesh mesh = variants[_random.Next(0, variants.Length)];
+            GameObject go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            float height = mesh.bounds.size.y * scale;
+            go.transform.position = new Vector3(p.x, GroundHeight(p) - height * 0.03f, p.y);
+            go.transform.rotation = Quaternion.Euler(0f, Range(0f, 360f), 0f);
+            go.transform.localScale = Vector3.one * scale;
+
+            AddRenderer(go, mesh, ScanMaterial(id));
+            MeshCollider collider = go.AddComponent<MeshCollider>();
+            collider.sharedMesh = mesh;
+            collider.convex = false; // statisch: exakte Oberfläche für die Fußplatzierung
+            go.AddComponent<SurfaceTag>().surfaceType = surface;
+        }
+
+        /// <summary>Große Wald-Felsen: gescannt (rock_moss_set abwechselnd), sonst prozeduraler Felsblock.</summary>
+        private static void PlaceRockScan(Transform rocks, Vector2 p)
+        {
+            string id = _rockToggle++ % 2 == 0 ? "rock_moss_set_01" : "rock_moss_set_02";
+            if (!ScanModels.IsAvailable(id))
+            {
+                id = ScanModels.IsAvailable("rock_moss_set_01") ? "rock_moss_set_01" : "rock_moss_set_02";
+            }
+
+            if (ScanModels.IsAvailable(id))
+            {
+                PlaceScan(rocks, id, p, Range(0.5f, 0.9f), SurfaceType.Rock, "ScanRock");
+            }
+            else
+            {
+                PlaceRock(rocks, p, Range(0.6f, 1.4f), true);
+            }
+        }
+
+        /// <summary>Kleine Steine: gescannt (rock_07/rock_09/stone_01 zufällig), sonst prozedurale Steine.</summary>
+        private static void PlaceStoneScan(Transform rocks, Vector2 p, float fallbackMin, float fallbackMax)
+        {
+            for (int i = 0; i < SmallStoneIds.Length; i++)
+            {
+                string id = SmallStoneIds[(_random.Next(0, SmallStoneIds.Length) + i) % SmallStoneIds.Length];
+                if (ScanModels.IsAvailable(id))
+                {
+                    PlaceScan(rocks, id, p, Range(0.6f, 1.4f), SurfaceType.Rock, "ScanStone");
+                    return;
+                }
+            }
+
+            PlaceRock(rocks, p, Range(fallbackMin, fallbackMax), false);
+        }
+
+        /// <summary>Liegende große Stämme: gescannt (dead_tree_trunk abwechselnd), sonst prozeduraler Stamm.</summary>
+        private static void PlaceTrunkScan(Transform wood, Vector2 p)
+        {
+            string id = _trunkToggle++ % 2 == 0 ? "dead_tree_trunk" : "dead_tree_trunk_02";
+            if (!ScanModels.IsAvailable(id))
+            {
+                id = ScanModels.IsAvailable("dead_tree_trunk") ? "dead_tree_trunk" : "dead_tree_trunk_02";
+            }
+
+            if (ScanModels.IsAvailable(id))
+            {
+                // Name „ScanLog“ statt „Log“: der Kletter-Test sucht gezielt „Log“ mit CapsuleCollider.
+                PlaceScan(wood, id, p, Range(0.6f, 1.0f), SurfaceType.Wood, "ScanLog");
+            }
+            else
+            {
+                PlaceLog(wood, p, Range(1.6f, 3.4f), Range(0.07f, 0.16f), Range(0f, 360f), "Log");
+            }
+        }
+
+        /// <summary>Baumstümpfe: gescannt (tree_stump abwechselnd), sonst prozeduraler Stumpf.</summary>
+        private static void PlaceStumpScan(Transform wood, Vector2 p)
+        {
+            string id = _stumpToggle++ % 2 == 0 ? "tree_stump_01" : "tree_stump_02";
+            if (!ScanModels.IsAvailable(id))
+            {
+                id = ScanModels.IsAvailable("tree_stump_01") ? "tree_stump_01" : "tree_stump_02";
+            }
+
+            if (ScanModels.IsAvailable(id))
+            {
+                PlaceScan(wood, id, p, Range(0.35f, 0.55f), SurfaceType.Wood, "ScanStump");
+            }
+            else
+            {
+                PlaceStump(wood, p, Range(0.14f, 0.24f), Range(0.18f, 0.4f));
+            }
+        }
+
+        /// <summary>Scan-Material pro id cachen (ein Material-Asset je Modell, nicht je Objekt).</summary>
+        private static Material ScanMaterial(string id)
+        {
+            if (!_scanMaterials.TryGetValue(id, out Material material))
+            {
+                material = ScanModels.CreateSolidMaterial(id);
+                _scanMaterials[id] = material;
+            }
+
+            return material;
+        }
+
         private static void AddRenderer(GameObject go, Mesh mesh, Material material)
         {
             go.AddComponent<MeshFilter>().sharedMesh = mesh;
             MeshRenderer renderer = go.AddComponent<MeshRenderer>();
             renderer.sharedMaterial = material;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; // Schatten explizit an
         }
 
         private static bool ClearOfWater(Vector2 p, float margin)

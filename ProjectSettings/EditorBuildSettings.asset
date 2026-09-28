@@ -11,5 +11,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/_Project/Scenes/M1_Testgelaende.unity
     guid: c4886ccac5f29c347a5c5bcc586553f8
+  - enabled: 1
+    path: Assets/_Project/Scenes/Klettertest.unity
+    guid: 4ca387aa44f266f4eaf65a509ab172b8
   m_configObjects: {}
   m_UseUCBPForAssetBundles: 0
