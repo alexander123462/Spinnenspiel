@@ -1,0 +1,15 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1045 &1
+EditorBuildSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Scenes:
+  - enabled: 1
+    path: Assets/_Project/Scenes/Testwelt.unity
+    guid: 6e0de9851cf259b4cb5cdd1f1bde9918
+  - enabled: 1
+    path: Assets/_Project/Scenes/M1_Testgelaende.unity
+    guid: c4886ccac5f29c347a5c5bcc586553f8
+  m_configObjects: {}
+  m_UseUCBPForAssetBundles: 0
