@@ -23,7 +23,7 @@ namespace Spinnenspiel.EditorTools
             {
                 // Reihenfolge ist fest: TerrainSurfaceMap hängt von den Layer-Indizes ab.
                 ScanLayer("TL_Earth", "forest_ground_04", 2.0f, () => CreateLayer("TL_Earth", TextureFactory.Earth(), null, new Vector2(2.5f, 2.5f), 0.05f)),
-                ScanLayer("TL_Grass", "forest_leaves_04", 2.0f, () => CreateLayer("TL_Grass", TextureFactory.Grass(), null, new Vector2(2f, 2f), 0.08f)),
+                ScanLayer("TL_Grass", "sparse_grass", 2.0f, () => CreateLayer("TL_Grass", TextureFactory.Grass(), null, new Vector2(2f, 2f), 0.08f)),
                 ScanLayer("TL_Mud", "brown_mud_leaves_01", 1.6f, () => CreateLayer("TL_Mud", TextureFactory.Mud(), null, new Vector2(2f, 2f), 0.55f)),
                 ScanLayer("TL_Rock", "rocky_trail", 2.5f, () => CreateLayer("TL_Rock", TextureFactory.Rock(), TextureFactory.RockNormal(), new Vector2(3f, 3f), 0.2f))
             };

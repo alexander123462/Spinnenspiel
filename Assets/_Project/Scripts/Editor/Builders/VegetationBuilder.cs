@@ -47,23 +47,62 @@ namespace Spinnenspiel.EditorTools
                 Layer("Gras kurz", grassA, grass, 14f, VegetationBiome.Meadow, 0.8f, 1.3f, 22f, false, 11),
                 Layer("Gras hoch", grassB, grass, 3f, VegetationBiome.Meadow, 0.8f, 1.4f, 26f, false, 12),
                 Layer("Gras trocken", grassA, grassDry, 2f, VegetationBiome.Meadow, 0.9f, 1.5f, 22f, false, 13),
-                Layer("Waldgras", grassA, grass, 1.5f, VegetationBiome.Forest, 0.6f, 1.0f, 18f, false, 14),
-                Layer("Blume weiß", flowerWhite, flower, 0.35f, VegetationBiome.Meadow, 0.8f, 1.2f, 24f, false, 15),
-                Layer("Blume gelb", flowerYellow, flower, 0.25f, VegetationBiome.Meadow, 0.8f, 1.2f, 24f, false, 16),
-                Layer("Blume violett", flowerViolet, flower, 0.2f, VegetationBiome.Meadow, 0.8f, 1.2f, 24f, false, 17),
-                Layer("Farn", fernMesh, fern, 0.6f, VegetationBiome.Forest, 0.7f, 1.5f, 30f, true, 18),
-                Layer("Laub", litterMesh, litter, 2.5f, VegetationBiome.Forest, 0.8f, 1.3f, 20f, false, 19),
-                Layer("Schilf", reedMesh, reed, 3f, VegetationBiome.WaterBank, 0.8f, 1.3f, 30f, true, 20),
-                Layer("Busch", bushMesh, leaves, 0.05f, VegetationBiome.Any, 0.8f, 1.8f, 45f, true, 21),
-                Layer("Rasen", grassFine, grass, 30f, VegetationBiome.Meadow, 0.8f, 1.4f, 13f, false, 22),
-                Layer("Moos/Waldrasen", grassFine, fern, 8f, VegetationBiome.Forest, 0.6f, 1.1f, 12f, false, 23)
+                Layer("Waldgras", grassA, grass, 1.5f, VegetationBiome.Forest, 0.6f, 1.0f, 18f, false, 14)
             };
 
-            // Uferpflanzen dürfen näher ans Wasser, Büsche nicht in den Bach.
-            layers[9].waterClearance = -0.1f;
-            layers[10].waterClearance = 1.2f;
-            layers[8].alignToNormal = true;
-            layers[8].sinkDepth = 0f;
+            // Gescannte Pflanzen (echte Größe, deshalb nur Skalierung 0.8–1.2) ersetzen die prozeduralen;
+            // fehlt der Scan, bleibt die bisherige prozedurale Pflanze.
+            if (!AddScanLayers(layers, "periwinkle_plant", 0.35f, VegetationBiome.Meadow, 0.8f, 1.2f, 24f, false, 15))
+            {
+                layers.Add(Layer("Blume weiß", flowerWhite, flower, 0.35f, VegetationBiome.Meadow, 0.8f, 1.2f, 24f, false, 15));
+            }
+
+            if (!AddScanLayers(layers, "dandelion_01", 0.25f, VegetationBiome.Meadow, 0.8f, 1.2f, 24f, false, 16))
+            {
+                layers.Add(Layer("Blume gelb", flowerYellow, flower, 0.25f, VegetationBiome.Meadow, 0.8f, 1.2f, 24f, false, 16));
+            }
+
+            if (!AddScanLayers(layers, "weed_plant_02", 0.2f, VegetationBiome.Meadow, 0.8f, 1.2f, 24f, false, 17))
+            {
+                layers.Add(Layer("Blume violett", flowerViolet, flower, 0.2f, VegetationBiome.Meadow, 0.8f, 1.2f, 24f, false, 17));
+            }
+
+            if (!AddScanLayers(layers, "fern_02", 0.6f, VegetationBiome.Forest, 0.8f, 1.2f, 30f, true, 18))
+            {
+                layers.Add(Layer("Farn", fernMesh, fern, 0.6f, VegetationBiome.Forest, 0.7f, 1.5f, 30f, true, 18));
+            }
+
+            layers.Add(Layer("Laub", litterMesh, litter, 2.5f, VegetationBiome.Forest, 0.8f, 1.3f, 20f, false, 19));
+            layers.Add(Layer("Schilf", reedMesh, reed, 3f, VegetationBiome.WaterBank, 0.8f, 1.3f, 30f, true, 20));
+
+            if (!AddScanLayers(layers, "shrub_02", 0.05f, VegetationBiome.Any, 0.8f, 1.2f, 45f, true, 21))
+            {
+                layers.Add(Layer("Busch", bushMesh, leaves, 0.05f, VegetationBiome.Any, 0.8f, 1.8f, 45f, true, 21));
+            }
+
+            layers.Add(Layer("Rasen", grassFine, grass, 30f, VegetationBiome.Meadow, 0.8f, 1.4f, 13f, false, 22));
+            layers.Add(Layer("Moos/Waldrasen", grassFine, fern, 8f, VegetationBiome.Forest, 0.6f, 1.1f, 12f, false, 23));
+
+            // Neu: weitere gescannte Kräuter und Büsche (je halbe Dichte der ersetzten Pflanze, gleiche Biome).
+            AddScanLayers(layers, "nettle_plant", 0.3f, VegetationBiome.Forest, 0.8f, 1.2f, 30f, true, 30);
+            AddScanLayers(layers, "shrub_03", 0.025f, VegetationBiome.Any, 0.8f, 1.2f, 45f, true, 31);
+            AddScanLayers(layers, "shrub_04", 0.025f, VegetationBiome.Any, 0.8f, 1.2f, 45f, true, 32);
+
+            // Scan-Layer verschieben die Indizes, deshalb nach Name statt Index einstellen:
+            // Uferpflanzen dürfen näher ans Wasser, Büsche (auch Scan-Büsche) nicht in den Bach.
+            WaterClearanceOf(layers, "Schilf", -0.1f);
+            WaterClearanceOf(layers, "Busch", 1.2f);
+            WaterClearanceOf(layers, "Scan shrub_0", 1.2f);
+
+            // Farne (Scan oder prozedural) liegen flach am Hang an.
+            foreach (VegetationLayer layer in layers)
+            {
+                if (layer.name == "Farn" || layer.name.StartsWith("Scan fern_02", System.StringComparison.Ordinal))
+                {
+                    layer.alignToNormal = true;
+                    layer.sinkDepth = 0f;
+                }
+            }
 
             GameObject vegetation = new GameObject("Vegetation");
             vegetation.AddComponent<VegetationSystem>().Configure(terrain, layers);
@@ -168,6 +207,47 @@ namespace Spinnenspiel.EditorTools
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Erzeugt aus einem Scan-Modell je Variante einen Vegetationslayer (Dichte geteilt auf die Varianten,
+        /// eigener salt). Liefert false, wenn der Scan fehlt oder keine Varianten lädt – dann bleibt das Prozedurale.
+        /// </summary>
+        private static bool AddScanLayers(List<VegetationLayer> layers, string id, float densityTotal, VegetationBiome biome,
+            float minScale, float maxScale, float cull, bool shadows, int salt)
+        {
+            if (!ScanModels.IsAvailable(id))
+            {
+                return false;
+            }
+
+            ScanModels.EnsureImported(id);
+            Mesh[] variants = ScanModels.LoadVariants(id);
+            if (variants.Length == 0)
+            {
+                return false;
+            }
+
+            Material material = ScanModels.CreateFoliageMaterial(id);
+            for (int i = 0; i < variants.Length; i++)
+            {
+                layers.Add(Layer("Scan " + id + " " + variants[i].name, variants[i], material, densityTotal / variants.Length, biome,
+                    minScale, maxScale, cull, shadows, salt + i));
+            }
+
+            return true;
+        }
+
+        /// <summary>Setzt waterClearance für alle Layer, deren Name mit dem Präfix beginnt.</summary>
+        private static void WaterClearanceOf(List<VegetationLayer> layers, string namePrefix, float clearance)
+        {
+            foreach (VegetationLayer layer in layers)
+            {
+                if (layer.name.StartsWith(namePrefix, System.StringComparison.Ordinal))
+                {
+                    layer.waterClearance = clearance;
+                }
+            }
         }
 
         private static VegetationLayer Layer(string name, Mesh mesh, Material material, float density, VegetationBiome biome,
