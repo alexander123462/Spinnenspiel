@@ -90,16 +90,14 @@ namespace Spinnenspiel.Tests
         {
             yield return LoadWorld();
             GameObject spider = LoadedSpider();
-            CharacterController controller = spider.GetComponent<CharacterController>();
+            SpiderMovement movement = spider.GetComponent<SpiderMovement>();
             SpiderSurfaceDetector surface = spider.GetComponent<SpiderSurfaceDetector>();
             SpiderFootEffects effects = spider.GetComponent<SpiderFootEffects>();
             Assert.IsNotNull(surface, "SpiderSurfaceDetector fehlt");
 
             float x = 44f;
             Vector3 target = new Vector3(x, WorldLayout.StreamWaterHeight(x) + 0.05f, WorldLayout.StreamCenterZ(x));
-            controller.enabled = false;
-            spider.transform.position = target;
-            controller.enabled = true;
+            movement.Teleport(target, spider.transform.rotation);
             foreach (SpiderLeg leg in spider.GetComponentsInChildren<SpiderLeg>())
             {
                 leg.SnapToGround();
@@ -109,7 +107,6 @@ namespace Spinnenspiel.Tests
             Assert.IsTrue(surface.IsOnWater, "Spinne erkennt das Wasser nicht, Oberfläche: " + surface.CurrentSurface);
             Assert.Less(surface.SpeedMultiplier, 0.8f, "Wasser bremst die Spinne nicht");
 
-            SpiderMovement movement = spider.GetComponent<SpiderMovement>();
             movement.SetExternalMoveInput(new Vector2(1f, 0f));
             yield return new WaitForSeconds(1.5f);
             movement.SetExternalMoveInput(Vector2.zero);
@@ -139,9 +136,6 @@ namespace Spinnenspiel.Tests
             yield return LoadWorld();
             GameObject spider = LoadedSpider();
             SpiderMovement movement = spider.GetComponent<SpiderMovement>();
-            CharacterController controller = spider.GetComponent<CharacterController>();
-            SpiderClimber climber = spider.GetComponent<SpiderClimber>();
-            Assert.IsNotNull(climber, "SpiderClimber fehlt");
 
             // Stamm suchen: nah am Spawnpunkt, Richtung (-1.6, 0, 2.4).
             Vector3 reference = WorldLayout.SpawnPoint + new Vector3(-1.6f, 0f, 2.4f);
@@ -177,10 +171,7 @@ namespace Spinnenspiel.Tests
             // Startpunkt quer vor dem Stamm, auf Terrain-Höhe.
             Vector3 start = log.transform.position - perp * 0.45f;
             start.y = Terrain.activeTerrain.SampleHeight(start) + Terrain.activeTerrain.transform.position.y + 0.02f;
-            controller.enabled = false;
-            spider.transform.position = start;
-            spider.transform.rotation = Quaternion.LookRotation(perp, Vector3.up);
-            controller.enabled = true;
+            movement.Teleport(start, Quaternion.LookRotation(perp, Vector3.up));
             foreach (SpiderLeg leg in spider.GetComponentsInChildren<SpiderLeg>())
             {
                 leg.SnapToGround();
@@ -190,7 +181,6 @@ namespace Spinnenspiel.Tests
 
             // Eingabe aus Kameraperspektive, damit die Spinne quer über den Stamm läuft.
             float dot = Vector3.Dot(spider.transform.position - log.transform.position, perp);
-            bool warGeklettert = false;
             float time = 0f;
             while (time < 8f && dot <= 0.4f)
             {
@@ -202,18 +192,12 @@ namespace Spinnenspiel.Tests
                 camF = camF.normalized;
                 camR = camR.normalized;
                 movement.SetExternalMoveInput(new Vector2(Vector3.Dot(perp, camR), Vector3.Dot(perp, camF)));
-                if (climber.IsClimbing)
-                {
-                    warGeklettert = true;
-                }
-
                 dot = Vector3.Dot(spider.transform.position - log.transform.position, perp);
                 yield return null;
             }
 
             movement.SetExternalMoveInput(Vector2.zero);
             Assert.Greater(dot, 0.4f, "Spinne kommt nicht über den Baumstamm, Abstand hinter der Achse: " + dot);
-            Assert.IsTrue(warGeklettert, "SpiderClimber hat nie geklettert");
         }
     }
 }

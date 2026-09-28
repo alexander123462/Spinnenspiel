@@ -13,18 +13,16 @@ namespace Spinnenspiel.EditorTools
             var root = new GameObject("Spider");
             root.transform.position = position;
 
-            CharacterController cc = root.AddComponent<CharacterController>();
-            cc.radius = 0.06f;
-            cc.height = 0.12f;
-            cc.center = new Vector3(0f, 0.06f, 0f);
-            cc.skinWidth = 0.005f;
-            cc.stepOffset = 0.05f;
-            cc.slopeLimit = 60f;
-            cc.minMoveDistance = 0f;
+            // Bewegung ohne CharacterController: kinematisches Rigidbody + Körperkugel.
+            Rigidbody rb = root.AddComponent<Rigidbody>();
+            rb.isKinematic = true;
+            rb.useGravity = false;
+            var bodyCollider = root.AddComponent<SphereCollider>();
+            bodyCollider.radius = 0.05f;
+            bodyCollider.center = new Vector3(0f, 0.05f, 0f);
 
             root.AddComponent<Spinnenspiel.SpiderInput>();
             var movement = root.AddComponent<Spinnenspiel.SpiderMovement>();
-            root.AddComponent<Spinnenspiel.SpiderClimber>();
             root.AddComponent<Spinnenspiel.SpiderController>();
 
             var so = new SerializedObject(movement);

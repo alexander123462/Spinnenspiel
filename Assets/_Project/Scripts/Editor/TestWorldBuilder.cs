@@ -49,6 +49,14 @@ namespace Spinnenspiel.EditorTools
             Vector3 spawn = WorldLayout.SpawnPoint;
             spawn.y = terrain.SampleHeight(spawn) + terrain.transform.position.y + 0.02f;
             GameObject spider = SpiderBuilder.Create(spawn, cam.transform);
+
+            // Weltgrenzen (XZ-Klemmung), damit die Spinne die Welt nicht verlässt.
+            var boundsSo = new SerializedObject(spider.GetComponent<Spinnenspiel.SpiderMovement>());
+            boundsSo.FindProperty("useWorldBounds").boolValue = true;
+            boundsSo.FindProperty("worldBoundsMin").vector3Value = new Vector3(0.5f, -100f, 0.5f);
+            boundsSo.FindProperty("worldBoundsMax").vector3Value = new Vector3(WorldLayout.Size - 0.5f, 100f, WorldLayout.Size - 0.5f);
+            boundsSo.ApplyModifiedPropertiesWithoutUndo();
+
             EffectsBuilder.Build(spider);
             SetLayerRecursive(spider, 2); // "Ignore Raycast": Kamera- und Beinstrahlen ignorieren die Spinne
 

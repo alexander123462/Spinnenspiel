@@ -3,11 +3,12 @@ using UnityEngine;
 namespace Spinnenspiel
 {
     /// <summary>
-    /// Bodenbasierte Bewegung der Spinne über einen CharacterController.
-    /// Liest SpiderInput und bewegt die Spinne relativ zur Kamera.
-    /// Beschleunigung und Abbremsen laufen über Vector3.MoveTowards mit getrennten Werten.
+    /// Oberflächen-Haftung statt CharacterController: Die Spinne haftet an jeder Unterlage
+    /// (Boden, Wand, Kante, Überhang), richtet ihre up-Achse an der Oberflächen-Normale aus
+    /// und läuft tangent zur Fläche. Position wird manuell integriert; ein Kollisionssphärenwurf
+    /// begrenzt den Schritt vor Hindernissen. Verliert sie die Unterlage, fällt sie und
+    /// haftet beim nächsten Treffer sofort wieder an.
     /// </summary>
-    [RequireComponent(typeof(CharacterController))]
     [DisallowMultipleComponent]
     public class SpiderMovement : MonoBehaviour
     {
@@ -29,31 +30,50 @@ namespace Spinnenspiel
 
         [Header("Schwerkraft")]
         [SerializeField] private float gravityScale = 1f;
-        [SerializeField] private float groundAdhesion = 2f; // Haftkraft am Boden, damit die Spinne bergab nicht abhebt
 
-        private CharacterController _controller;
-        private Vector3 _horizontalVelocity;
-        private float _verticalVelocity;
+        [Header("Oberflächen-Haftung")]
+        [SerializeField] private SpiderSurfaceSensor sensor = new SpiderSurfaceSensor();
+        [SerializeField] private float adhesionRate = 20f; // wie schnell (1/s) die Spinne zur Fläche gezogen wird
+        [SerializeField] private float alignRate = 6f; // up-Achse zur Normale ausrichten (rad/s)
+        [SerializeField] private float detachDelay = 0.2f; // Toleranz nach Letztem Oberflächen-Treffer (s)
+        [SerializeField] private float bodyRadius = 0.05f; // Körperkugel für Kollisionsschutz (m)
+
+        [Header("Weltgrenzen")]
+        [SerializeField] private bool useWorldBounds; // XZ-Abgrenzung nur, wenn an
+        [SerializeField] private Vector3 worldBoundsMin;
+        [SerializeField] private Vector3 worldBoundsMax;
+
+        private Vector3 _vel;
         private Vector3 _lastVelocity;
+        private Vector3 _surfaceNormal = Vector3.up;
+        private bool _attached = true;
+        private float _lastSurfaceTime = float.NegativeInfinity;
         private Vector2? _externalMoveInput;
+        private Vector2? _externalMoveLocal;
         private bool? _externalSprint;
         private bool _warnedNoCamera;
         private SpiderSurfaceDetector _surface;
-        private SpiderClimber _climber;
 
-        /// <summary>Letzte Gesamtbewegungsgeschwindigkeit (horizontal + vertikal).</summary>
+        /// <summary>Letzte Gesamtbewegungsgeschwindigkeit in m/s (Positionsdifferenz pro Sekunde).</summary>
         public Vector3 Velocity => _lastVelocity;
 
-        /// <summary>Horizontale Geschwindigkeit in m/s.</summary>
-        public float Speed => _horizontalVelocity.magnitude;
+        /// <summary>Aktuelle tangentiale Geschwindigkeit in m/s.</summary>
+        public float Speed => _vel.magnitude;
 
-        public bool IsGrounded => _controller != null && _controller.isGrounded;
+        /// <summary>True, solange die Spinne an einer Oberfläche haftet.</summary>
+        public bool IsAttached => _attached;
+
+        /// <summary>Normale der zuletzt erkannten Oberfläche (Weltkoordinaten).</summary>
+        public Vector3 SurfaceNormal => _surfaceNormal;
+
+        /// <summary>True, wenn die Spinne an einer Unterlage haftet (Boden, Wand, ...).</summary>
+        public bool IsGrounded => IsAttached;
 
         public float WalkSpeed => walkSpeed;
 
         public float SprintSpeed => sprintSpeed;
 
-        /// <summary>True, wenn Sprint gehalten wird und sich die Spinne horizontal bewegt.</summary>
+        /// <summary>True, wenn Sprint gehalten wird und sich die Spinne bewegt.</summary>
         public bool IsSprinting => IsSprintHeld() && Speed > rotationThreshold;
 
         /// <summary>Sprint-Zustand: extern gesetzter Wert hat Vorrang, sonst die Eingabe.</summary>
@@ -68,12 +88,21 @@ namespace Spinnenspiel
         }
 
         /// <summary>
-        /// Setzt eine externe Bewegungsrichtung (z. B. für automatisierte Tests).
+        /// Setzt eine externe, kamerarelative Bewegungsrichtung (z. B. für automatisierte Tests).
         /// Wenn nicht null, ersetzt der Wert die Tastatur-/Gamepad-Eingabe.
         /// </summary>
         public void SetExternalMoveInput(Vector2? moveInput)
         {
             _externalMoveInput = moveInput;
+        }
+
+        /// <summary>
+        /// Setzt eine externe Bewegungsrichtung RELATIV ZUR EIGENEN BLICKRICHTUNG DER SPINNE
+        /// (x = rechts, y = vorwärts). Hat Vorrang vor allen anderen Eingaben. Für Tests an Wänden.
+        /// </summary>
+        public void SetExternalMoveLocal(Vector2? moveInput)
+        {
+            _externalMoveLocal = moveInput;
         }
 
         /// <summary>
@@ -85,11 +114,23 @@ namespace Spinnenspiel
             _externalSprint = sprint;
         }
 
+        /// <summary>
+        /// Teleportiert die Spinne, setzt die Geschwindigkeit auf null und hält sie
+        /// im Haftzustand (für Tests, z. B. an Wänden).
+        /// </summary>
+        public void Teleport(Vector3 position, Quaternion rotation)
+        {
+            transform.position = position;
+            transform.rotation = rotation;
+            _vel = Vector3.zero;
+            _lastVelocity = Vector3.zero;
+            _attached = true;
+            _lastSurfaceTime = Time.time;
+        }
+
         private void Awake()
         {
-            _controller = GetComponent<CharacterController>();
             _surface = GetComponent<SpiderSurfaceDetector>();
-            _climber = GetComponent<SpiderClimber>();
 
             if (input == null)
             {
@@ -107,13 +148,22 @@ namespace Spinnenspiel
 
         private void Update()
         {
-            if (_controller == null)
+            float dt = Time.deltaTime;
+            if (dt <= 0f)
             {
                 return;
             }
 
+            Vector3 up = transform.up;
+
+            // a) Eingabe -> Richtung in der Ebene senkrecht zu up.
+            bool local = _externalMoveLocal.HasValue;
             Vector2 moveInput;
-            if (_externalMoveInput.HasValue)
+            if (local)
+            {
+                moveInput = _externalMoveLocal.Value;
+            }
+            else if (_externalMoveInput.HasValue)
             {
                 moveInput = _externalMoveInput.Value;
             }
@@ -122,56 +172,169 @@ namespace Spinnenspiel
                 moveInput = input != null ? input.Move : Vector2.zero;
             }
 
-            Vector3 moveDirection = GetCameraRelativeDirection(moveInput);
+            Vector3 dir = local
+                ? GetLocalDirection(moveInput, up)
+                : GetCameraRelativeDirection(moveInput, up);
 
-            // Zielgeschwindigkeit: Richtung * Geschwindigkeit (analoge Eingabe wird skaliert).
-            bool sprinting = IsSprintHeld() && moveDirection.sqrMagnitude > 0.0001f;
-            float surfaceFactor = _surface != null ? _surface.SpeedMultiplier : 1f;
-            float targetSpeed = (sprinting ? sprintSpeed : walkSpeed) * surfaceFactor * Mathf.Clamp01(moveDirection.magnitude);
-            Vector3 targetVelocity = moveDirection * targetSpeed;
+            Vector3 oldPos = transform.position;
 
-            // Beschleunigen/Abbremsen mit getrennten Werten.
-            bool decelerating = _horizontalVelocity.sqrMagnitude > targetVelocity.sqrMagnitude;
-            float rate = decelerating ? deceleration : acceleration;
-            _horizontalVelocity = Vector3.MoveTowards(_horizontalVelocity, targetVelocity, rate * Time.deltaTime);
-
-            // Weiche Drehung in Bewegungsrichtung (keine Sofortdrehung).
-            if (moveDirection.sqrMagnitude > rotationThreshold * rotationThreshold)
+            if (_attached)
             {
-                Quaternion targetRotation = Quaternion.LookRotation(moveDirection, Vector3.up);
-                transform.rotation = Quaternion.RotateTowards(transform.rotation, targetRotation, turnSpeed * Time.deltaTime);
-            }
-
-            // Schwerkraft und Bodenhaftung.
-            if (_climber != null && _climber.TryGetClimbSpeed(_horizontalVelocity, out float climbUp))
-            {
-                // Klettern: Hindernis überwinden, normale Schwerkraft/Bodenhaftung für diesen Frame überspringen.
-                _verticalVelocity = climbUp;
-            }
-            else if (_controller.isGrounded)
-            {
-                if (_verticalVelocity > 0f)
-                {
-                    _verticalVelocity = 0f;
-                }
-
-                _verticalVelocity = -groundAdhesion;
+                UpdateAttached(dt, dir, up);
             }
             else
             {
-                _verticalVelocity += Physics.gravity.y * gravityScale * Time.deltaTime;
+                UpdateFalling(dt);
             }
 
-            // Bewegung ausführen.
-            _lastVelocity = _horizontalVelocity + Vector3.up * _verticalVelocity;
-            _controller.Move(_lastVelocity * Time.deltaTime);
+            // d) XZ-Weltgrenzen.
+            if (useWorldBounds)
+            {
+                Vector3 p = transform.position;
+                p.x = Mathf.Clamp(p.x, worldBoundsMin.x, worldBoundsMax.x);
+                p.z = Mathf.Clamp(p.z, worldBoundsMin.z, worldBoundsMax.z);
+                transform.position = p;
+            }
+
+            _lastVelocity = (transform.position - oldPos) / dt;
+        }
+
+        /// <summary>b) Haftend: tangent laufen, up-Achse ausrichten, Kollision begrenzen, an die Fläche haften.</summary>
+        private void UpdateAttached(float dt, Vector3 dir, Vector3 up)
+        {
+            _vel = Vector3.ProjectOnPlane(_vel, up);
+
+            bool sprinting = IsSprintHeld() && dir.sqrMagnitude > 0.0001f;
+            float surfaceFactor = _surface != null ? _surface.SpeedMultiplier : 1f;
+            float targetSpeed = (sprinting ? sprintSpeed : walkSpeed) * surfaceFactor * Mathf.Clamp01(dir.magnitude);
+            Vector3 targetVelocity = dir * targetSpeed;
+
+            // Beschleunigen/Abbremsen mit getrennten Werten.
+            bool decelerating = _vel.sqrMagnitude > targetVelocity.sqrMagnitude;
+            float rate = decelerating ? deceleration : acceleration;
+            _vel = Vector3.MoveTowards(_vel, targetVelocity, rate * dt);
+
+            // In Bewegungsrichtung nach der Unterlage suchen (sonst Blickrichtung).
+            Vector3 senseDir = _vel.sqrMagnitude > 0.000001f ? _vel.normalized : transform.forward;
+
+            Vector3 point;
+            Vector3 normal;
+            bool hit = sensor.Sense(transform.position, up, senseDir, out point, out normal, out bool wallAhead);
+            if (!hit)
+            {
+                // Kein Treffer: nach Toleranzzeit loslassen.
+                if (Time.time - _lastSurfaceTime > detachDelay)
+                {
+                    _attached = false;
+                }
+
+                return;
+            }
+
+            _lastSurfaceTime = Time.time;
+            _surfaceNormal = normal;
+
+            // up-Achse weich zur Oberflächen-Normale ausrichten.
+            Vector3 newUp = Vector3.RotateTowards(up, normal, alignRate * dt, 0f).normalized;
+            transform.rotation = Quaternion.FromToRotation(up, newUp) * transform.rotation;
+
+            // Haftung startet am Sensortreffer, bei Steilflächen am Hindernistreffer.
+            Vector3 adhesionPoint = point;
+            Vector3 adhesionNormal = normal;
+
+            // Schritt in Laufrichtung; Sphärenwurf begrenzt bei Hindernis.
+            Vector3 oldUp = newUp;
+            float step = _vel.magnitude * dt;
+            if (step > 0.0001f)
+            {
+                if (Physics.SphereCast(transform.position + newUp * bodyRadius, bodyRadius * 0.9f, _vel.normalized,
+                        out RaycastHit castHit, step + 0.01f, sensor.mask, QueryTriggerInteraction.Ignore))
+                {
+                    if (castHit.distance > 0.0001f && Vector3.Angle(castHit.normal, newUp) > 35f)
+                    {
+                        // Steiles Hindernis = neue Kletterfläche: umdrehen und entlanglaufen.
+                        Vector3 wallUp = Vector3.RotateTowards(oldUp, castHit.normal, alignRate * 3f * dt, 0f).normalized;
+                        transform.rotation = Quaternion.FromToRotation(newUp, wallUp) * transform.rotation;
+                        newUp = wallUp;
+
+                        // Geschwindigkeit entlang der Hindernisfläche umlenken, Betrag behalten.
+                        Vector3 along = Vector3.ProjectOnPlane(_vel, castHit.normal);
+                        Vector3 climbDir = along.magnitude < 0.3f * _vel.magnitude
+                            ? Vector3.ProjectOnPlane(oldUp, castHit.normal).normalized
+                            : along.normalized;
+                        _vel = climbDir * _vel.magnitude;
+                        // step bleibt normal: entlang der neuen Richtung weiterlaufen.
+
+                        adhesionPoint = castHit.point;
+                        adhesionNormal = castHit.normal;
+                    }
+                    else if (castHit.distance > 0.0001f)
+                    {
+                        // Flaches Hindernis (z. B. Oberseite eines kleinen Steins):
+                        // nicht kappen, sondern entlang der getroffenen Fläche weiterlaufen.
+                        Vector3 along = Vector3.ProjectOnPlane(_vel, castHit.normal);
+                        if (along.sqrMagnitude > 1e-6f)
+                            _vel = along.normalized * _vel.magnitude;
+                        adhesionPoint = castHit.point;
+                        adhesionNormal = castHit.normal;
+                        // step bleibt die volle Schrittweite; Ausrichtung übernimmt der Sensor im nächsten Frame.
+                    }
+                    // distance <= 0.0001f: Kugel startet überlappend, Schritt normal ausführen.
+                }
+            }
+
+            Vector3 pos = transform.position + (step > 0.0001f ? _vel.normalized * step : Vector3.zero);
+
+            // Haftung: weiches Ziehen auf die Fläche (d > 0: Spinne schwebt, d < 0: drin).
+            float d = Vector3.Dot(pos - adhesionPoint, adhesionNormal);
+            pos -= adhesionNormal * d * Mathf.Min(1f, adhesionRate * dt);
+            transform.position = pos;
+
+            // Weiche Drehung in Laufrichtung (keine Sofortdrehung).
+            Vector3 movePlaneDir = Vector3.ProjectOnPlane(dir, newUp);
+            if (dir.magnitude > rotationThreshold && movePlaneDir.sqrMagnitude > 0.000001f)
+            {
+                Quaternion target = Quaternion.LookRotation(movePlaneDir.normalized, newUp);
+                transform.rotation = Quaternion.RotateTowards(transform.rotation, target, turnSpeed * dt);
+            }
+        }
+
+        /// <summary>c) Nicht haftend: fallen, up zurück zu Welt-up, bei Sphären-Treffer wieder anhaften.</summary>
+        private void UpdateFalling(float dt)
+        {
+            _vel += Physics.gravity * gravityScale * dt;
+
+            // In der Luft richtet sich die Spinne langsam wieder zu Welt-up aus.
+            Vector3 up = transform.up;
+            Vector3 newUp = Vector3.RotateTowards(up, Vector3.up, 3f * dt, 0f).normalized;
+            transform.rotation = Quaternion.FromToRotation(up, newUp) * transform.rotation;
+
+            float step = _vel.magnitude * dt;
+            if (step > 0.0001f &&
+                Physics.SphereCast(transform.position + newUp * bodyRadius, bodyRadius, _vel.normalized,
+                    out RaycastHit hit, step + 0.01f, sensor.mask, QueryTriggerInteraction.Ignore))
+            {
+                // Oberfläche im Fall getroffen: sofort anhaften und tangent abgleiten.
+                Vector3 n = hit.normal;
+                Vector3 curUp = transform.up;
+                transform.rotation = Quaternion.FromToRotation(curUp, n) * transform.rotation;
+                _vel = Vector3.ProjectOnPlane(_vel, n) * 0.3f;
+                _surfaceNormal = n;
+                _attached = true;
+                _lastSurfaceTime = Time.time;
+                transform.position = hit.point;
+            }
+            else
+            {
+                transform.position += _vel * dt;
+            }
         }
 
         /// <summary>
-        /// Projektion von Kamera-Forward/-Right auf die XZ-Ebene, daraus die gewünschte
-        /// Bewegungsrichtung. Fällt ohne Kamera auf die eigene Achse der Spinne zurück.
+        /// Kamerarelative Bewegungsrichtung in der Ebenen senkrecht zu up.
+        /// Fällt ohne Kamera auf die eigene Achse der Spinne zurück.
         /// </summary>
-        private Vector3 GetCameraRelativeDirection(Vector2 moveInput)
+        private Vector3 GetCameraRelativeDirection(Vector2 moveInput, Vector3 up)
         {
             Transform cam = cameraTransform;
             if (cam == null)
@@ -185,21 +348,38 @@ namespace Spinnenspiel
                 cam = transform;
             }
 
-            Vector3 forward = Vector3.ProjectOnPlane(cam.forward, Vector3.up);
-            if (forward.sqrMagnitude < 0.0001f)
+            Vector3 camF = Vector3.ProjectOnPlane(cam.forward, up);
+            if (camF.magnitude < 0.2f)
             {
-                forward = Vector3.forward;
+                // Kamera schaut frontal auf die Fläche (z. B. Wand): Kameras-up als Vorwärts nehmen.
+                camF = Vector3.ProjectOnPlane(cam.up, up);
             }
 
-            forward.Normalize();
+            camF = SafeNormalize(camF, transform.forward);
+            Vector3 camR = SafeNormalize(Vector3.ProjectOnPlane(cam.right, up), transform.right);
 
-            Vector3 right = Vector3.ProjectOnPlane(cam.right, Vector3.up);
-            if (right.sqrMagnitude < 0.0001f)
+            Vector3 direction = camF * moveInput.y + camR * moveInput.x;
+            if (direction.sqrMagnitude > 1f)
             {
-                right = Vector3.right;
+                direction.Normalize();
+            }
+            else if (moveInput.magnitude > 0.5f && direction.magnitude < 0.3f)
+            {
+                // Eingabe fast senkrecht zur Fläche: an der Fläche "nach oben" laufen.
+                Vector3 surfaceUp = Vector3.ProjectOnPlane(Vector3.up, up);
+                direction = surfaceUp.sqrMagnitude > 0.0001f
+                    ? surfaceUp.normalized * moveInput.magnitude
+                    : transform.forward * moveInput.magnitude;
             }
 
-            right.Normalize();
+            return direction;
+        }
+
+        /// <summary>Bewegungsrichtung relativ zur eigenen Blickrichtung (x = rechts, y = vorwärts).</summary>
+        private Vector3 GetLocalDirection(Vector2 moveInput, Vector3 up)
+        {
+            Vector3 forward = SafeNormalize(Vector3.ProjectOnPlane(transform.forward, up), transform.forward);
+            Vector3 right = SafeNormalize(Vector3.ProjectOnPlane(transform.right, up), transform.right);
 
             Vector3 direction = forward * moveInput.y + right * moveInput.x;
             if (direction.sqrMagnitude > 1f)
@@ -208,6 +388,16 @@ namespace Spinnenspiel
             }
 
             return direction;
+        }
+
+        private static Vector3 SafeNormalize(Vector3 v, Vector3 fallback)
+        {
+            if (v.sqrMagnitude < 0.000001f)
+            {
+                return fallback;
+            }
+
+            return v.normalized;
         }
     }
 }
