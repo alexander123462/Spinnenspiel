@@ -26,6 +26,14 @@ namespace Spinnenspiel.EditorTools
             GameObject wand = CreateBox("Wand", new Vector3(4f, 2f, 0.3f), new Vector3(0f, 1f, 3f), wandMat);
             GameObject block = CreateBox("Block", new Vector3(0.6f, 0.4f, 0.6f), new Vector3(3f, 0.2f, 0f), blockMat);
             GameObject stamm = CreateCylinder("Stamm", new Vector3(0.3f, 1.5f, 0.3f), new Vector3(-3f, 1.5f, 0f), stammMat);
+            // CapsuleCollider unten rund (haengt ueber); Stamm unten gerade: MeshCollider mit Zylinder-Mesh.
+            CapsuleCollider stammCapsule = stamm.GetComponent<CapsuleCollider>();
+            if (stammCapsule != null)
+            {
+                Object.DestroyImmediate(stammCapsule);
+            }
+
+            stamm.AddComponent<MeshCollider>().sharedMesh = stamm.GetComponent<MeshFilter>().sharedMesh;
             GameObject ueberhang = CreateBox("Ueberhang", new Vector3(2f, 0.2f, 1.5f), new Vector3(0f, 2.1f, 2.25f), plaetteMat);
 
             GameObject light = new GameObject("Sun");

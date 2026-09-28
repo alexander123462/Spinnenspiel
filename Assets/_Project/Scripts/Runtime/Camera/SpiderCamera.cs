@@ -37,6 +37,8 @@ namespace Spinnenspiel
         [SerializeField] private float followTime = 0.12f;
         [SerializeField] private float rotationSmoothing = 14f;
         [SerializeField] private float distanceSmoothing = 8f;
+        [Tooltip("Wie schnell die Kamerahochachse der Spinne folgt (z. B. an der Wand).")]
+        [SerializeField] private float upFollow = 3f;
 
         [Header("Kollision")]
         [SerializeField] private float collisionRadius = 0.04f;
@@ -54,6 +56,8 @@ namespace Spinnenspiel
         private float _zoomDistance;
         private Vector3 _pivotPosition;
         private Vector3 _pivotVelocity;
+        private Vector3 _frameUp = Vector3.up;
+        private Quaternion _frame = Quaternion.identity;
 
         /// <summary>Wunschdistanz zur Spinne.</summary>
         public float Distance
@@ -106,18 +110,29 @@ namespace Spinnenspiel
 
             _zoomDistance = Mathf.Clamp(desiredDistance, minZoomDistance, maxZoomDistance);
             _currentDistance = _zoomDistance;
+
+            if (target != null)
+            {
+                _frameUp = target.up.normalized;
+            }
+            _frame = Quaternion.FromToRotation(Vector3.up, _frameUp);
             _pivotPosition = DesiredPivotPosition();
         }
 
         private void LateUpdate()
         {
             float deltaTime = Time.deltaTime;
+
+            // Kamerarahmen: Hochachse folgt der Spinne (Wand/Stamm), statt festem Welt-oben.
+            _frameUp = Vector3.Slerp(_frameUp, target != null ? target.up : Vector3.up, 1f - Mathf.Exp(-upFollow * deltaTime)).normalized;
+            _frame = Quaternion.FromToRotation(Vector3.up, _frameUp);
+
             UpdateOrbit();
             UpdateZoom();
 
             _pivotPosition = Vector3.SmoothDamp(_pivotPosition, DesiredPivotPosition(), ref _pivotVelocity, followTime, Mathf.Infinity, deltaTime);
 
-            Quaternion targetRotation = Quaternion.Euler(pitch, yaw, 0f);
+            Quaternion targetRotation = _frame * Quaternion.Euler(pitch, yaw, 0f);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 1f - Mathf.Exp(-rotationSmoothing * deltaTime));
 
             Vector3 direction = transform.rotation * Vector3.back;
@@ -187,6 +202,12 @@ namespace Spinnenspiel
 
         private Vector3 KeepAboveGround(Vector3 position)
         {
+            // Nur bei "normaler" Bodenhaltung: an Wänden/Stämmen wäre der senkrechte Raycast falsch.
+            if (Vector3.Angle(_frameUp, Vector3.up) >= 30f)
+            {
+                return position;
+            }
+
             Vector3 origin = new Vector3(position.x, position.y + 2f, position.z);
             RaycastHit hit;
             if (Physics.Raycast(origin, Vector3.down, out hit, 4f, obstacleMask, QueryTriggerInteraction.Ignore))
@@ -203,7 +224,8 @@ namespace Spinnenspiel
 
         private Vector3 DesiredPivotPosition()
         {
-            return target != null ? target.position + targetOffset : targetOffset;
+            // Offset im Kamerarahmen: an der Wand zeigt „über der Spinne" von der Wand weg.
+            return target != null ? target.position + _frame * targetOffset : _frame * targetOffset;
         }
     }
 }

@@ -126,7 +126,43 @@ namespace Spinnenspiel
                 }
             }
 
+            // Umgreifen: bei schmalen, runden Stämmen (Radius < Beinspanne) verfehlt die
+            // senkrechte Probe die seitliche Fläche. Wir greifen vom Fuß zur Körperachse hin
+            // und treffen so die Rundung seitlich, wie echte Spinnen dünne Stängel umgreifen.
+            Vector3 center = restTarget != null && restTarget.parent != null
+                ? restTarget.parent.position
+                : HipPosition - up * 0.06f;
+            if (TryWrapFoothold(desired, up, center, out point, out normal, out surface)
+                || TryWrapFoothold(rest, up, center, out point, out normal, out surface))
+            {
+                return true;
+            }
+
             point = rest;
+            normal = up;
+            surface = SurfaceType.Ground;
+            return false;
+        }
+
+        /// <summary>Ray von der Fußprobe zur Körperachse, um dünne Stämme seitlich zu umgreifen.</summary>
+        private bool TryWrapFoothold(Vector3 candidate, Vector3 up, Vector3 center, out Vector3 point, out Vector3 normal, out SurfaceType surface)
+        {
+            Vector3 start = candidate + up * (probeHeight * 0.5f);
+            Vector3 toAxis = (center - up * 0.03f) - start;
+            float length = toAxis.magnitude;
+            if (length > 1e-6f
+                && Physics.Raycast(start, toAxis / length, out RaycastHit hit, length + 0.05f, groundMask, QueryTriggerInteraction.Ignore)
+                && Vector3.Angle(hit.normal, up) <= 100f
+                && (hit.point - HipPosition).magnitude <= MaxReach
+                && !IsBlockedFromHip(hit.point, hit.normal))
+            {
+                point = hit.point;
+                normal = hit.normal;
+                surface = SurfaceQuery.FromHit(hit);
+                return true;
+            }
+
+            point = candidate;
             normal = up;
             surface = SurfaceType.Ground;
             return false;

@@ -173,6 +173,11 @@ namespace Spinnenspiel.EditorTools
             trunkCollider.radius = 0.24f;
             trunkCollider.height = trunk.bounds.size.y * 0.6f;
             trunkCollider.center = new Vector3(0f, trunkCollider.height * 0.5f, 0f);
+            // Untere Halbkugel komplett unter y=0 des Baums, Oberkante bleibt gleich.
+            trunkCollider.height += trunkCollider.radius * 2f;
+            Vector3 trunkCenter = trunkCollider.center;
+            trunkCenter.y -= trunkCollider.radius;
+            trunkCollider.center = trunkCenter;
             tree.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Wood;
 
             LODGroup lod = tree.AddComponent<LODGroup>();
