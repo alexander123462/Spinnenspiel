@@ -57,6 +57,8 @@ namespace Spinnenspiel
         public int StepCount { get; private set; }
         public Transform RestTarget => restTarget;
         public Vector3 HipPosition => transform.position;
+
+        private SpiderMovement _movement;
         public float MaxReach => (upperLength + lowerLength) * 0.98f + tarsusLength;
         private Vector3 Up => restTarget != null ? restTarget.up : Vector3.up;
 
@@ -110,9 +112,30 @@ namespace Spinnenspiel
         /// <summary>
         /// Sucht einen gültigen Halt nahe der gewünschten Position. Probiert bei ungeeignetem Untergrund
         /// (zu steil, nicht erreichbar, durch ein Hindernis verdeckt) Punkte näher an der Ruheposition.
+        /// Als letzten Versuch tastet die Bogen-Suche von der Hüfte aus im Bogen von außen über
+        /// unten nach innen, um dünne, runde Stämme an der Kante zu umgreifen.
         /// </summary>
         public bool TryFindFoothold(Vector3 desired, out Vector3 point, out Vector3 normal, out SurfaceType surface)
         {
+            // Faden-Modus: das Bein greift auf den Seidenfaden, an dem die Spinne hängt.
+            if (_movement == null)
+            {
+                _movement = GetComponentInParent<SpiderMovement>();
+            }
+            if (_movement != null && _movement.CurrentThread != null)
+            {
+                SilkThread thread = _movement.CurrentThread;
+                Vector3 onThread = thread.PointAt(thread.ClosestT(desired));
+                if ((onThread - HipPosition).magnitude > MaxReach)
+                {
+                    onThread = thread.PointAt(thread.ClosestT(HipPosition));
+                }
+                point = onThread;
+                normal = Up;
+                surface = SurfaceType.Wood;
+                return true;
+            }
+
             Vector3 up = Up;
             Vector3 rest = restTarget != null ? restTarget.position : desired;
             for (int i = 0; i < 3; i++)
@@ -126,43 +149,39 @@ namespace Spinnenspiel
                 }
             }
 
-            // Umgreifen: bei schmalen, runden Stämmen (Radius < Beinspanne) verfehlt die
-            // senkrechte Probe die seitliche Fläche. Wir greifen vom Fuß zur Körperachse hin
-            // und treffen so die Rundung seitlich, wie echte Spinnen dünne Stängel umgreifen.
-            Vector3 center = restTarget != null && restTarget.parent != null
-                ? restTarget.parent.position
-                : HipPosition - up * 0.06f;
-            if (TryWrapFoothold(desired, up, center, out point, out normal, out surface)
-                || TryWrapFoothold(rest, up, center, out point, out normal, out surface))
+            // Bogen-Suche: wie eine echte Spinne tastet das Bein vom Ansatz (Hüfte) im Bogen
+            // von außen über unten nach innen, bis es eine Fläche findet, die in Richtung
+            // Bein zeigt. So umgreifen die Beine dünne, runde Stämme an der Kante.
+            Vector3 hip = HipPosition;
+            Vector3 outDir = Vector3.ProjectOnPlane(desired - hip, up);
+            if (outDir.sqrMagnitude < 1e-6f)
             {
-                return true;
+                outDir = Vector3.ProjectOnPlane(rest - hip, up);
+            }
+            outDir = outDir.normalized;
+            if (outDir.sqrMagnitude > 1e-6f)
+            {
+                // Achse so wählen, dass a=90° „nach unten“ (−up) ergibt: Rotation um 90° um
+                // die Achse u liefert u × v. Mit u = up × outDir folgt
+                // (up × outDir) × outDir = −up (outDir ⊥ up, beide normiert).
+                Vector3 axis = Vector3.Cross(up, outDir).normalized;
+                for (int k = 0; k < 10; k++)
+                {
+                    Vector3 dir = Quaternion.AngleAxis(k * 18f, axis) * outDir;
+                    // Strahl startet an der Hüfte, daher ist der Weg frei und der Treffer
+                    // automatisch innerhalb von MaxReach.
+                    if (Physics.Raycast(hip, dir, out RaycastHit hit, MaxReach, groundMask, QueryTriggerInteraction.Ignore)
+                        && Vector3.Angle(hit.normal, -dir) < 80f)
+                    {
+                        point = hit.point;
+                        normal = hit.normal;
+                        surface = SurfaceQuery.FromHit(hit);
+                        return true;
+                    }
+                }
             }
 
             point = rest;
-            normal = up;
-            surface = SurfaceType.Ground;
-            return false;
-        }
-
-        /// <summary>Ray von der Fußprobe zur Körperachse, um dünne Stämme seitlich zu umgreifen.</summary>
-        private bool TryWrapFoothold(Vector3 candidate, Vector3 up, Vector3 center, out Vector3 point, out Vector3 normal, out SurfaceType surface)
-        {
-            Vector3 start = candidate + up * (probeHeight * 0.5f);
-            Vector3 toAxis = (center - up * 0.03f) - start;
-            float length = toAxis.magnitude;
-            if (length > 1e-6f
-                && Physics.Raycast(start, toAxis / length, out RaycastHit hit, length + 0.05f, groundMask, QueryTriggerInteraction.Ignore)
-                && Vector3.Angle(hit.normal, up) <= 100f
-                && (hit.point - HipPosition).magnitude <= MaxReach
-                && !IsBlockedFromHip(hit.point, hit.normal))
-            {
-                point = hit.point;
-                normal = hit.normal;
-                surface = SurfaceQuery.FromHit(hit);
-                return true;
-            }
-
-            point = candidate;
             normal = up;
             surface = SurfaceType.Ground;
             return false;

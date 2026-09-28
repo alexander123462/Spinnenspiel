@@ -15,6 +15,8 @@ namespace Spinnenspiel
         private InputAction _lookAction;
         private InputAction _sprintAction;
         private InputAction _zoomAction;
+        private InputAction _silkAction;
+        private InputAction _releaseAction;
 
         /// <summary>Aktuelle Bewegungsrichtung (x = rechts, y = vor), typischerweise -1..1.</summary>
         public Vector2 Move => _moveAction != null ? _moveAction.ReadValue<Vector2>() : Vector2.zero;
@@ -24,6 +26,12 @@ namespace Spinnenspiel
 
         /// <summary>True, solange die Sprint-Taste gehalten wird.</summary>
         public bool SprintHeld => _sprintAction != null && _sprintAction.ReadValue<float>() > 0.5f;
+
+        /// <summary>True, in dem Frame in dem die Faden-Taste gedrückt wurde (spinnen).</summary>
+        public bool SilkPressed => _silkAction != null && _silkAction.WasPressedThisFrame();
+
+        /// <summary>True, in dem Frame in dem die Loslassen-Taste gedrückt wurde (Faden verlassen).</summary>
+        public bool ReleasePressed => _releaseAction != null && _releaseAction.WasPressedThisFrame();
 
         /// <summary>Zoom-Eingabe (Mausrad, positiv = heranzoomen), normiert auf ca. -1..1 pro Rastung.</summary>
         public float Zoom
@@ -60,6 +68,8 @@ namespace Spinnenspiel
             _lookAction = null;
             _sprintAction = null;
             _zoomAction = null;
+            _silkAction = null;
+            _releaseAction = null;
         }
 
         private void Update()
@@ -96,10 +106,23 @@ namespace Spinnenspiel
             _zoomAction = new InputAction("Zoom", InputActionType.Value);
             _zoomAction.AddBinding("<Mouse>/scroll/y");
 
+            // Silk: Faden spinnen (F / rechte Maustaste / rechter Schulterknopf).
+            _silkAction = new InputAction("Silk", InputActionType.Button);
+            _silkAction.AddBinding("<Keyboard>/f");
+            _silkAction.AddBinding("<Mouse>/rightButton");
+            _silkAction.AddBinding("<Gamepad>/rightShoulder");
+
+            // Release: Faden loslassen (Leertaste / B).
+            _releaseAction = new InputAction("Release", InputActionType.Button);
+            _releaseAction.AddBinding("<Keyboard>/space");
+            _releaseAction.AddBinding("<Gamepad>/buttonSouth");
+
             _moveAction.Enable();
             _lookAction.Enable();
             _sprintAction.Enable();
             _zoomAction.Enable();
+            _silkAction.Enable();
+            _releaseAction.Enable();
         }
 
         private void DisableActions()
@@ -122,6 +145,16 @@ namespace Spinnenspiel
             if (_zoomAction != null)
             {
                 _zoomAction.Disable();
+            }
+
+            if (_silkAction != null)
+            {
+                _silkAction.Disable();
+            }
+
+            if (_releaseAction != null)
+            {
+                _releaseAction.Disable();
             }
         }
 

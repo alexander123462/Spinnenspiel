@@ -51,6 +51,7 @@ namespace Spinnenspiel
         private Vector2? _externalMoveInput;
         private Vector2? _externalMoveLocal;
         private bool? _externalSprint;
+        private float _threadT;
         private bool _warnedNoCamera;
         private SpiderSurfaceDetector _surface;
 
@@ -67,7 +68,10 @@ namespace Spinnenspiel
         public Vector3 SurfaceNormal => _surfaceNormal;
 
         /// <summary>True, wenn die Spinne an einer Unterlage haftet (Boden, Wand, ...).</summary>
-        public bool IsGrounded => IsAttached;
+        public bool IsGrounded => IsAttached || CurrentThread != null;
+
+        /// <summary>An welchen Seidenfaden die Spinne aktuell hängt/klettert (null = kein Faden).</summary>
+        public SilkThread CurrentThread { get; private set; }
 
         public float WalkSpeed => walkSpeed;
 
@@ -128,6 +132,34 @@ namespace Spinnenspiel
             _lastSurfaceTime = Time.time;
         }
 
+        /// <summary>
+        /// Hängt die Spinne an einen Seidenfaden (t = Position 0..1, 0 = anchorA).
+        /// Davor laufende Bewegung wird verworfen; das Bein-System greift dann auf den Faden.
+        /// </summary>
+        public void AttachToThread(SilkThread thread, float t)
+        {
+            CurrentThread = thread;
+            _threadT = Mathf.Clamp01(t);
+            _vel = Vector3.zero;
+            _lastVelocity = Vector3.zero;
+        }
+
+        /// <summary>Entfernt den Fadenbezug (z. B. beim Loslassen an einem Ende).</summary>
+        public void DetachFromThread()
+        {
+            CurrentThread = null;
+        }
+
+        /// <summary>
+        /// Faden aktiv loslassen: Fadenbezug entfernen und Haftung aufheben, damit die Spinne fällt,
+        /// bis sie wieder auf einer Oberfläche landet.
+        /// </summary>
+        public void LetGo()
+        {
+            DetachFromThread();
+            _attached = false;
+        }
+
         private void Awake()
         {
             _surface = GetComponent<SpiderSurfaceDetector>();
@@ -177,6 +209,14 @@ namespace Spinnenspiel
                 : GetCameraRelativeDirection(moveInput, up);
 
             Vector3 oldPos = transform.position;
+
+            // Faden-Modus hat Vorrang: entlang des Fadens klettern, Beine greifen auf den Faden.
+            if (CurrentThread != null)
+            {
+                UpdateThread(dt, dir);
+                _lastVelocity = (transform.position - oldPos) / dt;
+                return;
+            }
 
             if (_attached)
             {
@@ -327,6 +367,71 @@ namespace Spinnenspiel
             else
             {
                 transform.position += _vel * dt;
+            }
+        }
+
+        /// <summary>
+        /// Faden-Modus: Die Spinne klettert entlang des angebundenen Fadens in Bewegungsrichtung.
+        /// Am Ende des Fadens dreht sie sich um und haftet an der dortigen Fläche.
+        /// </summary>
+        private void UpdateThread(float dt, Vector3 dir)
+        {
+            SilkThread thread = CurrentThread;
+            if (thread == null)
+            {
+                return;
+            }
+
+            Vector3 tan = thread.TangentAt(_threadT);
+            float along = Vector3.Dot(dir, tan);
+            float tempo = (IsSprintHeld() ? sprintSpeed : walkSpeed) * 0.7f;
+            _threadT = Mathf.Clamp01(_threadT + along * tempo * dt / thread.Length);
+            transform.position = thread.PointAt(_threadT);
+
+            // Aufhängung: Bauch Richtung Welt-down (so gut wie möglich) senkrecht zur Faden-Tangente.
+            Vector3 hangUp = Vector3.ProjectOnPlane(Vector3.down, tan);
+            if (hangUp.sqrMagnitude < 1e-6f)
+            {
+                hangUp = Vector3.ProjectOnPlane(transform.up, tan);
+            }
+            if (hangUp.sqrMagnitude > 1e-6f)
+            {
+                hangUp.Normalize();
+            }
+            else
+            {
+                hangUp = Vector3.down;
+            }
+
+            // Laufrichtung entlang der Fadenachse: vorwärts = Zeichen von along, sonst Blickrichtung.
+            float sign = along < -0.05f ? -1f : along > 0.05f ? 1f
+                : (Vector3.Dot(transform.forward, tan) < 0f ? -1f : 1f);
+            Quaternion target = Quaternion.LookRotation(tan * sign, hangUp);
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, target, turnSpeed * dt);
+
+            // Ende B: an anchorB angekommen – dort anhaften, Blick zur Fläche (−tangent).
+            if (_threadT >= 0.999f && along > 0.1f)
+            {
+                Vector3 curUp = transform.up;
+                DetachFromThread();
+                transform.position = thread.anchorB;
+                transform.rotation = Quaternion.FromToRotation(curUp, -tan.normalized) * transform.rotation;
+                _vel = Vector3.zero;
+                _attached = true;
+                _lastSurfaceTime = Time.time;
+                return;
+            }
+
+            // Ende A: an anchorA angekommen – dort anhaften, Blick zur Fläche (+tangent).
+            if (_threadT <= 0.001f && along < -0.1f)
+            {
+                Vector3 curUp = transform.up;
+                DetachFromThread();
+                transform.position = thread.anchorA;
+                transform.rotation = Quaternion.FromToRotation(curUp, tan.normalized) * transform.rotation;
+                _vel = Vector3.zero;
+                _attached = true;
+                _lastSurfaceTime = Time.time;
             }
         }
 

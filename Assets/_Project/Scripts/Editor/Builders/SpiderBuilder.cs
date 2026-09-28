@@ -67,6 +67,17 @@ namespace Spinnenspiel.EditorTools
             root.AddComponent<AudioSource>();
             root.AddComponent<SpiderFootstepAudio>();
 
+            // Seide (Milestone 7): Spinnwarzen an der Spitze des Hinterleibs, leicht unten.
+            var spinnerets = new GameObject("Spinnerets");
+            spinnerets.transform.SetParent(body.transform, false);
+            spinnerets.transform.localPosition = new Vector3(0f, -0.004f, -0.106f);
+
+            var silk = root.AddComponent<SpiderSilk>();
+            silk.spinnerets = spinnerets.transform;
+
+            // Seiden-Steuerung (t53): Faden spinnen / loslassen + Fadenkreuz. Referenzen füllt Awake.
+            root.AddComponent<SilkAiming>();
+
             return root;
         }
 

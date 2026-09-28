@@ -263,5 +263,107 @@ namespace Spinnenspiel.Tests
 
             Check(fehler.ToArray());
         }
+
+        [UnityTest]
+        public IEnumerator Climb_TreeInWorld()
+        {
+            // Szene "Testwelt": Stamm (CapsuleCollider, direction=1, Radius >= 0.2) am
+            // naechsten am Spawnpunkt suchen, Spinne 0.45 m vor den Stamm setzen,
+            // 8 s vorwaerts laufen: Hoehe und Anzahl stehender Beine messen.
+            SceneManager.LoadScene("Testwelt");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht in Testwelt gefunden");
+            movement = spider.GetComponent<SpiderMovement>();
+            Assert.IsNotNull(movement, "SpiderMovement fehlt");
+            legs = spider.GetComponentsInChildren<SpiderLeg>();
+            Assert.AreEqual(8, legs.Length, "Die Spinne braucht 8 Beine");
+
+            // Baumstamm am naechsten am Spawnpunkt.
+            Vector3 spawn = WorldLayout.SpawnPoint;
+            CapsuleCollider trunk = null;
+            float bestDist = float.MaxValue;
+            foreach (CapsuleCollider col in Object.FindObjectsOfType<CapsuleCollider>()) // CS0618: deprecated, FindObjectsByType braucht in 6000.3.24f1 ein sonst unzugängliches Enum
+            {
+                if (col.direction != 1 || col.radius < 0.2f)
+                {
+                    continue;
+                }
+                float dist = Vector3.Distance(col.transform.position, spawn);
+                if (dist < bestDist)
+                {
+                    bestDist = dist;
+                    trunk = col;
+                }
+            }
+            Assert.IsNotNull(trunk, "Kein Baumstamm (CapsuleCollider direction=1, Radius >= 0.2) gefunden");
+
+            // 0.45 m vor den Stamm (auf der Spawnpunkt-Seite), auf der Terrainhoehe + 0.02, Blick zum Stamm.
+            Vector3 toTrunk = trunk.transform.position - spawn;
+            toTrunk.y = 0f;
+            Assert.IsTrue(toTrunk.sqrMagnitude > 1e-6f, "Stamm sitzt exakt im Spawnpunkt");
+            toTrunk.Normalize();
+            Vector3 pos = new Vector3(trunk.transform.position.x, 0f, trunk.transform.position.z) - toTrunk * 0.45f;
+            RaycastHit ground;
+            Assert.IsTrue(Physics.Raycast(pos + Vector3.up * 20f, Vector3.down, out ground, 100f,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore),
+                "Kein Terrain unter der Startposition gefunden");
+            pos.y = ground.point.y + 0.02f;
+            Quaternion rot = Quaternion.LookRotation(toTrunk, Vector3.up);
+
+            movement.Teleport(pos, rot);
+            foreach (SpiderLeg leg in legs)
+            {
+                leg.SnapToGround();
+            }
+            yield return new WaitForSeconds(0.3f);
+
+            float startY = pos.y;
+            float maxY = startY;
+            int standingFrames = 0;
+            int totalFrames = 0;
+            movement.SetExternalMoveLocal(new Vector2(0f, 1f));
+            float t = 0f;
+            while (t < 8f)
+            {
+                totalFrames++;
+                maxY = Mathf.Max(maxY, spider.transform.position.y);
+                int standing = 0;
+                foreach (SpiderLeg leg in legs)
+                {
+                    if (leg.IsGrounded && !leg.IsStepping)
+                    {
+                        standing++;
+                    }
+                }
+                if (standing >= 4)
+                {
+                    standingFrames++;
+                }
+                t += Time.deltaTime;
+                yield return null;
+            }
+            movement.SetExternalMoveLocal(null);
+            yield return new WaitForSeconds(0.2f);
+
+            float rise = maxY - startY;
+            float fraction = totalFrames > 0 ? (float)standingFrames / totalFrames : 0f;
+            string stats = string.Format(CultureInfo.InvariantCulture,
+                "startY={0:F3} maxHoehe={1:F3} Aufstieg={2:F3} AnteilStandbeine={3:F2} ({4}/{5})",
+                startY, maxY, rise, fraction, standingFrames, totalFrames);
+
+            List<string> fehler = new List<string>();
+            if (rise < 1.5f)
+            {
+                fehler.Add("Spinne ist in der Testwelt nicht >= 1.5 m ueber ihrer Startposition: " + stats);
+            }
+            if (fraction < 0.7f)
+            {
+                fehler.Add("In zu wenigen Frames der Testwelt stehen >= 4 Beine (Anteil < 0.7): " + stats);
+            }
+            Check(fehler.ToArray());
+        }
     }
 }
