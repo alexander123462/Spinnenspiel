@@ -86,5 +86,86 @@ namespace Spinnenspiel.EditorTools
             Object.DestroyImmediate(target);
             Object.DestroyImmediate(image);
         }
+
+        /// <summary>
+        /// Rendert Kletter-Kontrollbilder der Spinne (Wand, Stamm, Unterseite des Ueberhangs)
+        /// aus der Szene "Klettertest" mit einer temporären, schräg seitlichen Kamera nach
+        /// Logs/ci/shot_klettern_*.png. Vor jedem Bild: Pose setzen, Physik synchonisieren,
+        /// Beine in Ruhepose bringen.
+        /// </summary>
+        private struct Pose
+        {
+            public string name;
+            public Vector3 spiderPos;
+            public Quaternion spiderRot;
+            public Vector3 camOffset; // schräg seitlich, ca. 0.6 m Abstand zur Spinne
+
+            public Pose(string name, Vector3 spiderPos, Quaternion spiderRot, Vector3 camOffset)
+            {
+                this.name = name;
+                this.spiderPos = spiderPos;
+                this.spiderRot = spiderRot;
+                this.camOffset = camOffset;
+            }
+        }
+
+        [MenuItem("Spinnenspiel/Debug/Kletter-Kontrollbilder rendern")]
+        public static void CaptureClimb()
+        {
+            const string scenePath = "Assets/_Project/Scenes/Klettertest.unity";
+            EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            GameObject spider = GameObject.Find("Spider");
+            if (spider == null)
+            {
+                Debug.LogError("[Spinnenspiel] Screenshot: Spinne nicht gefunden (Szene: " + scenePath + ").");
+                return;
+            }
+
+            SpiderLeg[] legs = spider.GetComponentsInChildren<SpiderLeg>();
+
+            Pose[] poses =
+            {
+                new Pose("shot_klettern_wand", new Vector3(0f, 1.0f, 2.85f), Quaternion.LookRotation(Vector3.up, Vector3.back), new Vector3(0.55f, 0.05f, -0.30f)),
+                new Pose("shot_klettern_stamm", new Vector3(-3f, 1.2f, -0.15f), Quaternion.LookRotation(Vector3.up, Vector3.back), new Vector3(0.55f, 0.05f, 0f)),
+                new Pose("shot_klettern_decke", new Vector3(0f, 2.0f, 2.2f), Quaternion.LookRotation(Vector3.back, Vector3.down), new Vector3(0.55f, -0.15f, 0.30f))
+            };
+
+            string folder = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ci");
+            Directory.CreateDirectory(folder);
+
+            GameObject camGo = new GameObject("KletterShotCamera");
+            Camera cam = camGo.AddComponent<Camera>();
+            cam.clearFlags = CameraClearFlags.Skybox;
+
+            RenderTexture target = new RenderTexture(1600, 900, 24, RenderTextureFormat.ARGB32);
+            target.antiAliasing = 4;
+            Texture2D image = new Texture2D(1600, 900, TextureFormat.RGB24, false);
+            foreach (Pose pose in poses)
+            {
+                spider.transform.position = pose.spiderPos;
+                spider.transform.rotation = pose.spiderRot;
+                Physics.SyncTransforms();
+                foreach (SpiderLeg leg in legs)
+                {
+                    leg.PoseAtRest();
+                }
+
+                cam.transform.position = pose.spiderPos + pose.camOffset;
+                cam.transform.LookAt(pose.spiderPos);
+                cam.targetTexture = target;
+                cam.Render();
+                RenderTexture.active = target;
+                image.ReadPixels(new Rect(0, 0, 1600, 900), 0, 0);
+                image.Apply();
+                RenderTexture.active = null;
+                cam.targetTexture = null;
+                File.WriteAllBytes(Path.Combine(folder, pose.name + ".png"), image.EncodeToPNG());
+                Debug.Log("[Spinnenspiel] Kletter-Kontrollbild: " + pose.name + ".png");
+            }
+
+            Object.DestroyImmediate(camGo);
+            Object.DestroyImmediate(target);
+            Object.DestroyImmediate(image);
+        }
     }
 }

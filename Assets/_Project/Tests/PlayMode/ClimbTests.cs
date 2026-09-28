@@ -236,5 +236,32 @@ namespace Spinnenspiel.Tests
 
             Check(fehler.ToArray());
         }
+
+        [UnityTest]
+        public IEnumerator Climb_Ceiling()
+        {
+            // Start an der Wand (Vorderseite z=2.85), Blick nach oben (Bauch zur Wand).
+            // Die Spinne soll ueber die Kante klettern und an der Ueberhang-Unterseite (y=2.0) haengen.
+            yield return Setup(new Vector3(0f, 1.6f, 2.85f), Quaternion.LookRotation(Vector3.up, Vector3.back));
+            ClimbStats stats = new ClimbStats();
+            yield return RunFor(8f, stats, Vector3.down);
+
+            List<string> fehler = new List<string>();
+            if (stats.MinAngle >= 35f)
+            {
+                fehler.Add(string.Format(CultureInfo.InvariantCulture,
+                    "Spinne haengt zu keinem Zeitpunkt kopfueber an der Unterseite (minWinkel zu down {0:F1} >= 35 Grad; laengsteAbloesung {1:F2} s; maxY {2:F3})",
+                    stats.MinAngle, stats.LongestDetached, stats.MaxY));
+            }
+
+            if (stats.LongestDetached > 0.5f)
+            {
+                fehler.Add(string.Format(CultureInfo.InvariantCulture,
+                    "Spinne ist einmal laenger als 0.5 s am Stueck nicht haftend ({0:F2} s; minWinkel zu down {1:F1}; maxY {2:F3})",
+                    stats.LongestDetached, stats.MinAngle, stats.MaxY));
+            }
+
+            Check(fehler.ToArray());
+        }
     }
 }
