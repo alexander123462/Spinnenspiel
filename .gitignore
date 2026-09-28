@@ -15,3 +15,4 @@
 *.suo
 *.user
 *.userprefs
+/AssetSource/

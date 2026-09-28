@@ -36,6 +36,7 @@ namespace Spinnenspiel
         private float _verticalVelocity;
         private Vector3 _lastVelocity;
         private Vector2? _externalMoveInput;
+        private bool? _externalSprint;
         private bool _warnedNoCamera;
         private SpiderSurfaceDetector _surface;
         private SpiderClimber _climber;
@@ -53,7 +54,18 @@ namespace Spinnenspiel
         public float SprintSpeed => sprintSpeed;
 
         /// <summary>True, wenn Sprint gehalten wird und sich die Spinne horizontal bewegt.</summary>
-        public bool IsSprinting => input != null && input.SprintHeld && Speed > rotationThreshold;
+        public bool IsSprinting => IsSprintHeld() && Speed > rotationThreshold;
+
+        /// <summary>Sprint-Zustand: extern gesetzter Wert hat Vorrang, sonst die Eingabe.</summary>
+        private bool IsSprintHeld()
+        {
+            if (_externalSprint.HasValue)
+            {
+                return _externalSprint.Value;
+            }
+
+            return input != null && input.SprintHeld;
+        }
 
         /// <summary>
         /// Setzt eine externe Bewegungsrichtung (z. B. für automatisierte Tests).
@@ -62,6 +74,15 @@ namespace Spinnenspiel
         public void SetExternalMoveInput(Vector2? moveInput)
         {
             _externalMoveInput = moveInput;
+        }
+
+        /// <summary>
+        /// Setzt einen externen Sprint-Zustand (z. B. für automatisierte Tests).
+        /// Wenn nicht null, ersetzt der Wert die Tastatur-/Gamepad-Eingabe.
+        /// </summary>
+        public void SetExternalSprint(bool? sprint)
+        {
+            _externalSprint = sprint;
         }
 
         private void Awake()
@@ -104,7 +125,7 @@ namespace Spinnenspiel
             Vector3 moveDirection = GetCameraRelativeDirection(moveInput);
 
             // Zielgeschwindigkeit: Richtung * Geschwindigkeit (analoge Eingabe wird skaliert).
-            bool sprinting = input != null && input.SprintHeld && moveDirection.sqrMagnitude > 0.0001f;
+            bool sprinting = IsSprintHeld() && moveDirection.sqrMagnitude > 0.0001f;
             float surfaceFactor = _surface != null ? _surface.SpeedMultiplier : 1f;
             float targetSpeed = (sprinting ? sprintSpeed : walkSpeed) * surfaceFactor * Mathf.Clamp01(moveDirection.magnitude);
             Vector3 targetVelocity = moveDirection * targetSpeed;

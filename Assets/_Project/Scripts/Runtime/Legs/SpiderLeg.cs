@@ -169,6 +169,20 @@ namespace Spinnenspiel
             IsStepping = true;
         }
 
+        /// <summary>
+        /// Stellt das Ziel eines laufenden Schritts nach, weil der Körper weiterläuft. Wirkt nur,
+        /// solange der Schritt zu weniger als 85 % fortgeschritten ist; Startpunkt und Bogen bleiben.
+        /// </summary>
+        public void UpdateStepTarget(Vector3 desired)
+        {
+            if (!IsStepping || _stepProgress >= 0.85f)
+            {
+                return;
+            }
+
+            _stepEndGrounded = TryFindFoothold(desired, out _stepEnd, out _stepEndNormal, out _stepEndSurface);
+        }
+
         /// <summary>Wird vom Gangcontroller einmal pro Frame aufgerufen.</summary>
         public void TickStep(float deltaTime)
         {

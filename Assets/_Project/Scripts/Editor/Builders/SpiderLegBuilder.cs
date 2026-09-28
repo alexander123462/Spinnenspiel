@@ -9,13 +9,15 @@ namespace Spinnenspiel.EditorTools
     public static class SpiderLegBuilder
     {
         // Winkel der Ruhepositionen von vorne gemessen (Grad), je Beinpaar 1..4.
-        private static readonly float[] RestAngles = { 38f, 70f, 115f, 155f };
+        private static readonly float[] RestAngles = { 26f, 68f, 112f, 150f };
         // Hüft-Z auf dem Körper (lokal), von vorne nach hinten.
         private static readonly float[] HipZ = { 0.045f, 0.033f, 0.021f, 0.009f };
         // Längenfaktor je Paar: vorne lang, drittes Paar kurz, viertes Paar am längsten (Wolfsspinne).
         private static readonly float[] LengthScale = { 1.12f, 1.0f, 0.95f, 1.2f };
+        // Abstand des Ruhepunkts je Paar (Faktor auf RestRadius): vorne weiter vor, hinten näher am Körper.
+        private static readonly float[] RestReach = { 1.05f, 1.0f, 0.92f, 0.88f };
 
-        private const float RestRadius = 0.155f;
+        private const float RestRadius = 0.135f;
         private const float HipSideOffset = 0.024f;
         private const float HipHeight = 0.004f;
         private const float UpperLength = 0.085f;
@@ -45,7 +47,7 @@ namespace Spinnenspiel.EditorTools
                     hip.localPosition = new Vector3(side * HipSideOffset, HipHeight, HipZ[pair]);
 
                     float angle = RestAngles[pair] * Mathf.Deg2Rad;
-                    float radius = RestRadius * scale;
+                    float radius = RestRadius * scale * RestReach[pair];
                     Transform rest = new GameObject("Rest_" + legName).transform;
                     rest.SetParent(targets, false);
                     rest.localPosition = new Vector3(side * Mathf.Sin(angle) * radius, 0f, Mathf.Cos(angle) * radius);

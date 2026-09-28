@@ -63,7 +63,7 @@ namespace Spinnenspiel
             referenceSpeed = 0.6f,
             minStepDistance = 0.025f,
             strideFactor = 0.7f,
-            leadFactor = 0.4f,
+            leadFactor = 0.5f,
             stepHeight = 0.04f,
             maxSimultaneousSteps = 2,
             waveDelay = 0.1f

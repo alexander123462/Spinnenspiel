@@ -20,6 +20,7 @@ namespace Spinnenspiel
         private int _groupCount;
         private Vector3 _lastPosition;
         private Vector3 _measuredVelocity;
+        private int _lastGroup = -1;
 
         public GaitProfile Profile => profile;
         public IReadOnlyList<SpiderLeg> Legs => _legs;
@@ -73,6 +74,16 @@ namespace Spinnenspiel
             Vector3 lead = velocity * (stepDuration * profile.leadFactor);
             CurrentStepDuration = stepDuration;
             CurrentStepThreshold = threshold;
+            bool moving = speed > 0.05f;
+
+            // Der Körper läuft während eines Schritts weiter: laufende Beine folgen der Ruheposition.
+            foreach (SpiderLeg leg in _legs)
+            {
+                if (leg.IsStepping && leg.RestTarget != null)
+                {
+                    leg.UpdateStepTarget(leg.RestTarget.position + lead);
+                }
+            }
 
             int stepping = 0;
             foreach (SpiderLeg leg in _legs)
@@ -84,15 +95,49 @@ namespace Spinnenspiel
                 }
             }
 
-            stepping += StartGroupSteps(lead, threshold, stepDuration, stepping);
-            stepping += StartEmergencySteps(lead, threshold, stepDuration, stepping);
+            stepping += StartGroupSteps(lead, threshold, stepDuration, stepping, moving);
+
+            // Beim Laufen regelt die feste Gruppenfolge alles; Notschritte nur im Stand.
+            if (!moving)
+            {
+                stepping += StartEmergencySteps(lead, threshold, stepDuration, stepping);
+            }
 
             SteppingCount = stepping;
             MaxSteppingObserved = Mathf.Max(MaxSteppingObserved, stepping);
         }
 
-        private int StartGroupSteps(Vector3 lead, float threshold, float stepDuration, int alreadyStepping)
+        private int StartGroupSteps(Vector3 lead, float threshold, float stepDuration, int alreadyStepping, bool moving)
         {
+            // Bei Bewegung: Gruppen strikt abwechseln, immer komplett (sonst verpassen Beine das Fenster).
+            if (moving)
+            {
+                if (alreadyStepping > 0)
+                {
+                    return 0;
+                }
+
+                int group = (_lastGroup + 1) % _groupCount;
+                _lastGroup = group;
+
+                int startedInGroup = 0;
+                foreach (SpiderLeg leg in _legs)
+                {
+                    if (leg.GaitGroup != group || leg.RestTarget == null)
+                    {
+                        continue;
+                    }
+
+                    Vector3 desired = leg.RestTarget.position + lead;
+                    // Welle von hinten nach vorne: hinteres Paar (3) ohne, vorderes (0) mit maximaler Verzögerung.
+                    float delay = (3 - leg.PairIndex) * profile.waveDelay * stepDuration;
+                    leg.BeginStep(desired, stepDuration - delay, profile.stepHeight, delay);
+                    startedInGroup++;
+                }
+
+                return startedInGroup;
+            }
+
             int bestGroup = -1;
             float bestUrgency = 0f;
             for (int group = 0; group < _groupCount; group++)
@@ -130,6 +175,8 @@ namespace Spinnenspiel
             {
                 return 0;
             }
+
+            _lastGroup = bestGroup;
 
             int started = 0;
             foreach (SpiderLeg leg in _legs)

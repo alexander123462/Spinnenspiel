@@ -1,4 +1,8 @@
+using System;
 using System.Collections;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -94,6 +98,140 @@ namespace Spinnenspiel.Tests
 
             float bodyY = body.Body.localPosition.y - body.AverageFootHeight;
             Assert.That(bodyY, Is.InRange(0.03f, 0.1f), "Körperhöhe über den Füßen unplausibel: " + bodyY);
+        }
+
+        [UnityTest]
+        public IEnumerator Legs_GaitMeasurement_WalkAndSprint()
+        {
+            SceneManager.LoadScene(SceneName);
+            yield return null;
+            yield return new WaitForSeconds(1f);
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+            SpiderMovement movement = spider.GetComponent<SpiderMovement>();
+            Assert.IsNotNull(movement, "SpiderMovement fehlt");
+            SpiderLeg[] legs = spider.GetComponentsInChildren<SpiderLeg>();
+            Assert.AreEqual(8, legs.Length, "Die Spinne braucht 8 Beine");
+
+            List<string> report = new List<string>();
+            List<string> fehler = new List<string>();
+            string[] laeufe = { "Gehen", "Sprint" };
+            bool[] sprints = { false, true };
+
+            for (int run = 0; run < 2; run++)
+            {
+                string lauf = laeufe[run];
+
+                // Messlauf starten: Sprint-Zustand, Vorwärts-Eingabe, 1 s einlaufen lassen.
+                movement.SetExternalSprint(sprints[run]);
+                movement.SetExternalMoveInput(new Vector2(0f, 1f));
+                yield return new WaitForSeconds(1f);
+
+                // Messstart: Schrittzähler erfassen, Messwerte initialisieren.
+                int[] stepsBefore = new int[legs.Length];
+                float[] dzMin = new float[legs.Length];
+                float[] dzMax = new float[legs.Length];
+                float[] dzSum = new float[legs.Length];
+                int[] dzSamples = new int[legs.Length];
+                float[] extMax = new float[legs.Length];
+                float[] vorneZmin = new float[legs.Length];
+                for (int i = 0; i < legs.Length; i++)
+                {
+                    stepsBefore[i] = legs[i].StepCount;
+                    dzMin[i] = float.MaxValue;
+                    dzMax[i] = float.MinValue;
+                    extMax[i] = 0f;
+                    vorneZmin[i] = float.MaxValue;
+                }
+
+                // 3 s messen: pro Frame und Bein nur stehende Füße.
+                float time = 0f;
+                while (time < 3f)
+                {
+                    time += Time.deltaTime;
+
+                    for (int i = 0; i < legs.Length; i++)
+                    {
+                        SpiderLeg leg = legs[i];
+                        if (leg.IsStepping || !leg.IsGrounded)
+                        {
+                            continue;
+                        }
+
+                        Vector3 footL = spider.transform.InverseTransformPoint(leg.FootPosition);
+                        Vector3 restL = spider.transform.InverseTransformPoint(leg.RestTarget.position);
+                        float dz = footL.z - restL.z;
+                        dzMin[i] = Mathf.Min(dzMin[i], dz);
+                        dzMax[i] = Mathf.Max(dzMax[i], dz);
+                        dzSum[i] += dz;
+                        dzSamples[i]++;
+
+                        float ext = (leg.FootPosition - leg.HipPosition).magnitude / leg.MaxReach;
+                        extMax[i] = Mathf.Max(extMax[i], ext);
+
+                        if (leg.PairIndex == 0)
+                        {
+                            vorneZmin[i] = Mathf.Min(vorneZmin[i], footL.z);
+                        }
+                    }
+
+                    yield return null;
+                }
+
+                // Messlauf beenden: Eingaben zurücksetzen, 1 s warten.
+                movement.SetExternalMoveInput(null);
+                movement.SetExternalSprint(null);
+                yield return new WaitForSeconds(1f);
+
+                // Berichtszeilen und Verstöße für diesen Lauf.
+                for (int i = 0; i < legs.Length; i++)
+                {
+                    SpiderLeg leg = legs[i];
+                    int steps = leg.StepCount - stepsBefore[i];
+                    float dzMittel = dzSamples[i] > 0 ? dzSum[i] / dzSamples[i] : 0f;
+
+                    string fmt(float v)
+                    {
+                        return v.ToString("F3", CultureInfo.InvariantCulture);
+                    }
+
+                    string vorne = leg.PairIndex == 0 ? fmt(vorneZmin[i]) : "-";
+                    report.Add(string.Format(CultureInfo.InvariantCulture, "{0} | {1} | {2} | {3} | {4} | {5} | {6} | {7}",
+                        lauf, leg.name, steps.ToString(CultureInfo.InvariantCulture),
+                        dzSamples[i] > 0 ? fmt(dzMin[i]) : "-",
+                        dzSamples[i] > 0 ? fmt(dzMax[i]) : "-",
+                        dzSamples[i] > 0 ? fmt(dzMittel) : "-",
+                        fmt(extMax[i]), vorne));
+
+                    if (steps < 3)
+                    {
+                        fehler.Add(string.Format(CultureInfo.InvariantCulture, "{0} Bein {1}: {2} Schritte (min. 3)", lauf, leg.name, steps));
+                    }
+
+                    if (extMax[i] > 0.95f)
+                    {
+                        fehler.Add(string.Format(CultureInfo.InvariantCulture, "{0} Bein {1}: extMax {2} > 0.95", lauf, leg.name, fmt(extMax[i])));
+                    }
+
+                    if (leg.PairIndex == 0 && vorneZmin[i] < 0.07f)
+                    {
+                        fehler.Add(string.Format(CultureInfo.InvariantCulture, "{0} Bein {1}: vorneZmin {2} < 0.07", lauf, leg.name, fmt(vorneZmin[i])));
+                    }
+
+                    if (Mathf.Abs(dzMittel) > 0.02f)
+                    {
+                        fehler.Add(string.Format(CultureInfo.InvariantCulture, "{0} Bein {1}: |dzMittel| {2} > 0.02", lauf, leg.name, fmt(Mathf.Abs(dzMittel))));
+                    }
+                }
+            }
+
+            // Bericht schreiben, BEVOR geprüft wird.
+            string logDir = Path.Combine(Application.dataPath, "../Logs/ci");
+            Directory.CreateDirectory(logDir);
+            File.WriteAllLines(Path.Combine(logDir, "gait_report.txt"), report);
+
+            Assert.IsEmpty(fehler, string.Join("\n", fehler));
         }
     }
 }
