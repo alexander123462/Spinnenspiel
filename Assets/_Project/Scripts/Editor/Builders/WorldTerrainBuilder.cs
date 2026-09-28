@@ -21,10 +21,11 @@ namespace Spinnenspiel.EditorTools
         {
             TerrainLayer[] layers =
             {
-                CreateLayer("TL_Earth", TextureFactory.Earth(), null, new Vector2(2.5f, 2.5f), 0.05f),
-                CreateLayer("TL_Grass", TextureFactory.Grass(), null, new Vector2(2f, 2f), 0.08f),
-                CreateLayer("TL_Mud", TextureFactory.Mud(), null, new Vector2(2f, 2f), 0.55f),
-                CreateLayer("TL_Rock", TextureFactory.Rock(), TextureFactory.RockNormal(), new Vector2(3f, 3f), 0.2f)
+                // Reihenfolge ist fest: TerrainSurfaceMap hängt von den Layer-Indizes ab.
+                ScanLayer("TL_Earth", "forest_ground_04", 2.0f, () => CreateLayer("TL_Earth", TextureFactory.Earth(), null, new Vector2(2.5f, 2.5f), 0.05f)),
+                ScanLayer("TL_Grass", "forest_leaves_04", 2.0f, () => CreateLayer("TL_Grass", TextureFactory.Grass(), null, new Vector2(2f, 2f), 0.08f)),
+                ScanLayer("TL_Mud", "brown_mud_leaves_01", 1.6f, () => CreateLayer("TL_Mud", TextureFactory.Mud(), null, new Vector2(2f, 2f), 0.55f)),
+                ScanLayer("TL_Rock", "rocky_trail", 2.5f, () => CreateLayer("TL_Rock", TextureFactory.Rock(), TextureFactory.RockNormal(), new Vector2(3f, 3f), 0.2f))
             };
 
             // Erst als Asset anlegen, DANN Layer/Splatmap setzen – sonst werden die Splat-Texturen
@@ -72,6 +73,21 @@ namespace Spinnenspiel.EditorTools
 
             Debug.Log(string.Format("[Spinnenspiel] Splatmap-Anteile: Erde {0:P0}, Gras {1:P0}, Schlamm {2:P0}, Fels {3:P0}",
                 sum[0] / count, sum[1] / count, sum[2] / count, sum[3] / count));
+        }
+
+        /// <summary>
+        /// Liefert einen TerrainLayer aus dem passenden Foto-Scan, falls vorhanden;
+        /// sonst die prozedurale Fallback-Textur. Scan-Layer ersetzen das gleichnamige Fallback-Asset.
+        /// </summary>
+        private static TerrainLayer ScanLayer(string name, string scanId, float tileSize, System.Func<TerrainLayer> fallback)
+        {
+            if (ScanTextures.IsAvailable(scanId))
+            {
+                ScanTextures.EnsureImported(scanId);
+                return ScanTextures.CreateTerrainLayer(scanId, tileSize);
+            }
+
+            return fallback();
         }
 
         private static TerrainLayer CreateLayer(string name, Texture2D diffuse, Texture2D normal, Vector2 tileSize, float smoothness)

@@ -24,25 +24,54 @@ namespace Spinnenspiel.EditorTools
             sun.shadowBias = 0.02f;
             sun.intensity = 1.35f;
             sun.color = new Color(1f, 0.93f, 0.82f);
-            sunObject.transform.rotation = Quaternion.Euler(38f, -35f, 0f);
             RenderSettings.sun = sun;
 
-            Shader skyShader = Shader.Find("Skybox/Procedural");
-            if (skyShader != null)
+            if (ScanSky.IsAvailable())
             {
-                Material sky = new Material(skyShader);
-                sky.SetFloat("_SunSize", 0.035f);
-                sky.SetFloat("_AtmosphereThickness", 0.9f);
-                sky.SetColor("_SkyTint", new Color(0.52f, 0.6f, 0.72f));
-                sky.SetColor("_GroundColor", new Color(0.35f, 0.33f, 0.3f));
-                sky.SetFloat("_Exposure", 1.15f);
-                RenderSettings.skybox = AssetUtil.ReplaceAsset(sky, Folder + "/MAT_Sky.mat");
-            }
+                Texture2D hdri = ScanSky.EnsureImported();
+                // Sonnenausrichtung per Hand im HDRI vermessen (hellster Pixel),
+                // siehe ScanSky.SunRotation.
+                sunObject.transform.rotation = ScanSky.SunRotation;
 
-            RenderSettings.ambientMode = AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.50f, 0.58f, 0.70f);
-            RenderSettings.ambientEquatorColor = new Color(0.52f, 0.54f, 0.50f);
-            RenderSettings.ambientGroundColor = new Color(0.22f, 0.20f, 0.16f);
+                Shader panoramic = Shader.Find("Skybox/Panoramic");
+                if (panoramic != null)
+                {
+                    Material sky = new Material(panoramic);
+                    sky.SetTexture("_MainTex", hdri);
+                    sky.SetFloat("_Mapping", 1f); // Latitude-Longitude (Equirect)
+                    sky.SetFloat("_ImageType", 0f);
+                    sky.SetFloat("_Exposure", 1f);
+                    RenderSettings.skybox = AssetUtil.ReplaceAsset(sky, Folder + "/MAT_Sky.mat");
+                }
+                else
+                {
+                    Debug.LogWarning("[Spinnenspiel] Shader Skybox/Panoramic nicht gefunden – Skybox bleibt leer.");
+                }
+
+                RenderSettings.ambientMode = AmbientMode.Skybox;
+                RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox;
+            }
+            else
+            {
+                sunObject.transform.rotation = Quaternion.Euler(38f, -35f, 0f);
+
+                Shader skyShader = Shader.Find("Skybox/Procedural");
+                if (skyShader != null)
+                {
+                    Material sky = new Material(skyShader);
+                    sky.SetFloat("_SunSize", 0.035f);
+                    sky.SetFloat("_AtmosphereThickness", 0.9f);
+                    sky.SetColor("_SkyTint", new Color(0.52f, 0.6f, 0.72f));
+                    sky.SetColor("_GroundColor", new Color(0.35f, 0.33f, 0.3f));
+                    sky.SetFloat("_Exposure", 1.15f);
+                    RenderSettings.skybox = AssetUtil.ReplaceAsset(sky, Folder + "/MAT_Sky.mat");
+                }
+
+                RenderSettings.ambientMode = AmbientMode.Trilight;
+                RenderSettings.ambientSkyColor = new Color(0.50f, 0.58f, 0.70f);
+                RenderSettings.ambientEquatorColor = new Color(0.52f, 0.54f, 0.50f);
+                RenderSettings.ambientGroundColor = new Color(0.22f, 0.20f, 0.16f);
+            }
 
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;

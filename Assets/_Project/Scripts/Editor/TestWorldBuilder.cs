@@ -35,6 +35,7 @@ namespace Spinnenspiel.EditorTools
             Debug.Log("[Spinnenspiel] Wasser gebaut.");
 
             new GameObject("Wind").AddComponent<WindController>();
+            new GameObject("Sky Ambient").AddComponent<SkyAmbientUpdater>();
             new GameObject("Ambient Audio").AddComponent<AmbientAudio>();
             new GameObject("Debug Overlay").AddComponent<DebugOverlay>();
 

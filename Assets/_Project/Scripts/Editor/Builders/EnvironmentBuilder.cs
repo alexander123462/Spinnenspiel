@@ -55,8 +55,26 @@ namespace Spinnenspiel.EditorTools
                 _logMeshes[i] = MeshFactory.Log("M_Log" + i, 5 + i * 3, 14, 10, 0.7f + 0.1f * i, 0.18f);
             }
 
-            _rockMaterial = AssetUtil.CreateLitMaterial(MaterialFolder + "/MAT_Rock.mat", new Color(0.62f, 0.6f, 0.56f), 0.18f, TextureFactory.Rock(), TextureFactory.RockNormal());
-            _barkMaterial = AssetUtil.CreateLitMaterial(MaterialFolder + "/MAT_Bark.mat", Color.white, 0.1f, TextureFactory.Bark(), TextureFactory.BarkNormal());
+            // Foto-Scans bevorzugen, bei fehlenden Quelldateien die prozedurale Fallback-Textur.
+            if (ScanTextures.IsAvailable("mossy_rock"))
+            {
+                ScanTextures.EnsureImported("mossy_rock");
+                _rockMaterial = ScanTextures.CreateLitMaterial("mossy_rock", new Vector2(1f, 1f));
+            }
+            else
+            {
+                _rockMaterial = AssetUtil.CreateLitMaterial(MaterialFolder + "/MAT_Rock.mat", new Color(0.62f, 0.6f, 0.56f), 0.18f, TextureFactory.Rock(), TextureFactory.RockNormal());
+            }
+
+            if (ScanTextures.IsAvailable("pine_bark"))
+            {
+                ScanTextures.EnsureImported("pine_bark");
+                _barkMaterial = ScanTextures.CreateLitMaterial("pine_bark", new Vector2(1f, 2f));
+            }
+            else
+            {
+                _barkMaterial = AssetUtil.CreateLitMaterial(MaterialFolder + "/MAT_Bark.mat", Color.white, 0.1f, TextureFactory.Bark(), TextureFactory.BarkNormal());
+            }
         }
 
         /// <summary>Hindernisparcours direkt am Spawn, damit das Beinsystem sofort sichtbar gefordert wird.</summary>
