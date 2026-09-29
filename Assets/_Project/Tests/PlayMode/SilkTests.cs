@@ -375,5 +375,68 @@ namespace Spinnenspiel.Tests
             Assert.IsTrue(movement.IsAttached, "Hochklettern: nicht innerhalb 8 s angedockt: " + stats);
             Assert.IsTrue(angle < 45f, "Spinne nicht kopfüber an der Decke (Winkel > 45°): " + stats);
         }
+
+        [UnityTest]
+        public IEnumerator SpinningPose_ScriptedApi()
+        {
+            yield return Setup();
+
+            movement.Teleport(new Vector3(3f, 0.4f, 0f), Quaternion.LookRotation(Vector3.left, Vector3.up));
+            yield return new WaitForSeconds(0.3f);
+
+            Transform abdomen = spider.transform.Find("Body/Abdomen");
+            Assert.IsNotNull(abdomen, "Abdomen-Transform fehlt");
+            Quaternion startRot = abdomen.localRotation;
+
+            silk.BeginSpinningPose();
+            yield return new WaitForSeconds(0.4f);
+
+            // 0.6 s: jeden Frame die Spinnpose weiterführen (Fadenpunkt 0.3 m vor der Spinne).
+            float t = 0f;
+            while (t < 0.6f)
+            {
+                silk.UpdateSpinningPose(spider.transform.position - spider.transform.forward * 0.3f);
+                t += Time.deltaTime;
+                yield return null;
+            }
+
+            string stats = string.Format(CultureInfo.InvariantCulture,
+                "IsSpinning={0} angleDelta={1:F2}",
+                silk.IsSpinning, Quaternion.Angle(abdomen.localRotation, startRot));
+            Assert.IsTrue(silk.IsSpinning, "IsSpinning ist nicht true: " + stats);
+            Assert.IsTrue(Quaternion.Angle(abdomen.localRotation, startRot) > 15f,
+                "Abdomen hebt sich nicht um > 15°: " + stats);
+
+            silk.EndSpinningPose();
+            yield return null;
+
+            string endStats = string.Format(CultureInfo.InvariantCulture,
+                "IsSpinning={0} angleDelta={1:F2}",
+                silk.IsSpinning, Quaternion.Angle(abdomen.localRotation, startRot));
+            Assert.IsFalse(silk.IsSpinning, "IsSpinning ist nach EndSpinningPose noch true: " + endStats);
+            Assert.IsTrue(Quaternion.Angle(abdomen.localRotation, startRot) < 0.5f,
+                "Abdomen nicht exakt in der Ausgangspose: " + endStats);
+        }
+
+        [UnityTest]
+        public IEnumerator Scripted_MovementIgnoresInput()
+        {
+            yield return Setup();
+
+            movement.Teleport(new Vector3(3f, 0.4f, 0f), Quaternion.LookRotation(Vector3.left, Vector3.up));
+            yield return new WaitForSeconds(0.3f);
+
+            movement.SetScripted(true);
+            Vector3 startPos = spider.transform.position;
+            movement.SetExternalMoveInput(new Vector2(0f, 1f));
+            yield return new WaitForSeconds(0.5f);
+
+            float delta = (spider.transform.position - startPos).magnitude;
+            Assert.IsTrue(delta < 0.001f,
+                "Spinne bewegt sich im Skriptmodus trotz Eingabe: " + delta.ToString(CultureInfo.InvariantCulture));
+
+            movement.SetScripted(false);
+            movement.SetExternalMoveInput(null);
+        }
     }
 }

@@ -23,10 +23,23 @@ namespace Spinnenspiel
         private const float AbdomenLiftAngle = -25f;
         private const float LegSwitchInterval = 0.12f;
 
+        // Spinnpose per API (Netz-Vorbereitung): Zustand von BeginSpinningPose().
+        private bool _poseActive;
+        private float _poseLiftT;
+        private float _poseT;
+        private Transform _poseAbdomen;
+        private Vector3 _poseAbdOrigPos;
+        private Quaternion _poseAbdOrigRot;
+        private SpiderLeg _poseRearA;
+        private SpiderLeg _poseRearB;
+
         public SilkThread LastThread { get; private set; }
 
         /// <summary>True, während ein Faden ausgefahren wird (Spinn-Animation aktiv).</summary>
         public bool IsSpinning { get; private set; }
+
+        /// <summary>Spinnwarzen-Transform (öffentliche API, z. B. für Netzbau-Skripte).</summary>
+        public Transform Spinnerets => spinnerets;
 
         /// <summary>Wird nach dem Straffziehen für einen erfolgreichen Faden ausgelöst.</summary>
         public event System.Action<SilkThread> ThreadAttached;
@@ -77,6 +90,120 @@ namespace Spinnenspiel
             Quaternion q = Quaternion.AngleAxis(angle, Vector3.right);
             abdomen.localPosition = pivot + q * (origPos - pivot);
             abdomen.localRotation = q * origRot;
+        }
+
+        /// <summary>
+        /// Startet die Spinnpose ohne Faden (Vorbereitung für den Netzbau):
+        /// IsSpinning wird true, der Hinterleib hebt sich über AbdomenLiftDuration
+        /// absolut aus der Ausgangspose (Update()); die Hinterbeine (PairIndex 3)
+        /// stehen für UpdateSpinningPose() bereit.
+        /// </summary>
+        public void BeginSpinningPose()
+        {
+            IsSpinning = true;
+            _poseActive = true;
+            _poseLiftT = 0f;
+            _poseT = 0f;
+
+            _poseAbdomen = FindRecursive(transform, "Abdomen");
+            _poseAbdOrigPos = Vector3.zero;
+            _poseAbdOrigRot = Quaternion.identity;
+            if (_poseAbdomen != null)
+            {
+                _poseAbdOrigPos = _poseAbdomen.localPosition;
+                _poseAbdOrigRot = _poseAbdomen.localRotation;
+            }
+
+            _poseRearA = null;
+            _poseRearB = null;
+            foreach (SpiderLeg leg in GetComponentsInChildren<SpiderLeg>())
+            {
+                if (leg == null || leg.PairIndex != 3)
+                {
+                    continue;
+                }
+
+                if (_poseRearA == null)
+                {
+                    _poseRearA = leg;
+                }
+                else
+                {
+                    _poseRearB = leg;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Führt die Spinnpose weiter (jeden Frame aufrufbar): die Hinterbeine
+        /// (PairIndex 3) führen abwechselnd den Punkt zwischen Spinnwarzen und
+        /// <paramref name="silkWorldPoint"/> an – gleiche Wechsel-Logik/Zeiten wie
+        /// Schritt 2 von ExtendAndTighten.
+        /// </summary>
+        public void UpdateSpinningPose(Vector3 silkWorldPoint)
+        {
+            _poseT += Time.deltaTime;
+            int activeLeg = (int)Mathf.Floor(_poseT / LegSwitchInterval) % 2;
+            SpiderLeg active = activeLeg == 0 ? _poseRearA : _poseRearB;
+            SpiderLeg idle = activeLeg == 0 ? _poseRearB : _poseRearA;
+            if (active == null)
+            {
+                return;
+            }
+
+            Vector3 spinneretPos = spinnerets != null ? spinnerets.position : transform.position;
+            Transform body = _poseAbdomen != null ? _poseAbdomen.parent : null;
+            Vector3 right = (body != null ? body : transform).right;
+            Vector3 offset = activeLeg == 0 ? right : -right;
+            Vector3 target = Vector3.Lerp(spinneretPos, silkWorldPoint, 0.5f);
+            active.SetOverrideFoot(target + transform.up * 0.01f + offset * 0.012f);
+
+            if (idle != null)
+            {
+                idle.SetOverrideFoot(null);
+            }
+        }
+
+        /// <summary>
+        /// Endet die Spinnpose: Hinterleib exakt in der Ausgangspose (Winkel 0),
+        /// beide Hinterbeine frei, IsSpinning = false. Mehrfachaufruf harmlos.
+        /// </summary>
+        public void EndSpinningPose()
+        {
+            if (_poseAbdomen != null)
+            {
+                ApplyAbdomenPose(_poseAbdomen, _poseAbdOrigPos, _poseAbdOrigRot, 0f);
+            }
+
+            if (_poseRearA != null)
+            {
+                _poseRearA.SetOverrideFoot(null);
+            }
+
+            if (_poseRearB != null)
+            {
+                _poseRearB.SetOverrideFoot(null);
+            }
+
+            _poseActive = false;
+            IsSpinning = false;
+        }
+
+        private void Update()
+        {
+            // Spinnpose (API-Modus): Hinterleib über AbdomenLiftDuration heben,
+            // absolut aus der Ausgangspose berechnet (keine Rundungsfehler).
+            if (!_poseActive || _poseLiftT >= AbdomenLiftDuration)
+            {
+                return;
+            }
+
+            _poseLiftT += Time.deltaTime;
+            float k = Mathf.Clamp01(_poseLiftT / AbdomenLiftDuration);
+            if (_poseAbdomen != null)
+            {
+                ApplyAbdomenPose(_poseAbdomen, _poseAbdOrigPos, _poseAbdOrigRot, AbdomenLiftAngle * k);
+            }
         }
 
         private IEnumerator ExtendAndTighten(SilkThread thread)

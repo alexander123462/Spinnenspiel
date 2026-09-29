@@ -124,6 +124,23 @@ namespace Spinnenspiel
             _externalSprint = sprint;
         }
 
+        /// <summary>True, während im Skriptmodus ein anderes Skript transform direkt steuert.</summary>
+        public bool IsScripted { get; private set; }
+
+        /// <summary>
+        /// Skriptmodus: bei true überspringt Update() die Bewegung vollständig –
+        /// ein anderes Skript bewegt transform direkt. Bei false setzt
+        /// Teleport() am aktuellen Ort Geschwindigkeit/Anker zurück.
+        /// </summary>
+        public void SetScripted(bool on)
+        {
+            IsScripted = on;
+            if (!on)
+            {
+                Teleport(transform.position, transform.rotation);
+            }
+        }
+
         /// <summary>
         /// Teleportiert die Spinne, setzt die Geschwindigkeit auf null und hält sie
         /// im Haftzustand (für Tests, z. B. an Wänden).
@@ -298,6 +315,11 @@ namespace Spinnenspiel
 
         private void Update()
         {
+            if (IsScripted)
+            {
+                return;
+            }
+
             float dt = Time.deltaTime;
             if (dt <= 0f)
             {
