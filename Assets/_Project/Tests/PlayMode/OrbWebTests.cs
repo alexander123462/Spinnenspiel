@@ -100,5 +100,44 @@ namespace Spinnenspiel.Tests
             Assert.GreaterOrEqual(lines, 26,
                 "Erwartet >= 26 LineRenderer als Kinder, gefunden: " + lines);
         }
+
+        [Test]
+        public void Progress_RevealsStages()
+        {
+            var layout = CreateLayout();
+            var go = new GameObject("OrbWebProgressTest");
+            var web = go.AddComponent<OrbWeb>();
+            web.Build(layout);
+
+            // Bei Stage Radii (t=0.5): ca. Hälfte der Radien sichtbar, Fangspirale unsichtbar.
+            web.SetProgress(OrbWeb.WebStage.Radii, 0.5f);
+            int visible = 0;
+            foreach (Transform child in go.transform)
+            {
+                if (!child.name.StartsWith("Radius"))
+                    continue;
+                LineRenderer lr = child.GetComponent<LineRenderer>();
+                if (lr != null && lr.positionCount > 0)
+                    visible++;
+            }
+
+            int total = layout.RadiusCount;
+            Assert.That(visible, Is.InRange(total / 2 - 2, total / 2 + 2),
+                "Sichtbare Radien bei Radii/0.5: " + visible + " von " + total + ", erwartet ca. " + (total / 2) + " (±2).");
+
+            LineRenderer capture = go.transform.Find("CaptureSpiral").GetComponent<LineRenderer>();
+            Assert.That(capture.positionCount, Is.Zero,
+                "Fangspirale soll bei Stage Radii unsichtbar sein, positionCount=" + capture.positionCount + ".");
+
+            // Bei Done: Hilfsspirale weg, Fangspirale voll.
+            web.SetProgress(OrbWeb.WebStage.Done, 1f);
+            LineRenderer aux = go.transform.Find("AuxSpiral").GetComponent<LineRenderer>();
+            Assert.That(aux.positionCount, Is.Zero,
+                "Hilfsspirale soll bei Done unsichtbar sein, positionCount=" + aux.positionCount + ".");
+            Assert.AreEqual(layout.CaptureSpiral.Count, capture.positionCount,
+                "Fangspirale soll bei Done vollständig sein (" + layout.CaptureSpiral.Count + " Punkte), gefunden: " + capture.positionCount + ".");
+
+            Object.DestroyImmediate(go);
+        }
     }
 }

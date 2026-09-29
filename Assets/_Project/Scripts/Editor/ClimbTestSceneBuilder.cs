@@ -21,6 +21,7 @@ namespace Spinnenspiel.EditorTools
             Material blockMat = AssetUtil.CreateLitMaterial(MaterialsFolder + "/MAT_KlettertestBlock.mat", new Color(0.38f, 0.32f, 0.26f), 0.3f);
             Material stammMat = AssetUtil.CreateLitMaterial(MaterialsFolder + "/MAT_KlettertestStamm.mat", new Color(0.32f, 0.23f, 0.15f), 0.3f);
             Material plaetteMat = AssetUtil.CreateLitMaterial(MaterialsFolder + "/MAT_KlettertestUeberhang.mat", new Color(0.40f, 0.37f, 0.32f), 0.3f);
+            Material netzstabMat = AssetUtil.CreateLitMaterial(MaterialsFolder + "/MAT_KlettertestNetzstab.mat", new Color(0.30f, 0.26f, 0.20f), 0.3f);
 
             GameObject boden = CreateBox("Boden", new Vector3(20f, 0.2f, 20f), new Vector3(0f, -0.1f, 0f), bodenMat);
             GameObject wand = CreateBox("Wand", new Vector3(4f, 2f, 0.3f), new Vector3(0f, 1f, 3f), wandMat);
@@ -35,6 +36,10 @@ namespace Spinnenspiel.EditorTools
 
             stamm.AddComponent<MeshCollider>().sharedMesh = stamm.GetComponent<MeshFilter>().sharedMesh;
             GameObject ueberhang = CreateBox("Ueberhang", new Vector3(2f, 0.2f, 1.5f), new Vector3(0f, 2.1f, 2.25f), plaetteMat);
+
+            // Netzplatz: zwei dünne senkrechte Stäbe, zwischen denen das Radnetz gespannt wird.
+            CreateBox("NetzStab_L", new Vector3(0.04f, 1.2f, 0.04f), new Vector3(5.0f, 0.6f, 2.0f), netzstabMat);
+            CreateBox("NetzStab_R", new Vector3(0.04f, 1.2f, 0.04f), new Vector3(5.8f, 0.6f, 2.0f), netzstabMat);
 
             GameObject light = new GameObject("Sun");
             Light sun = light.AddComponent<Light>();

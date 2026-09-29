@@ -202,6 +202,43 @@ namespace Spinnenspiel.EditorTools
                 sm.LetGo();
             }
 
+            // Fünftes Bild: Radnetz zwischen den Netzstäben, Spinne am Hub (Netz 2a).
+            var webGo = new GameObject("NetzShotWeb");
+            OrbWeb web = webGo.AddComponent<OrbWeb>();
+            Vector3[] anchors =
+            {
+                new Vector3(5.02f, 1.15f, 2.0f),
+                new Vector3(5.78f, 1.15f, 2.0f),
+                new Vector3(5.72f, 0.02f, 2.0f),
+                new Vector3(5.08f, 0.02f, 2.0f)
+            };
+            OrbWebLayout netzLayout = new OrbWebLayout(anchors, 16, 0.02f, 0.03f, 7);
+            web.Build(netzLayout);
+            web.SetProgress(OrbWeb.WebStage.Done, 1f);
+
+            Vector3 hub = netzLayout.Hub;
+            spider.transform.position = hub;
+            spider.transform.rotation = Quaternion.LookRotation(Vector3.up, Vector3.back);
+            Physics.SyncTransforms();
+            foreach (SpiderLeg leg in legs)
+            {
+                leg.PoseAtRest();
+            }
+
+            // Kamera frontal von -Z, 1.3 m Abstand, leicht von der Seite.
+            cam.transform.position = hub + new Vector3(0.30f, 0.08f, -1.3f);
+            cam.transform.LookAt(hub);
+            cam.targetTexture = target;
+            cam.Render();
+            RenderTexture.active = target;
+            image.ReadPixels(new Rect(0, 0, 1600, 900), 0, 0);
+            image.Apply();
+            RenderTexture.active = null;
+            cam.targetTexture = null;
+            File.WriteAllBytes(Path.Combine(folder, "shot_netz.png"), image.EncodeToPNG());
+            Debug.Log("[Spinnenspiel] Kletter-Kontrollbild: shot_netz.png");
+
+            Object.DestroyImmediate(webGo);
             Object.DestroyImmediate(camGo);
             Object.DestroyImmediate(threadGo);
             Object.DestroyImmediate(target);
