@@ -27,6 +27,7 @@ namespace Spinnenspiel
 
         private List<OrbWeb> _webs = new List<OrbWeb>();
         private Vector3[] _anchors;
+        private float _anchorsTime;
         private float _nextCheck;
         private int _counter;
 
@@ -40,6 +41,10 @@ namespace Spinnenspiel
                 if (builder != null && !builder.IsBuilding && !builder.IsSittingInWeb)
                 {
                     CanBuild = WebSiteFinder.TryFindNear(transform.position, View(), transform, out _anchors, out _);
+                    if (CanBuild)
+                    {
+                        _anchorsTime = Time.time;
+                    }
                 }
                 else
                 {
@@ -87,12 +92,17 @@ namespace Spinnenspiel
         }
 
         /// <summary>
-        /// Baut sofort ein Netz am nächsten gültigen Platz und startet den
-        /// Bau. true bei Erfolg.
+        /// Baut ein Netz an den übergebenen 4 Ankern und startet den Bau.
+        /// true bei Erfolg.
         /// </summary>
-        public bool TryPlaceWebNow()
+        public bool PlaceWeb(Vector3[] anchors)
         {
-            if (!WebSiteFinder.TryFindNear(transform.position, View(), transform, out Vector3[] anchors, out _))
+            if (anchors == null || anchors.Length != 4)
+            {
+                return false;
+            }
+            SpiderWebBuilder builder = FindFirstObjectByType<SpiderWebBuilder>();
+            if (builder == null || builder.IsBuilding)
             {
                 return false;
             }
@@ -102,13 +112,32 @@ namespace Spinnenspiel
                 return false;
             }
             RegisterWeb(web);
-            SpiderWebBuilder builder = FindFirstObjectByType<SpiderWebBuilder>();
-            if (builder != null)
-            {
-                builder.StartBuild(web);
-            }
+            builder.StartBuild(web);
             CanBuild = false;
             return true;
+        }
+
+        /// <summary>
+        /// Baut sofort ein Netz am zuletzt gefundenen (frischen) Platz oder
+        /// macht eine frische Suche und baut dort. true bei Erfolg.
+        /// </summary>
+        public bool TryPlaceWebNow()
+        {
+            // Frische gemerkte Anker (weniger als 1 s alt) bevorzugen: bauen
+            // dort, wo die Suche sie gefunden hat, nicht an der aktuellen
+            // (ggf. veränderten) Position der Spinne.
+            if (CanBuild && _anchors != null && Time.time - _anchorsTime < 1f)
+            {
+                return PlaceWeb(_anchors);
+            }
+
+            if (!WebSiteFinder.TryFindNear(transform.position, View(), transform, out Vector3[] anchors, out _))
+            {
+                return false;
+            }
+            _anchors = anchors;
+            _anchorsTime = Time.time;
+            return PlaceWeb(anchors);
         }
 
         /// <summary>

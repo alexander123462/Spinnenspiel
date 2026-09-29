@@ -30,6 +30,12 @@ namespace Spinnenspiel.EditorTools
             Debug.Log("[Spinnenspiel] Hindernisse gebaut.");
 
             VegetationBuilder.Build(terrain, 11);
+            // Pflanzen-Collider-Pool an das Objekt mit dem VegetationSystem hängen (für Netze/Fäden)
+            VegetationSystem vegetationSystem = Object.FindFirstObjectByType<VegetationSystem>();
+            if (vegetationSystem != null)
+            {
+                vegetationSystem.gameObject.AddComponent<VegetationColliderPool>();
+            }
             Debug.Log("[Spinnenspiel] Vegetation gebaut.");
 
             WaterBuilder.Build();

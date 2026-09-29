@@ -201,7 +201,22 @@ namespace Spinnenspiel.Tests
         }
 
         [UnityTest]
-        [Ignore("wartet auf Pflanzen-Collider, Auftrag 6.3d2")]
+        public IEnumerator PlantColliders_NearSpider()
+        {
+            yield return LoadWorld();
+            VegetationColliderPool pool = Object.FindFirstObjectByType<VegetationColliderPool>();
+            Assert.IsNotNull(pool, "VegetationColliderPool fehlt");
+            Assert.Greater(pool.ActiveCount, 0, "Keine aktiven Pflanzen-Collider in Spinennähe");
+            foreach (Transform child in pool.transform)
+            {
+                if (child.gameObject.activeSelf)
+                {
+                    Assert.AreEqual(GameLayers.Plants, child.gameObject.layer, "Falscher Layer: " + child.name);
+                }
+            }
+        }
+
+        [UnityTest]
         public IEnumerator WorldWeb_BuildsBetweenPlants()
         {
             yield return LoadWorld();
@@ -211,6 +226,15 @@ namespace Spinnenspiel.Tests
             SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
             Assert.IsNotNull(placer, "SpiderWebPlacer fehlt");
             Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+
+            // Pflanzen-Collider vor der Netzplatz-Suche aktivieren (Auftrag 6.3d2).
+            VegetationColliderPool pool = Object.FindFirstObjectByType<VegetationColliderPool>();
+            Assert.IsNotNull(pool, "VegetationColliderPool fehlt");
+            pool.radius = 12f;
+            pool.maxColliders = 800;
+            pool.focus = spider.transform;
+            pool.ForceRefresh();
+            Physics.SyncTransforms();
 
             // 4 Blickrichtungen relativ zum Start (waagrecht).
             Vector3 start = spider.transform.position;
@@ -224,6 +248,7 @@ namespace Spinnenspiel.Tests
             int found = 0;
             Vector3 firstPoint = Vector3.zero;
             Vector3 firstBlick = fwd;
+            Vector3[] firstAnker = null;
             bool haveFirst = false;
             for (int gx = -10; gx <= 10; gx++)
             {
@@ -259,6 +284,7 @@ namespace Spinnenspiel.Tests
                             {
                                 firstPoint = ground;
                                 firstBlick = blick;
+                                firstAnker = (Vector3[])anchors.Clone(); // Anker des ersten Treffers merken
                                 haveFirst = true;
                             }
                         }
@@ -275,7 +301,8 @@ namespace Spinnenspiel.Tests
             yield return new WaitForSeconds(0.5f);
             placer.viewOverride = firstBlick;
             builder.durationScale = 0.1f;
-            Assert.IsTrue(placer.TryPlaceWebNow(), "TryPlaceWebNow fehlgeschlagen am ersten Platz");
+            Assert.IsNotNull(firstAnker, "Keine Anker des ersten Treffers gemerkt");
+            Assert.IsTrue(placer.PlaceWeb(firstAnker), "PlaceWeb am ersten Platz fehlgeschlagen");
 
             float wait = 0f;
             while (builder.CurrentStage != OrbWeb.WebStage.Done && wait < 20f)

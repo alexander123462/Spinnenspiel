@@ -325,5 +325,45 @@ namespace Spinnenspiel
         {
             Graphics.RenderMeshInstanced(renderParams, mesh, 0, _batch, count, 0);
         }
+
+        /// <summary>Liefert alle Pflanzeninstanzen innerhalb der Kugel, die hoch genug sind (für Kollider).</summary>
+        public int QueryInstances(Vector3 center, float radius, float minHeight, List<Matrix4x4> outMatrices, List<Bounds> outMeshBounds)
+        {
+            outMatrices.Clear();
+            outMeshBounds.Clear();
+            float radiusSqr = radius * radius;
+            foreach (Chunk chunk in _chunks.Values)
+            {
+                if (chunk.bounds.SqrDistance(center) > radiusSqr)
+                {
+                    continue;
+                }
+                for (int l = 0; l < layers.Count; l++)
+                {
+                    VegetationLayer layer = layers[l];
+                    if (layer.mesh == null)
+                    {
+                        continue;
+                    }
+                    Matrix4x4[] matrices = chunk.matrices[l];
+                    for (int i = 0; i < matrices.Length; i++)
+                    {
+                        Matrix4x4 m = matrices[i];
+                        Vector3 pos = m.GetColumn(3);
+                        if ((pos - center).sqrMagnitude > radiusSqr)
+                        {
+                            continue;
+                        }
+                        if (layer.mesh.bounds.size.y * m.GetColumn(1).magnitude < minHeight)
+                        {
+                            continue;
+                        }
+                        outMatrices.Add(m);
+                        outMeshBounds.Add(layer.mesh.bounds);
+                    }
+                }
+            }
+            return outMatrices.Count;
+        }
     }
 }
