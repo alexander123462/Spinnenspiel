@@ -28,6 +28,12 @@ namespace Spinnenspiel
         [Tooltip("Wie lange (s) sich das Insekt im Netz zappelt, bevor es sich befreit.")]
         public float escapeTime = 10f;
 
+        /// <summary>Festhalten, damit es nicht aus dem Netz ausbricht (z. B. beim Einwickeln).</summary>
+        public void Hold()
+        {
+            escapeTime = float.PositiveInfinity;
+        }
+
         /// <summary>Netz, in dem das Insekt gefangen ist (null wenn frei).</summary>
         public OrbWeb CaughtIn;
         /// <summary>Wo es am Fangpunkt sitzt (Zappeln passiert um diesen Punkt).</summary>
@@ -328,6 +334,50 @@ namespace Spinnenspiel
             if (wingRight != null)
             {
                 wingRight.localRotation = Quaternion.Euler(0f, 0f, angle);
+            }
+        }
+
+        /// <summary>
+        /// Einwickeln (7.3a): Fortschritt 0..1. Erstellt den Kokon (Sphere ohne Collider,
+        /// Kind des Insekts), dreht ihn beim Wachsen und stellt bei p01 >= 1 auf
+        /// Wrapped um und schaltet die Flügel ab.
+        /// </summary>
+        public void SetWrapProgress(float p01)
+        {
+            Transform cocoon = transform.Find("Kokon");
+            if (cocoon == null)
+            {
+                GameObject go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                Destroy(go.GetComponent<Collider>());
+                go.name = "Kokon";
+                go.transform.SetParent(transform, false);
+                go.transform.localPosition = Vector3.zero;
+                Material mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+                mat.color = new Color(0.92f, 0.92f, 0.88f);
+                mat.SetFloat("_Smoothness", 0.6f);
+                go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+                cocoon = go.transform;
+            }
+
+            cocoon.localScale = new Vector3(0.03f, 0.03f, 0.045f) * Mathf.Clamp01(p01);
+
+            if (p01 < 1f)
+            {
+                // Solange gewickelt wird: das Insekt dreht sich um die eigene Achse.
+                transform.Rotate(0f, 0f, 720f * Time.deltaTime, Space.Self);
+            }
+            else
+            {
+                State = InsectState.Wrapped;
+                if (wingLeft != null)
+                {
+                    wingLeft.gameObject.SetActive(false);
+                }
+
+                if (wingRight != null)
+                {
+                    wingRight.gameObject.SetActive(false);
+                }
             }
         }
 

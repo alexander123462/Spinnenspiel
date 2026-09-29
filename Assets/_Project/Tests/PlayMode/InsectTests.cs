@@ -211,6 +211,51 @@ namespace Spinnenspiel.Tests
             Object.Destroy(s.insect.gameObject);
         }
 
+        [UnityTest]
+        public IEnumerator Fly_WrapProgressMakesCocoon()
+        {
+            yield return LoadScene();
+
+            InsectSpawner spawner = Object.FindFirstObjectByType<InsectSpawner>();
+            Assert.IsNotNull(spawner, "Spawner 'Insekten' nicht gefunden");
+            spawner.enabled = false;
+
+            // Zuvor gespawnte Fliegen entfernen, damit sie nicht stoeren.
+            foreach (FlyingInsect f in Object.FindObjectsOfType<FlyingInsect>())
+            {
+                f.Remove();
+            }
+
+            Vector3 home = new Vector3(5.4f, 0.7f, 1.0f);
+            GameObject fly = Object.Instantiate(spawner.template, home, Quaternion.identity);
+            fly.name = "Testfliege";
+            fly.SetActive(true);
+            FlyingInsect insect = fly.GetComponent<FlyingInsect>();
+            Assert.IsNotNull(insect, "Testfliege hat kein FlyingInsect");
+            insect.home = home;
+            insect.Hold();
+
+            // 1 s lang jeden Frame den Einwickel-Fortschritt vorueberschicken.
+            float t = 0f;
+            while (t < 1f)
+            {
+                t += Time.deltaTime;
+                insect.SetWrapProgress(t);
+                yield return null;
+            }
+            insect.SetWrapProgress(1f);
+            yield return null;
+
+            Assert.AreEqual(FlyingInsect.InsectState.Wrapped, insect.State, "State ist nicht Wrapped");
+            Transform cocoon = fly.transform.Find("Kokon");
+            Assert.IsNotNull(cocoon, "Kind 'Kokon' fehlt an der Fliege");
+            Assert.Greater(cocoon.localScale.z, 0.04f, "Kokon-LocalScale zu klein: " + cocoon.localScale.z);
+            Assert.AreEqual(0, fly.GetComponentsInChildren<Collider>().Length,
+                "Fliege oder Kokon hat noch einen Collider");
+
+            Object.Destroy(fly);
+        }
+
         private static IEnumerator LoadScene()
         {
             SceneManager.LoadScene(SceneName);
