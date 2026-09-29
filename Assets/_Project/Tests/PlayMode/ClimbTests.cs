@@ -365,5 +365,117 @@ namespace Spinnenspiel.Tests
             }
             Check(fehler.ToArray());
         }
+
+        /// <summary>Bildserie: Gehen und Wanduebergang (Kontrolle der Bewegung).</summary>
+        [UnityTest]
+        public IEnumerator Gait_RecordsFrames()
+        {
+            yield return Setup(new Vector3(0f, 0.05f, -1.5f), Quaternion.identity);
+
+            // Aufnahme-Kamera seitlich, folgt der Spinne mit festem Versatz.
+            GameObject camGo = new GameObject("GaitRecCam");
+            Camera cam = camGo.AddComponent<Camera>();
+            cam.fieldOfView = 40f;
+            RenderTexture rt = new RenderTexture(960, 540, 24);
+            rt.Create();
+            cam.targetTexture = rt;
+
+            string dir = System.IO.Path.Combine(Application.dataPath, "../Logs/ci");
+            System.IO.Directory.CreateDirectory(dir);
+
+            // 1) Gehen: 0.6 s Anlauf, dann 8 Bilder im Abstand 0.07 s.
+            movement.SetExternalMoveInput(new Vector2(0f, 1f));
+            float t = 0f;
+            while (t < 0.6f)
+            {
+                FollowCam(cam);
+                t += Time.deltaTime;
+                yield return null;
+            }
+            for (int i = 0; i < 8; i++)
+            {
+                FollowCam(cam);
+                SaveFrame(cam, rt, System.IO.Path.Combine(dir, "gang_" + i + ".png"));
+                if (i < 7)
+                {
+                    t = 0f;
+                    while (t < 0.07f)
+                    {
+                        FollowCam(cam);
+                        t += Time.deltaTime;
+                        yield return null;
+                    }
+                }
+            }
+
+            // 2) Wanduebergang: laufen bis z >= 2.85 oder max. 4 s.
+            t = 0f;
+            while (spider.transform.position.z < 2.85f && t < 4f)
+            {
+                FollowCam(cam);
+                t += Time.deltaTime;
+                yield return null;
+            }
+
+            // Kamera fest bei (0.9, 0.5, 2.2), LookAt(Spinne); 6 Bilder alle 0.25 s.
+            cam.transform.position = new Vector3(0.9f, 0.5f, 2.2f);
+            for (int i = 0; i < 6; i++)
+            {
+                cam.transform.LookAt(spider.transform.position);
+                SaveFrame(cam, rt, System.IO.Path.Combine(dir, "wand_" + i + ".png"));
+                if (i < 5)
+                {
+                    t = 0f;
+                    while (t < 0.25f)
+                    {
+                        cam.transform.LookAt(spider.transform.position);
+                        t += Time.deltaTime;
+                        yield return null;
+                    }
+                }
+            }
+
+            // 3) Eingabe zuruecksetzen.
+            movement.SetExternalMoveInput(null);
+
+            // Alle 14 Dateien muessen existieren.
+            for (int i = 0; i < 8; i++)
+            {
+                Assert.IsTrue(System.IO.File.Exists(System.IO.Path.Combine(dir, "gang_" + i + ".png")),
+                    "gang_" + i + ".png fehlt");
+            }
+            for (int i = 0; i < 6; i++)
+            {
+                Assert.IsTrue(System.IO.File.Exists(System.IO.Path.Combine(dir, "wand_" + i + ".png")),
+                    "wand_" + i + ".png fehlt");
+            }
+
+            // Aufraeumen: Kamera + RenderTexture.
+            cam.targetTexture = null;
+            RenderTexture.active = null;
+            Object.DestroyImmediate(camGo);
+            Object.DestroyImmediate(rt);
+        }
+
+        /// <summary>Kamera seitlich neben der Spinne mit festem Versatz (gleicher Abstand, LookAt leicht ueber der Spinne).</summary>
+        private void FollowCam(Camera cam)
+        {
+            cam.transform.position = spider.transform.position + Vector3.right * 0.55f + Vector3.up * 0.12f;
+            cam.transform.LookAt(spider.transform.position + Vector3.up * 0.03f);
+        }
+
+        /// <summary>Render die Kamera in die RenderTexture und speichert als PNG ab.</summary>
+        private static void SaveFrame(Camera cam, RenderTexture rt, string file)
+        {
+            cam.Render();
+            RenderTexture.active = rt;
+            var tex = new Texture2D(960, 540, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, 960, 540), 0, 0);
+            tex.Apply(false);
+            byte[] png = tex.EncodeToPNG();
+            Object.DestroyImmediate(tex);
+            RenderTexture.active = null;
+            System.IO.File.WriteAllBytes(file, png);
+        }
     }
 }
