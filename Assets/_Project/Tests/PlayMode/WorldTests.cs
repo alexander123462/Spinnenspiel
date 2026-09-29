@@ -325,12 +325,14 @@ namespace Spinnenspiel.Tests
             string dir = System.IO.Path.Combine(Application.dataPath, "../Logs/ci");
             System.IO.Directory.CreateDirectory(dir);
 
+            // Wie in OrbWebTests.Builder_RecordsFrames: LookRotation ohne Up-Vektor
+            // (n liegt fast in Blickrichtung - als Up-Vektor kippt das Bild).
             cam.transform.position = hub + n * 0.9f + Vector3.up * 0.15f;
-            cam.transform.rotation = Quaternion.LookRotation(hub - cam.transform.position, n);
+            cam.transform.rotation = Quaternion.LookRotation(hub - cam.transform.position);
             SaveFrame(cam, rt, System.IO.Path.Combine(dir, "weltnetz.png"));
 
             cam.transform.position = hub + n * 2.5f + Vector3.up * 0.8f;
-            cam.transform.rotation = Quaternion.LookRotation(hub - cam.transform.position, n);
+            cam.transform.rotation = Quaternion.LookRotation(hub - cam.transform.position);
             SaveFrame(cam, rt, System.IO.Path.Combine(dir, "weltnetz_weit.png"));
 
             Assert.IsTrue(System.IO.File.Exists(System.IO.Path.Combine(dir, "weltnetz.png")), "weltnetz.png fehlt");

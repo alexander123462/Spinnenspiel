@@ -17,8 +17,11 @@ namespace Spinnenspiel
 
         /// <summary>
         /// Findet vier Ankerpunkte (TL, TR, BR, BL) um den Mittelpunkt in der
-        /// Blick-Ebene. Erfolgreich, wenn alle vier Quadranten einen Treffer
-        /// haben und der Abstand TL-TR sowie TL-BL jeweils >= 0.25 m betragen.
+        /// Blick-Ebene. Pro Quadrant gewinnt der Treffer mit der größten
+        /// Bewertung score = min(|dx|, |dy|) – Ecken schlagen Seitenpunkte.
+        /// Erfolgreich, wenn alle vier Quadranten einen Treffer haben und
+        /// die Spannweiten dx(TR)-dx(TL), dx(BR)-dx(BL), dy(TL)-dy(BL),
+        /// dy(TR)-dy(BR) jeweils >= 0.25 m betragen.
         /// </summary>
         public static bool TryFind(Vector3 center, Vector3 viewForward, Transform ignore, out Vector3[] anchors)
         {
@@ -40,7 +43,7 @@ namespace Spinnenspiel
             Vector3 up = Vector3.up;
 
             Vector3 tl = Vector3.zero, tr = Vector3.zero, br = Vector3.zero, bl = Vector3.zero;
-            float bestTl = 0f, bestTr = 0f, bestBr = 0f, bestBl = 0f;
+            float bestTl = -1f, bestTr = -1f, bestBr = -1f, bestBl = -1f;
 
             for (int i = 0; i < DirectionCount; i++)
             {
@@ -71,36 +74,40 @@ namespace Spinnenspiel
                     // Trefferpunkt auf die Netzebene (durch center, Normale n)
                     // projizieren, damit alle vier Anker in einer Ebene liegen.
                     Vector3 p = hits[h].point - n * Vector3.Dot(hits[h].point - center, n);
-                    float d = hits[h].distance;
+                    // Bewertung: Ecken (beide Komponenten groß) schlagen
+                    // weit abseits gelegene Seitenpunkte.
+                    float score = Mathf.Min(
+                        Mathf.Abs(Vector3.Dot(p - center, right)),
+                        Mathf.Abs(Vector3.Dot(p - center, up)));
                     if (x < 0f && y > 0f)
                     {
-                        if (d > bestTl)
+                        if (score > bestTl)
                         {
-                            bestTl = d;
+                            bestTl = score;
                             tl = p;
                         }
                     }
                     else if (x > 0f && y > 0f)
                     {
-                        if (d > bestTr)
+                        if (score > bestTr)
                         {
-                            bestTr = d;
+                            bestTr = score;
                             tr = p;
                         }
                     }
                     else if (x > 0f && y < 0f)
                     {
-                        if (d > bestBr)
+                        if (score > bestBr)
                         {
-                            bestBr = d;
+                            bestBr = score;
                             br = p;
                         }
                     }
                     else if (x < 0f && y < 0f)
                     {
-                        if (d > bestBl)
+                        if (score > bestBl)
                         {
-                            bestBl = d;
+                            bestBl = score;
                             bl = p;
                         }
                     }
@@ -108,13 +115,25 @@ namespace Spinnenspiel
                 }
             }
 
-            bool ok = bestTl > 0f && bestTr > 0f && bestBr > 0f && bestBl > 0f;
+            bool ok = bestTl >= 0f && bestTr >= 0f && bestBr >= 0f && bestBl >= 0f;
             if (!ok)
             {
                 return false;
             }
 
-            ok = Vector3.Distance(tl, tr) >= MinSpreadX && Vector3.Distance(tl, bl) >= MinSpreadY;
+            // Spannweiten als Komponenten-Abstände prüfen (quadratischere Rahmen).
+            float dxtl = Vector3.Dot(tl - center, right);
+            float dxtr = Vector3.Dot(tr - center, right);
+            float dxbr = Vector3.Dot(br - center, right);
+            float dxbl = Vector3.Dot(bl - center, right);
+            float dytl = Vector3.Dot(tl - center, up);
+            float dytr = Vector3.Dot(tr - center, up);
+            float dybr = Vector3.Dot(br - center, up);
+            float dybl = Vector3.Dot(bl - center, up);
+            ok = dxtr - dxtl >= MinSpreadX
+                && dxbr - dxbl >= MinSpreadX
+                && dytl - dybl >= MinSpreadY
+                && dytr - dybr >= MinSpreadY;
             if (!ok)
             {
                 return false;
