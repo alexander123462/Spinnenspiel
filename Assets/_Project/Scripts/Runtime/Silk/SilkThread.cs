@@ -170,7 +170,7 @@ namespace Spinnenspiel
         }
 
         /// <summary>Ein Material für alle Fäden: URP Unlit, weiß, Alpha 0.8, transparent.</summary>
-        private static Material SharedMaterial
+        public static Material SharedMaterial
         {
             get
             {
