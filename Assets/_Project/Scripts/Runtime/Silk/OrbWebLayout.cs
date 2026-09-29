@@ -114,6 +114,8 @@ namespace Spinnenspiel
                 minFrameR = Mathf.Min(minFrameR, r);
                 maxFrameR = Mathf.Max(maxFrameR, r);
             }
+            // Runde Fangspirale: Radius-Obergrenze für breite, niedrige Rahmen.
+            float orbMax = 1.25f * minFrameR;
 
             // Hilfsspirale: von 3*freeZoneRadius nach außen, je Umlauf spiralSpacing*4,
             // ein Punkt pro Radius; die Spirale endet, sobald ein Radius den Rahmen verlässt,
@@ -130,7 +132,7 @@ namespace Spinnenspiel
                     {
                         float ang = i * stepAngle;
                         Vector2 dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
-                        if (r > FrameRadius(dir)) continue;
+                        if (r > Mathf.Min(FrameRadius(dir), orbMax)) continue;
                         AuxSpiral.Add(ToWorld(dir * r));
                     }
                 }
@@ -149,7 +151,7 @@ namespace Spinnenspiel
                     {
                         float ang = i * stepAngle;
                         Vector2 dir = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang));
-                        float r = 0.9f * FrameRadius(dir) - t * spiralSpacing;
+                        float r = Mathf.Min(0.9f * FrameRadius(dir), 0.9f * orbMax) - t * spiralSpacing;
                         if (r < inner) continue;
                         CaptureSpiral.Add(ToWorld(dir * r));
                     }

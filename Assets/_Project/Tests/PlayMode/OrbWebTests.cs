@@ -32,6 +32,32 @@ namespace Spinnenspiel.Tests
         }
 
         [Test]
+        public void Layout_WideFrame_RoundOrb()
+        {
+            var anker = new[]
+            {
+                new Vector3(-1f, 0.5f, 0f),
+                new Vector3(1f, 0.5f, 0f),
+                new Vector3(1f, 0f, 0f),
+                new Vector3(-1f, 0f, 0f)
+            };
+            var layout = new OrbWebLayout(anker);
+            float minU = float.PositiveInfinity, maxU = float.NegativeInfinity;
+            float minV = float.PositiveInfinity, maxV = float.NegativeInfinity;
+            for (int i = 0; i < layout.CaptureSpiral.Count; i++)
+            {
+                Vector2 u = layout.ToPlane(layout.CaptureSpiral[i]);
+                minU = Mathf.Min(minU, u.x); maxU = Mathf.Max(maxU, u.x);
+                minV = Mathf.Min(minV, u.y); maxV = Mathf.Max(maxV, u.y);
+            }
+            float breite = maxU - minU;
+            float hoehe = maxV - minV;
+            Assert.That(layout.CaptureSpiral.Count, Is.GreaterThan(0), "Fangspirale leer");
+            Assert.That(breite, Is.LessThan(1.6f), "Spirale zu breit: " + breite.ToString("0.00", CultureInfo.InvariantCulture));
+            Assert.That(hoehe, Is.LessThan(1.6f), "Spirale zu hoch: " + hoehe.ToString("0.00", CultureInfo.InvariantCulture));
+        }
+
+        [Test]
         public void RadiusEndenLiegenAmRahmen()
         {
             var layout = CreateLayout();
