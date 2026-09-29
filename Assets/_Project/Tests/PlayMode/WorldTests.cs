@@ -57,7 +57,7 @@ namespace Spinnenspiel.Tests
                     {
                         // Ein aufgesetzter Fuß darf nicht in einem Kollider stecken (Berühren eines Hindernisses ist erlaubt).
                         Vector3 probe = leg.FootPosition + leg.FootNormal * 0.004f;
-                        Assert.IsFalse(Physics.CheckSphere(probe, 0.0015f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore),
+                        Assert.IsFalse(Physics.CheckSphere(probe, 0.0015f, Physics.DefaultRaycastLayers & ~GameLayers.PlantMask, QueryTriggerInteraction.Ignore),
                             "Fuß " + leg.name + " steckt in einem Hindernis bei " + leg.FootPosition);
                     }
                 }
@@ -198,6 +198,137 @@ namespace Spinnenspiel.Tests
 
             movement.SetExternalMoveInput(Vector2.zero);
             Assert.Greater(dot, 0.4f, "Spinne kommt nicht über den Baumstamm, Abstand hinter der Achse: " + dot);
+        }
+
+        [UnityTest]
+        [Ignore("wartet auf Pflanzen-Collider, Auftrag 6.3d2")]
+        public IEnumerator WorldWeb_BuildsBetweenPlants()
+        {
+            yield return LoadWorld();
+            GameObject spider = LoadedSpider();
+            SpiderMovement movement = spider.GetComponent<SpiderMovement>();
+            SpiderWebPlacer placer = spider.GetComponent<SpiderWebPlacer>();
+            SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
+            Assert.IsNotNull(placer, "SpiderWebPlacer fehlt");
+            Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+
+            // 4 Blickrichtungen relativ zum Start (waagrecht).
+            Vector3 start = spider.transform.position;
+            Vector3 fwd = spider.transform.forward;
+            fwd.y = 0f;
+            if (fwd.sqrMagnitude < 0.0001f) fwd = Vector3.forward; else fwd = fwd.normalized;
+            Vector3 rightDir = Vector3.Cross(Vector3.up, fwd);
+            Vector3[] blicke = { fwd, rightDir, -fwd, -rightDir };
+
+            // Raster -10..10 m um den Start, Bodenpunkt pro Spalte, dann Netzplatz-Suche.
+            int found = 0;
+            Vector3 firstPoint = Vector3.zero;
+            Vector3 firstBlick = fwd;
+            bool haveFirst = false;
+            for (int gx = -10; gx <= 10; gx++)
+            {
+                for (int gz = -10; gz <= 10; gz++)
+                {
+                    Vector3 col = new Vector3(start.x + gx, start.y + 20f, start.z + gz);
+                    RaycastHit[] hits = Physics.RaycastAll(col, Vector3.down, 40f,
+                        Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+                    Vector3 ground = Vector3.zero;
+                    bool groundFound = false;
+                    for (int h = 0; h < hits.Length; h++)
+                    {
+                        if (hits[h].collider.transform == spider.transform ||
+                            hits[h].collider.transform.IsChildOf(spider.transform))
+                        {
+                            continue; // eigene Kollider ignorieren
+                        }
+                        ground = hits[h].point;
+                        groundFound = true;
+                        break;
+                    }
+                    if (!groundFound)
+                    {
+                        continue;
+                    }
+
+                    foreach (Vector3 blick in blicke)
+                    {
+                        if (WebSiteFinder.TryFindNear(ground, blick, spider.transform, out Vector3[] anchors, out Vector3 center))
+                        {
+                            found++;
+                            if (!haveFirst)
+                            {
+                                firstPoint = ground;
+                                firstBlick = blick;
+                                haveFirst = true;
+                            }
+                        }
+                    }
+                }
+            }
+
+            Debug.Log("[WELTNETZ] Plaetze gefunden: " + found);
+            Assert.GreaterOrEqual(found, 5, "Zu wenige Netzplaetze in der Testwelt: " + found);
+
+            // Spinne auf den ersten Treffer teleportieren und Netz bauen lassen.
+            movement.SetScripted(true);
+            movement.Teleport(firstPoint + Vector3.up * 0.05f, Quaternion.LookRotation(firstBlick, Vector3.up));
+            yield return new WaitForSeconds(0.5f);
+            placer.viewOverride = firstBlick;
+            builder.durationScale = 0.1f;
+            Assert.IsTrue(placer.TryPlaceWebNow(), "TryPlaceWebNow fehlgeschlagen am ersten Platz");
+
+            float wait = 0f;
+            while (builder.CurrentStage != OrbWeb.WebStage.Done && wait < 20f)
+            {
+                wait += Time.deltaTime;
+                yield return null;
+            }
+            Assert.AreEqual(OrbWeb.WebStage.Done, builder.CurrentStage, "Netzbau nach 20 s nicht fertig");
+
+            // Kontrollbilder: nah (0,9 m) und weit (2,5 m) aus Netznormale-Perspektive.
+            Vector3 hub = builder.Web.Layout.Hub;
+            Vector3 n = builder.Normal;
+            GameObject camGo = new GameObject("WeltNetzCam");
+            Camera cam = camGo.AddComponent<Camera>();
+            cam.fieldOfView = 50f;
+            RenderTexture rt = new RenderTexture(1280, 720, 24);
+            rt.Create();
+            cam.targetTexture = rt;
+
+            string dir = System.IO.Path.Combine(Application.dataPath, "../Logs/ci");
+            System.IO.Directory.CreateDirectory(dir);
+
+            cam.transform.position = hub + n * 0.9f + Vector3.up * 0.15f;
+            cam.transform.rotation = Quaternion.LookRotation(hub - cam.transform.position, n);
+            SaveFrame(cam, rt, System.IO.Path.Combine(dir, "weltnetz.png"));
+
+            cam.transform.position = hub + n * 2.5f + Vector3.up * 0.8f;
+            cam.transform.rotation = Quaternion.LookRotation(hub - cam.transform.position, n);
+            SaveFrame(cam, rt, System.IO.Path.Combine(dir, "weltnetz_weit.png"));
+
+            Assert.IsTrue(System.IO.File.Exists(System.IO.Path.Combine(dir, "weltnetz.png")), "weltnetz.png fehlt");
+            Assert.IsTrue(System.IO.File.Exists(System.IO.Path.Combine(dir, "weltnetz_weit.png")), "weltnetz_weit.png fehlt");
+            Assert.IsTrue(builder.IsSittingInWeb, "Spinne sitzt nach dem Bau nicht in der Nabe");
+
+            // Aufräumen: Kamera + RenderTexture.
+            cam.targetTexture = null;
+            RenderTexture.active = null;
+            Object.DestroyImmediate(camGo);
+            Object.DestroyImmediate(rt);
+        }
+
+        /// <summary>Render die Kamera in die RenderTexture und speichert als PNG ab.</summary>
+        private static void SaveFrame(Camera cam, RenderTexture rt, string file)
+        {
+            cam.Render();
+            RenderTexture.active = rt;
+            Texture2D tex = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
+            tex.Apply(false);
+            byte[] png = tex.EncodeToPNG();
+            Object.DestroyImmediate(tex);
+            RenderTexture.active = null;
+            System.IO.File.WriteAllBytes(file, png);
         }
     }
 }

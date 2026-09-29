@@ -44,6 +44,8 @@ namespace Spinnenspiel
 
         private void Awake()
         {
+            // Pflanzen zählen als Surface nicht mit (eigene Layer-8-Ebene).
+            groundMask &= ~GameLayers.PlantMask;
             _legs = GetComponentsInChildren<SpiderLeg>();
         }
 

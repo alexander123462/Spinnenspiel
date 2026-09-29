@@ -15,8 +15,8 @@ namespace Spinnenspiel
         public float probeDepth = 0.2f;
         /// <summary>Reichweite der Wand-Probe nach vorn.</summary>
         public float wallProbe = 0.14f;
-        /// <summary>Raycast-Maske ohne Layer 2 (Ignore Raycast / Spinne).</summary>
-        public int mask = Physics.DefaultRaycastLayers & ~(1 << 2);
+        /// <summary>Raycast-Maske ohne Layer 2 (Ignore Raycast / Spinne) und ohne Pflanzen (Layer 8).</summary>
+        public int mask = Physics.DefaultRaycastLayers & ~(1 << 2) & ~GameLayers.PlantMask;
 
         private const float TiltDegrees = 40f;
 

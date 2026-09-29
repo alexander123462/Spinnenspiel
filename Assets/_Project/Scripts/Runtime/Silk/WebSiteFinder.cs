@@ -52,25 +52,32 @@ namespace Spinnenspiel
                 float y = Vector3.Dot(dir, up);
 
                 // Naechster gültige Treffer dieser Richtung (Hits sortiert nach Distanz).
-                RaycastHit[] hits = Physics.RaycastAll(center, dir, MaxDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+                RaycastHit[] hits = Physics.SphereCastAll(center, 0.04f, dir, MaxDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
                 for (int h = 0; h < hits.Length; h++)
                 {
                     if (ignore != null && hits[h].collider.transform.IsChildOf(ignore))
                     {
                         continue;
                     }
+                    if (hits[h].distance <= 0f)
+                    {
+                        continue; // Ueberlappung am Start, z.B. eigener Kollider
+                    }
                     if (hits[h].distance < MinAnchorDistance)
                     {
                         continue;
                     }
 
+                    // Trefferpunkt auf die Netzebene (durch center, Normale n)
+                    // projizieren, damit alle vier Anker in einer Ebene liegen.
+                    Vector3 p = hits[h].point - n * Vector3.Dot(hits[h].point - center, n);
                     float d = hits[h].distance;
                     if (x < 0f && y > 0f)
                     {
                         if (d > bestTl)
                         {
                             bestTl = d;
-                            tl = hits[h].point;
+                            tl = p;
                         }
                     }
                     else if (x > 0f && y > 0f)
@@ -78,7 +85,7 @@ namespace Spinnenspiel
                         if (d > bestTr)
                         {
                             bestTr = d;
-                            tr = hits[h].point;
+                            tr = p;
                         }
                     }
                     else if (x > 0f && y < 0f)
@@ -86,7 +93,7 @@ namespace Spinnenspiel
                         if (d > bestBr)
                         {
                             bestBr = d;
-                            br = hits[h].point;
+                            br = p;
                         }
                     }
                     else if (x < 0f && y < 0f)
@@ -94,7 +101,7 @@ namespace Spinnenspiel
                         if (d > bestBl)
                         {
                             bestBl = d;
-                            bl = hits[h].point;
+                            bl = p;
                         }
                     }
                     break;

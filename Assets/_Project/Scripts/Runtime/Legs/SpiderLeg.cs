@@ -85,6 +85,8 @@ namespace Spinnenspiel
 
         private void Start()
         {
+            // Pflanzen sind für die Beine kein festes Hindernis (eigene Layer-8-Ebene).
+            groundMask &= ~GameLayers.PlantMask;
             SnapToGround();
         }
 

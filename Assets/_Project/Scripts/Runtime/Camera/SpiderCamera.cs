@@ -79,6 +79,8 @@ namespace Spinnenspiel
 
         private void Awake()
         {
+            // Pflanzen blockieren die Kamera nicht (eigene Layer-8-Ebene).
+            obstacleMask &= ~GameLayers.PlantMask;
             _camera = GetComponent<Camera>();
             if (target == null)
             {
