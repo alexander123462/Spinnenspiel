@@ -345,6 +345,122 @@ namespace Spinnenspiel.Tests
             Assert.IsFalse(silk.IsSpinning, "Spinnpose wurde nicht beendet");
         }
 
+        [UnityTest]
+        public IEnumerator Predation_RecordsFrames()
+        {
+            yield return LoadScene();
+
+            // Spawner stilllegen und vorhandene Fliegen entfernen (wie in Predation_HuntsWrapsAndEats).
+            InsectSpawner spawner = Object.FindFirstObjectByType<InsectSpawner>();
+            Assert.IsNotNull(spawner, "Spawner 'Insekten' nicht gefunden");
+            spawner.enabled = false;
+            foreach (FlyingInsect f in Object.FindObjectsOfType<FlyingInsect>())
+            {
+                f.Remove();
+            }
+
+            WebBuildDemo demo = Object.FindFirstObjectByType<WebBuildDemo>();
+            Assert.IsNotNull(demo, "WebBuildDemo nicht gefunden");
+            OrbWeb web = demo.CreateWeb();
+            Assert.IsNotNull(web, "CreateWeb() lieferte kein Netz");
+            web.SetProgress(OrbWeb.WebStage.Done, 1f);
+
+            SpiderPredation predation = Object.FindFirstObjectByType<SpiderPredation>();
+            Assert.IsNotNull(predation, "SpiderPredation an der Spinne fehlt");
+            Transform spider = predation.transform;
+            SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
+            Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+
+            spider.position = new Vector3(5.4f, 0.6f, 1.9f);
+            builder.SitAtHub(web);
+            Assert.IsTrue(builder.IsSittingInWeb, "Voraussetzung: Spinne sitzt in der Nabe");
+
+            Vector3 n = builder.Normal;
+            Vector3 right = Vector3.Cross(Vector3.up, n).normalized;
+            Vector3 start = web.Layout.Hub + n * 0.5f + right * 0.2f;
+
+            GameObject fly = Object.Instantiate(spawner.template, start, Quaternion.identity);
+            fly.name = "Testfliege";
+            fly.SetActive(true);
+            FlyingInsect insect = fly.GetComponent<FlyingInsect>();
+            Assert.IsNotNull(insect, "Testfliege hat kein FlyingInsect");
+            insect.home = start;
+            insect.FlyTo(web.Layout.Hub - n * 0.5f + right * 0.2f);
+
+            // Fang abwarten (max. 3 s).
+            float t = 0f;
+            while (t < 3f && insect.State != FlyingInsect.InsectState.Caught)
+            {
+                t += Time.deltaTime;
+                yield return null;
+            }
+            Assert.AreEqual(FlyingInsect.InsectState.Caught, insect.State, "Fliege wurde nicht gefangen");
+
+            // Aufnahme-Kamera: auf die Nabe, leicht angehoben, FOV 45.
+            GameObject camGo = new GameObject("RecCam");
+            Camera cam = camGo.AddComponent<Camera>();
+            cam.transform.position = web.Layout.Hub + n * 0.45f + Vector3.up * 0.05f;
+            cam.transform.LookAt(web.Layout.Hub);
+            cam.fieldOfView = 45f;
+            RenderTexture rt = new RenderTexture(960, 540, 24);
+            rt.Create();
+            cam.targetTexture = rt;
+
+            string dir = System.IO.Path.Combine(Application.dataPath, "../Logs/ci");
+            System.IO.Directory.CreateDirectory(dir);
+
+            // Bild 0: Fliege gerade gefangen, vor StartHunt.
+            yield return new WaitForSeconds(0.1f);
+            SaveFrame(cam, rt, System.IO.Path.Combine(dir, "jagd_0.png"));
+
+            // Jagd starten und 7 Bilder zu festen Zeitpunkten (seit StartHunt) nehmen.
+            predation.durationScale = 0.5f;
+            float[] shots = { 0.4f, 1.0f, 1.6f, 2.2f, 2.8f, 3.6f, 5.0f };
+            predation.StartHunt(insect);
+            int shot = 0;
+            float elapsed = 0f;
+            while (shot < shots.Length && elapsed < 6f)
+            {
+                if (elapsed >= shots[shot])
+                {
+                    yield return new WaitForSeconds(0.1f);
+                    SaveFrame(cam, rt, System.IO.Path.Combine(dir, "jagd_" + (shot + 1) + ".png"));
+                    shot++;
+                }
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+            Assert.AreEqual(shots.Length, shot, "Nicht alle Jagd-Bilder aufgenommen");
+
+            // Alle 8 Dateien müssen existieren.
+            for (int i = 0; i < 8; i++)
+            {
+                Assert.IsTrue(System.IO.File.Exists(System.IO.Path.Combine(dir, "jagd_" + i + ".png")),
+                    "jagd_" + i + ".png fehlt");
+            }
+
+            // Aufräumen: Kamera + RenderTexture (und das Testnetz).
+            cam.targetTexture = null;
+            RenderTexture.active = null;
+            Object.DestroyImmediate(camGo);
+            Object.DestroyImmediate(rt);
+            Object.DestroyImmediate(web.gameObject);
+        }
+
+        /// <summary>Render die Kamera in die RenderTexture und speichert als PNG ab.</summary>
+        private static void SaveFrame(Camera cam, RenderTexture rt, string file)
+        {
+            cam.Render();
+            RenderTexture.active = rt;
+            var tex = new Texture2D(960, 540, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, 960, 540), 0, 0);
+            tex.Apply(false);
+            byte[] png = tex.EncodeToPNG();
+            Object.DestroyImmediate(tex);
+            RenderTexture.active = null;
+            System.IO.File.WriteAllBytes(file, png);
+        }
+
         private static IEnumerator LoadScene()
         {
             SceneManager.LoadScene(SceneName);
