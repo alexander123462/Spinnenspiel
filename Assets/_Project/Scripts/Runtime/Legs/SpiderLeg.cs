@@ -153,6 +153,39 @@ namespace Spinnenspiel
                 return true;
             }
 
+            // Netz-Modus: das Bein greift auf die Fäden eines Radnetzes (Tarsenklauen am Faden).
+            if (OrbWeb.All.Count > 0)
+            {
+                float bestSq = float.MaxValue;
+                Vector3 bestPoint = desired;
+                OrbWeb bestWeb = null;
+                foreach (OrbWeb web in OrbWeb.All)
+                {
+                    if (web.TryClosestPoint(desired, 0.09f, out Vector3 pt)
+                        && (pt - HipPosition).magnitude <= MaxReach)
+                    {
+                        float sq = (pt - desired).sqrMagnitude;
+                        if (sq < bestSq)
+                        {
+                            bestSq = sq;
+                            bestPoint = pt;
+                            bestWeb = web;
+                        }
+                    }
+                }
+                if (bestWeb != null)
+                {
+                    point = bestPoint;
+                    Vector3 n = bestWeb.PlaneNormal;
+                    // Normale zeigt zur Spinne: Dot(normal, Hüfte − Fadenpunkt) > 0.
+                    if (Vector3.Dot(n, HipPosition - point) < 0f)
+                        n = -n;
+                    normal = n;
+                    surface = SurfaceType.Wood;
+                    return true;
+                }
+            }
+
             Vector3 up = Up;
             Vector3 rest = restTarget != null ? restTarget.position : desired;
             for (int i = 0; i < 3; i++)

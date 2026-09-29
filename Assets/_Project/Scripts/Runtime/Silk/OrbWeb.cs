@@ -26,6 +26,15 @@ namespace Spinnenspiel
         /// <summary>Linienbreite aller Seidenfäden (m).</summary>
         public float threadWidth = 0.0012f;
 
+        /// <summary>Alle aktiven Radnetze im Spiel (Beine greifen darüber Fäden).</summary>
+        public static readonly List<OrbWeb> All = new List<OrbWeb>();
+
+        /// <summary>Normale der Netzebene aus dem Layout (vor Build: +Z).</summary>
+        public Vector3 PlaneNormal => Layout != null ? Layout.Normal : Vector3.forward;
+
+        private void OnEnable() => All.Add(this);
+        private void OnDisable() => All.Remove(this);
+
         private LineRenderer frameLine;
         private LineRenderer hubRingLine;
         private LineRenderer captureLine;
@@ -149,6 +158,68 @@ namespace Spinnenspiel
                 default:
                     return new Vector3[0];
             }
+        }
+
+        /// <summary>
+        /// Nächster Punkt auf einem sichtbaren Faden dieses Netzes (Rahmen, Hub-Ring,
+        /// Fangspirale, Hilfsspirale, Radien). True wenn der Abstand &lt;= maxDist.
+        /// </summary>
+        public bool TryClosestPoint(Vector3 p, float maxDist, out Vector3 point)
+        {
+            point = p;
+            if (Layout == null)
+                return false;
+
+            // Vorfilter: Punkt muss in maxDist-Entfernung an der Netzebene liegen.
+            if (Mathf.Abs(Vector3.Dot(p - Layout.Hub, PlaneNormal)) > maxDist)
+                return false;
+
+            float bestSq = float.MaxValue;
+            Vector3 best = p;
+            CheckLine(frameLine, p, ref bestSq, ref best);
+            CheckLine(hubRingLine, p, ref bestSq, ref best);
+            CheckLine(captureLine, p, ref bestSq, ref best);
+            CheckLine(auxLine, p, ref bestSq, ref best);
+            for (int i = 0; i < radiusLines.Count; i++)
+                CheckLine(radiusLines[i], p, ref bestSq, ref best);
+
+            if (bestSq <= maxDist * maxDist)
+            {
+                point = best;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>Nächster Punkt auf den Segmenten einer Linie (nur sichtbare Punkte).</summary>
+        private void CheckLine(LineRenderer line, Vector3 p, ref float bestSq, ref Vector3 best)
+        {
+            if (line == null || !line.enabled || line.positionCount < 2)
+                return;
+
+            int n = line.positionCount;
+            int end = line.loop ? n : n - 1; // loop: auch das schließende Segment
+            for (int i = 0; i < end; i++)
+            {
+                Vector3 a = GetWorldPoint(line, i);
+                Vector3 b = GetWorldPoint(line, (i + 1) % n);
+                Vector3 ab = b - a;
+                float t = Vector3.Dot(p - a, ab) / (ab.sqrMagnitude + 1e-12f);
+                t = Mathf.Clamp01(t);
+                Vector3 closest = a + ab * t;
+                float sq = (closest - p).sqrMagnitude;
+                if (sq < bestSq)
+                {
+                    bestSq = sq;
+                    best = closest;
+                }
+            }
+        }
+
+        private static Vector3 GetWorldPoint(LineRenderer line, int i)
+        {
+            Vector3 pos = line.GetPosition(i);
+            return line.useWorldSpace ? pos : line.transform.TransformPoint(pos);
         }
 
         /// <summary>Zeigt anteilig (t01) die ersten Punkte einer Linie, bei 0 keine.</summary>

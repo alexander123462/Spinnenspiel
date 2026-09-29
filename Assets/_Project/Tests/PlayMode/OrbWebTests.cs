@@ -237,9 +237,9 @@ namespace Spinnenspiel.Tests
             // Eigene Aufnahme-Kamera: aus -Z auf die Netzebene.
             GameObject camGo = new GameObject("RecCam");
             Camera cam = camGo.AddComponent<Camera>();
-            cam.transform.position = new Vector3(5.4f, 0.6f, 1.25f);
+            cam.transform.position = new Vector3(5.4f, 0.6f, 0.55f);
             cam.transform.rotation = Quaternion.LookRotation(new Vector3(5.4f, 0.6f, 2.0f) - cam.transform.position);
-            cam.fieldOfView = 50f;
+            cam.fieldOfView = 55f;
             RenderTexture rt = new RenderTexture(960, 540, 24);
             rt.Create();
             cam.targetTexture = rt;
@@ -302,6 +302,93 @@ namespace Spinnenspiel.Tests
             Object.DestroyImmediate(camGo);
             Object.DestroyImmediate(rt);
             Object.DestroyImmediate(web.gameObject);
+        }
+
+        [UnityTest]
+        public IEnumerator Builder_LegsHoldWebLines()
+        {
+            SceneManager.LoadScene("Klettertest");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+            SpiderMovement movement = spider.GetComponent<SpiderMovement>();
+            Assert.IsNotNull(movement, "SpiderMovement fehlt");
+            SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
+            Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+
+            // Gleiches Netz wie Builder_BuildsWebInOrder (durationScale 0.1).
+            GameObject webGo = new GameObject("LegsHoldWeb");
+            OrbWeb web = webGo.AddComponent<OrbWeb>();
+            Vector3[] anchors =
+            {
+                new Vector3(5.02f, 1.15f, 2.0f),
+                new Vector3(5.78f, 1.15f, 2.0f),
+                new Vector3(5.72f, 0.02f, 2.0f),
+                new Vector3(5.08f, 0.02f, 2.0f)
+            };
+            OrbWebLayout layout = new OrbWebLayout(anchors, 16, 0.02f, 0.03f, 7);
+            web.Build(layout);
+
+            movement.SetScripted(true);
+            movement.Teleport(new Vector3(5.4f, 0.6f, 1.9f), Quaternion.LookRotation(Vector3.up, Vector3.back));
+            builder.durationScale = 0.1f;
+            builder.StartBuild(web);
+            Assert.IsTrue(builder.IsBuilding, "StartBuild hat nicht gestartet");
+
+            SpiderLeg[] legs = spider.GetComponentsInChildren<SpiderLeg>();
+            Assert.AreEqual(8, legs.Length, "Erwartet 8 Beine, gefunden: " + legs.Length);
+
+            bool fourOnThreadDuringCapture = false;
+            float elapsed = 0f;
+            while (builder.IsBuilding && elapsed < 15f)
+            {
+                if (builder.CurrentStage == OrbWeb.WebStage.CaptureSpiral)
+                {
+                    fourOnThreadDuringCapture = fourOnThreadDuringCapture || CountLegsOnWeb(web, legs) >= 4;
+                }
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            Assert.IsFalse(builder.IsBuilding, "Netzbau nach 15 s noch nicht fertig");
+            Assert.AreEqual(OrbWeb.WebStage.Done, builder.CurrentStage, "CurrentStage != Done");
+            // Nach Done 0.5 s warten, damit die Beine absetzen.
+            yield return new WaitForSeconds(0.5f);
+
+            Assert.IsTrue(fourOnThreadDuringCapture,
+                "Während CaptureSpiral waren nie mindestens 4 Beine auf einem Faden.");
+
+            int grounded = 0;
+            int onThread = 0;
+            for (int i = 0; i < legs.Length; i++)
+            {
+                SpiderLeg leg = legs[i];
+                if (!leg.IsGrounded)
+                    continue;
+                grounded++;
+                if (web.TryClosestPoint(leg.FootPosition, 0.01f, out _))
+                    onThread++;
+            }
+            Assert.GreaterOrEqual(grounded, 6,
+                "Nur " + grounded + " von 8 Beinen geerdet.");
+            Assert.AreEqual(grounded, onThread,
+                "Nicht alle geerdeten Beine greifen einen Faden: " + onThread + "/" + grounded);
+
+            Object.DestroyImmediate(webGo);
+        }
+
+        /// <summary>Zählt geerdete Beine, deren Fuß auf einem Faden des Netzes liegt.</summary>
+        private static int CountLegsOnWeb(OrbWeb web, SpiderLeg[] legs)
+        {
+            int n = 0;
+            for (int i = 0; i < legs.Length; i++)
+            {
+                if (legs[i].IsGrounded && web.TryClosestPoint(legs[i].FootPosition, 0.01f, out _))
+                    n++;
+            }
+            return n;
         }
 
         /// <summary>Render die Kamera in die RenderTexture und speichert als PNG ab.</summary>
