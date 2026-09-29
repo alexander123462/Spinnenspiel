@@ -379,6 +379,61 @@ namespace Spinnenspiel.Tests
             Object.DestroyImmediate(webGo);
         }
 
+        [UnityTest]
+        public IEnumerator Builder_SitAtHub_LegsOnWeb()
+        {
+            SceneManager.LoadScene("Klettertest");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+            SpiderMovement movement = spider.GetComponent<SpiderMovement>();
+            Assert.IsNotNull(movement, "SpiderMovement fehlt");
+            SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
+            Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+            WebBuildDemo demo = Object.FindFirstObjectByType<WebBuildDemo>();
+            Assert.IsNotNull(demo, "WebBuildDemo fehlt");
+
+            OrbWeb web = demo.CreateWeb();
+            Assert.IsNotNull(web, "CreateWeb lieferte null");
+
+            // Spinne vor das Netz (Ebenen-Seite -Z), dann direkt in die Nabe setzen.
+            movement.SetScripted(true);
+            movement.Teleport(new Vector3(5.4f, 0.6f, 1.9f), Quaternion.LookRotation(Vector3.up, Vector3.back));
+            builder.SitAtHub(web);
+
+            // Beine absetzen lassen.
+            yield return new WaitForSeconds(0.8f);
+
+            Assert.IsTrue(builder.IsSittingInWeb, "IsSittingInWeb ist false");
+            Assert.IsTrue(movement.IsScripted, "movement.IsScripted ist false");
+            float d = Vector3.Distance(spider.transform.position, web.Layout.Hub);
+            Assert.That(d, Is.LessThan(0.06f),
+                "Spinne liegt " + d.ToString("F3", CultureInfo.InvariantCulture) + " m vom Hub");
+
+            SpiderLeg[] legs = spider.GetComponentsInChildren<SpiderLeg>();
+            Assert.AreEqual(8, legs.Length, "Erwartet 8 Beine, gefunden: " + legs.Length);
+
+            int grounded = 0;
+            int onThread = 0;
+            for (int i = 0; i < legs.Length; i++)
+            {
+                SpiderLeg leg = legs[i];
+                if (!leg.IsGrounded)
+                    continue;
+                grounded++;
+                if (web.TryClosestPoint(leg.FootPosition, 0.01f, out _))
+                    onThread++;
+            }
+            Assert.GreaterOrEqual(grounded, 6,
+                "Nur " + grounded + " von 8 Beinen geerdet.");
+            Assert.AreEqual(grounded, onThread,
+                "Nicht alle geerdeten Beine greifen einen Faden: " + onThread + "/" + grounded);
+
+            Object.DestroyImmediate(web.gameObject);
+        }
+
         /// <summary>Zählt geerdete Beine, deren Fuß auf einem Faden des Netzes liegt.</summary>
         private static int CountLegsOnWeb(OrbWeb web, SpiderLeg[] legs)
         {

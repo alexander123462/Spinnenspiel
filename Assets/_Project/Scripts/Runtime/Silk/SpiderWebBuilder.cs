@@ -23,6 +23,15 @@ namespace Spinnenspiel
         /// <summary>Das aktuell gebaute Netz (null, wenn nie gebaut).</summary>
         public OrbWeb Web { get; private set; }
 
+        /// <summary>True, wenn die Spinne nach dem Bau in der Nabe sitzt.</summary>
+        public bool IsSittingInWeb => _sittingInWeb;
+
+        /// <summary>Netznormale, zeigt zur Seite der Spinne.</summary>
+        public Vector3 Normal => _normal;
+
+        /// <summary>Unterdrückt das Loslassen (Move/Release) in der Nabe, z.B. während einer Animation.</summary>
+        public bool SuppressRelease { get; set; }
+
         private SpiderMovement _movement;
         private SpiderSilk _silk;
         private SpiderInput _input;
@@ -91,6 +100,11 @@ namespace Spinnenspiel
             // Spinne sitzt nach dem Bau in der Nabe: bei Bewegungseingabe oder
             // Release lässt sie sich wie echt am Sicherheitsfaden fallen.
             if (!_sittingInWeb || _input == null)
+            {
+                return;
+            }
+
+            if (SuppressRelease)
             {
                 return;
             }
@@ -200,8 +214,61 @@ namespace Spinnenspiel
             _sittingInWeb = true;
         }
 
+        /// <summary>Dreh-Ziel für eine Richtung: in die Netzebene projiziert, Kopf zeigt in Richtung.</summary>
+        public Quaternion FacingRotation(Vector3 direction)
+        {
+            Vector3 proj = direction - _normal * Vector3.Dot(direction, _normal);
+            if (proj.sqrMagnitude < 1e-6f)
+            {
+                return _currentRotation;
+            }
+
+            return Quaternion.LookRotation(proj.normalized, _normal);
+        }
+
+        /// <summary>Setzt die Spinne sofort fertig in der Nabe: Pose wie nach dem Bau, Beine greifen, Web als Done markiert.</summary>
+        public void SitAtHub(OrbWeb web)
+        {
+            if (web == null || web.Layout == null)
+            {
+                return;
+            }
+
+            Web = web;
+
+            // Netznormale zeigt zur Seite der Spinne (wie in StartBuild).
+            Vector3 toSpider = transform.position - web.Layout.Hub;
+            _normal = web.Layout.Normal;
+            if (Vector3.Dot(_normal, toSpider) < 0f)
+            {
+                _normal = -_normal;
+            }
+
+            if (_movement != null)
+            {
+                _movement.SetScripted(true);
+            }
+
+            // Kopf nach unten wie am Ende von BuildRoutine.
+            Vector3 flatDown = -Vector3.up - _normal * Vector3.Dot(-Vector3.up, _normal);
+            Quaternion hubRotation = flatDown.sqrMagnitude > 1e-6f
+                ? Quaternion.LookRotation(flatDown.normalized, _normal)
+                : _currentRotation;
+
+            transform.position = web.Layout.Hub + _normal * bodyOffset;
+            transform.rotation = hubRotation;
+            _currentRotation = hubRotation;
+
+            web.SetProgress(OrbWeb.WebStage.Done, 1f);
+            web.showAux = false;
+
+            CurrentStage = OrbWeb.WebStage.Done;
+            IsBuilding = false;
+            _sittingInWeb = true;
+        }
+
         /// <summary>Läuft linear zum Ziel (Position + sanfte Drehung) in der Dauer.</summary>
-        private IEnumerator WalkTo(Vector3 target, float duration, Quaternion targetRotation)
+        public IEnumerator WalkTo(Vector3 target, float duration, Quaternion targetRotation)
         {
             duration = Mathf.Max(duration, 0.001f);
             Vector3 from = transform.position;
