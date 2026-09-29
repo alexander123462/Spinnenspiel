@@ -207,5 +207,115 @@ namespace Spinnenspiel.Tests
 
             Object.DestroyImmediate(webGo);
         }
+
+        [UnityTest]
+        public IEnumerator Builder_RecordsFrames()
+        {
+            SceneManager.LoadScene("Klettertest");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+            SpiderMovement movement = spider.GetComponent<SpiderMovement>();
+            Assert.IsNotNull(movement, "SpiderMovement fehlt");
+            SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
+            Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+            WebBuildDemo demo = Object.FindFirstObjectByType<WebBuildDemo>();
+            Assert.IsNotNull(demo, "WebBuildDemo fehlt");
+
+            // Spinne vor das Netz (Ebenen-Seite -Z).
+            movement.SetScripted(true);
+            movement.Teleport(new Vector3(5.4f, 0.6f, 1.9f), Quaternion.LookRotation(Vector3.up, Vector3.back));
+
+            OrbWeb web = demo.CreateWeb();
+            Assert.IsNotNull(web, "CreateWeb lieferte null");
+            builder.durationScale = 0.25f;
+            builder.StartBuild(web);
+            Assert.IsTrue(builder.IsBuilding, "StartBuild hat nicht gestartet");
+
+            // Eigene Aufnahme-Kamera: aus -Z auf die Netzebene.
+            GameObject camGo = new GameObject("RecCam");
+            Camera cam = camGo.AddComponent<Camera>();
+            cam.transform.position = new Vector3(5.4f, 0.6f, 1.25f);
+            cam.transform.rotation = Quaternion.LookRotation(new Vector3(5.4f, 0.6f, 2.0f) - cam.transform.position);
+            cam.fieldOfView = 50f;
+            RenderTexture rt = new RenderTexture(960, 540, 24);
+            rt.Create();
+            cam.targetTexture = rt;
+
+            string dir = System.IO.Path.Combine(Application.dataPath, "../Logs/ci");
+            System.IO.Directory.CreateDirectory(dir);
+
+            // 8 Zeitpunkte: je 2 pro Stufe (30 % und 80 % der Stufendauer * 0.25),
+            // dazu 0.4 * 0.25 s Überweg pro Stufenanfang.
+            float[] stageDurations = { 5f, 12f, 5f, 20f };
+            float ds = builder.durationScale;
+            var shots = new System.Collections.Generic.List<float>();
+            float t = 0.4f * ds;
+            for (int s = 0; s < stageDurations.Length; s++)
+            {
+                float dur = stageDurations[s] * ds;
+                shots.Add(t + 0.3f * dur);
+                shots.Add(t + 0.8f * dur);
+                t += dur + 0.4f * ds;
+            }
+
+            int shot = 0;
+            float elapsed = 0f;
+            while (builder.IsBuilding && elapsed < 60f)
+            {
+                if (shot < shots.Count && elapsed >= shots[shot])
+                {
+                    SaveFrame(cam, rt, System.IO.Path.Combine(dir, "netzbau_" + shot + ".png"));
+                    shot++;
+                }
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            // Auf Done warten, dann das letzte Bild.
+            float wait = 0f;
+            while (builder.IsBuilding && wait < 20f)
+            {
+                wait += Time.deltaTime;
+                yield return null;
+            }
+            Assert.IsFalse(builder.IsBuilding, "Netzbau nach 20 s nicht fertig");
+            Assert.AreEqual(OrbWeb.WebStage.Done, builder.CurrentStage, "CurrentStage != Done");
+            // Batchmode: WaitForEndOfFrame nicht erlaubt, einfache Frame-Wartung.
+            yield return new WaitForSeconds(0.1f);
+            SaveFrame(cam, rt, System.IO.Path.Combine(dir, "netzbau_9.png"));
+
+            // Alle 9 Bilder müssen existieren (0-7 während des Baus, 9 nach Done).
+            for (int i = 0; i < 8; i++)
+            {
+                Assert.IsTrue(System.IO.File.Exists(System.IO.Path.Combine(dir, "netzbau_" + i + ".png")),
+                    "netzbau_" + i + ".png fehlt");
+            }
+            Assert.IsTrue(System.IO.File.Exists(System.IO.Path.Combine(dir, "netzbau_9.png")),
+                "netzbau_9.png fehlt");
+
+            // Aufräumen: Kamera + RenderTexture (und das Testnetz).
+            cam.targetTexture = null;
+            RenderTexture.active = null;
+            Object.DestroyImmediate(camGo);
+            Object.DestroyImmediate(rt);
+            Object.DestroyImmediate(web.gameObject);
+        }
+
+        /// <summary>Render die Kamera in die RenderTexture und speichert als PNG ab.</summary>
+        private static void SaveFrame(Camera cam, RenderTexture rt, string file)
+        {
+            cam.Render();
+            RenderTexture.active = rt;
+            var tex = new Texture2D(960, 540, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, 960, 540), 0, 0);
+            tex.Apply(false);
+            byte[] png = tex.EncodeToPNG();
+            Object.DestroyImmediate(tex);
+            RenderTexture.active = null;
+            System.IO.File.WriteAllBytes(file, png);
+        }
     }
 }

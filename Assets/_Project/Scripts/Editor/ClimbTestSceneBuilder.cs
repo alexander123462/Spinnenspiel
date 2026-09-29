@@ -56,6 +56,17 @@ namespace Spinnenspiel.EditorTools
                 leg.PoseAtRest();
             }
 
+            // Netzbau per Taste: WebBuildDemo mit vier Ankern am Netzplatz.
+            GameObject netzplatz = new GameObject("Netzplatz");
+            WebBuildDemo demo = netzplatz.AddComponent<WebBuildDemo>();
+            demo.anchors = new Vector3[]
+            {
+                new Vector3(5.02f, 1.15f, 2.0f),
+                new Vector3(5.78f, 1.15f, 2.0f),
+                new Vector3(5.72f, 0.02f, 2.0f),
+                new Vector3(5.08f, 0.02f, 2.0f)
+            };
+
             EnsureScenesFolder();
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScenePath);
             // Vorhandene Build-Szenen behalten, Klettertest nur ergaenzen.
