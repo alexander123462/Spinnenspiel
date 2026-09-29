@@ -80,6 +80,9 @@ namespace Spinnenspiel.EditorTools
             // Seiden-Steuerung (t53): Faden spinnen / loslassen + Fadenkreuz. Referenzen füllt Awake.
             root.AddComponent<SilkAiming>();
 
+            // Sicherheitsfaden (t55): Dragline mit Anker + Haftscheiben beim Laufen.
+            root.AddComponent<SpiderDragline>();
+
             return root;
         }
 

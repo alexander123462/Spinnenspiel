@@ -272,5 +272,33 @@ namespace Spinnenspiel.Tests
             Assert.IsTrue(Vector3.Distance(abdomen.localPosition, abdStartPos) < 0.002f,
                 "Abdomen weicht in der Position von der Ausgangslage ab: " + endStats);
         }
+
+        [UnityTest]
+        public IEnumerator Silk_Dragline_PlacesAnchors()
+        {
+            yield return Setup();
+
+            var dragline = spider.GetComponent<SpiderDragline>();
+            Assert.IsNotNull(dragline, "SpiderDragline fehlt");
+
+            // Spinne bei (0, 0, -2) mit Blick +X, 4 s vorwärts.
+            movement.Teleport(new Vector3(0f, 0f, -2f), Quaternion.LookRotation(Vector3.right, Vector3.up));
+            yield return new WaitForSeconds(0.3f);
+
+            movement.SetExternalMoveLocal(new Vector2(0f, 1f));
+            yield return new WaitForSeconds(4f);
+
+            string stats = string.Format(CultureInfo.InvariantCulture,
+                "anchors={0} lastAnchor=({1:F2},{2:F2},{3:F2}) spider=({4:F2},{5:F2},{6:F2}) lineEnabled={7}",
+                dragline.AnchorCount,
+                dragline.LastAnchor.x, dragline.LastAnchor.y, dragline.LastAnchor.z,
+                spider.transform.position.x, spider.transform.position.y, spider.transform.position.z,
+                dragline.Line != null && dragline.Line.enabled);
+
+            Assert.IsTrue(dragline.AnchorCount >= 3, "Weniger als 3 Anker nach 4 s Vorwärts: " + stats);
+            float dist = (spider.transform.position - dragline.LastAnchor).magnitude;
+            Assert.IsTrue(dist <= dragline.AnchorSpacing + 0.1f, "Abstand LastAnchor↔Spinne > anchorSpacing + 0.1: " + stats);
+            Assert.IsTrue(dragline.Line != null && dragline.Line.enabled, "Dragline-LineRenderer ist nicht aktiv: " + stats);
+        }
     }
 }
