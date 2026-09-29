@@ -58,7 +58,9 @@ namespace Spinnenspiel.EditorTools
             }
 
             // Netzbau per Taste: WebBuildDemo mit vier Ankern am Netzplatz.
+            // Netzplatz an der Nabe des Netzes, damit die Fliegen dort heimisch sind.
             GameObject netzplatz = new GameObject("Netzplatz");
+            netzplatz.transform.position = new Vector3(5.4f, 0.6f, 2.0f);
             WebBuildDemo demo = netzplatz.AddComponent<WebBuildDemo>();
             demo.anchors = new Vector3[]
             {

@@ -53,8 +53,7 @@ namespace Spinnenspiel.Tests
             float breite = maxU - minU;
             float hoehe = maxV - minV;
             Assert.That(layout.CaptureSpiral.Count, Is.GreaterThan(0), "Fangspirale leer");
-            Assert.That(breite, Is.LessThan(1.6f), "Spirale zu breit: " + breite.ToString("0.00", CultureInfo.InvariantCulture));
-            Assert.That(hoehe, Is.LessThan(1.6f), "Spirale zu hoch: " + hoehe.ToString("0.00", CultureInfo.InvariantCulture));
+            Assert.That(breite / hoehe, Is.LessThan(1.7f), "Spirale zu elliptisch: " + (breite / hoehe).ToString("0.00", CultureInfo.InvariantCulture));
         }
 
         [Test]

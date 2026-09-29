@@ -28,6 +28,9 @@ namespace Spinnenspiel
         [Tooltip("Wie lange (s) sich das Insekt im Netz zappelt, bevor es sich befreit.")]
         public float escapeTime = 10f;
 
+        /// <summary>Wahrscheinlichkeit (0..1) pro Neu-Zielen, ein fertiges Netz anzufliegen (simulierte Flugschneise).</summary>
+        public float webAttraction = 0.35f;
+
         /// <summary>Festhalten, damit es nicht aus dem Netz ausbricht (z. B. beim Einwickeln).</summary>
         public void Hold()
         {
@@ -44,6 +47,8 @@ namespace Spinnenspiel
         private float _lastTwitch;
         private Vector3 _twitchOffset;
         private float _lastWebVibe;
+
+        private float _webRunUntil; // Bis zu diesem Zeitpunkt wird die Home-Rückkehr unterdrückt (Flug ins Netz).
 
         [SerializeField] private float wanderRadius = 2.5f;
         [SerializeField] private float minHeight = 0.25f;   // über dem Boden
@@ -215,6 +220,31 @@ namespace Spinnenspiel
         /// <summary>Neues Wandern-Ziel: zufälliger Punkt in der Kugel um home, Höhe über Boden geklemmt.</summary>
         private void Retarget()
         {
+            // Simulierte Flugschneise: mit Wahrscheinlichkeit webAttraction fliegt die
+            // Fliege durch ein nahes fertiges Netz (Ziel 0.6 m HINTER der Netzebene).
+            if (Random.value < webAttraction)
+            {
+                OrbWeb web = FindNearbyCatchingWeb();
+                if (web != null)
+                {
+                    Vector3 hub = web.Layout.Hub;
+                    Vector3 n = web.PlaneNormal;
+                    int side = Vector3.Dot(transform.position - hub, n) >= 0f ? 1 : -1;
+                    Vector3 u = Vector3.Cross(n, Vector3.up).normalized;
+                    if (u.sqrMagnitude < 1e-6f)
+                    {
+                        u = Vector3.right;
+                    }
+
+                    Vector3 v = Vector3.Cross(n, u);
+                    Vector2 o = Random.insideUnitCircle * 0.15f;
+                    target = hub + u * o.x + v * o.y - n * side * 0.6f;
+                    nextTargetTime = Time.time + 4f;
+                    _webRunUntil = Time.time + 4f;
+                    return;
+                }
+            }
+
             Vector3 random = Random.insideUnitSphere * wanderRadius;
             Vector3 pos = home + random;
             pos.y = GroundHeight(pos) + Mathf.Clamp(Random.Range(minHeight, maxHeight), minHeight, maxHeight);
@@ -222,6 +252,29 @@ namespace Spinnenspiel
 
             // Neues Ziel auch nach 2–4 s, damit das Insekt nicht stillhält.
             nextTargetTime = Time.time + Random.Range(2f, 4f);
+        }
+
+        /// <summary>Nächstes Netz mit CanCatch und Hub < 4 m Abstand zur Fliege (null wenn keines).</summary>
+        private OrbWeb FindNearbyCatchingWeb()
+        {
+            OrbWeb best = null;
+            float bestDist = 4f;
+            foreach (OrbWeb web in OrbWeb.All)
+            {
+                if (web == null || !web.CanCatch)
+                {
+                    continue;
+                }
+
+                float d = Vector3.Distance(web.Layout.Hub, transform.position);
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    best = web;
+                }
+            }
+
+            return best;
         }
 
         /// <summary>Bodenhöhe unter einem Punkt (Raycast nach unten, von oben).</summary>
@@ -304,7 +357,7 @@ namespace Spinnenspiel
             }
 
             // Zu weit weg von home: Ziel sofort in Richtung home neu wählen.
-            if (Vector3.Distance(transform.position, home) > wanderRadius)
+            if (Time.time > _webRunUntil && Vector3.Distance(transform.position, home) > wanderRadius)
             {
                 Vector3 back = home + Vector3.up * Random.Range(minHeight, maxHeight);
                 target = back;

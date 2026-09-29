@@ -461,6 +461,95 @@ namespace Spinnenspiel.Tests
             System.IO.File.WriteAllBytes(file, png);
         }
 
+        [UnityTest]
+        public IEnumerator Flies_FindTheWeb()
+        {
+            yield return LoadScene();
+
+            WebBuildDemo demo = Object.FindFirstObjectByType<WebBuildDemo>();
+            Assert.IsNotNull(demo, "WebBuildDemo nicht gefunden");
+            OrbWeb web = demo.CreateWeb();
+            Assert.IsNotNull(web, "CreateWeb() lieferte kein Netz");
+            web.SetProgress(OrbWeb.WebStage.Done, 1f);
+
+            // Zähler ueber das statische AnyCaught-Ereignis (am Ende wieder abmelden).
+            int caught = 0;
+            System.Action<FlyingInsect, OrbWeb> onCaught = (f, w) => caught++;
+            FlyingInsect.AnyCaught += onCaught;
+
+            // Alle Fliegen (inkl. der inaktiven Spawner-Vorlage – neu gespawnte erben den Wert)
+            // auf maximale Netz-Anziehung setzen, damit das Zufallsziel immer das Netz ist.
+            foreach (FlyingInsect f in Object.FindObjectsByType<FlyingInsect>(
+                    FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                f.webAttraction = 1f;
+            }
+
+            // Bis 20 s warten, bis mindestens eine Fliege im Netz hängen bleibt.
+            float t = 0f;
+            while (t < 20f && caught < 1)
+            {
+                t += Time.deltaTime;
+                yield return null;
+            }
+
+            FlyingInsect.AnyCaught -= onCaught;
+
+            Assert.GreaterOrEqual(caught, 1,
+                "In 20 s ist keine Fliege ins fertige Netz geflogen");
+        }
+
+        [UnityTest]
+        public IEnumerator DIAG_Flies_FindTheWeb_Debug()
+        {
+            yield return LoadScene();
+
+            WebBuildDemo demo = Object.FindFirstObjectByType<WebBuildDemo>();
+            Assert.IsNotNull(demo, "demo");
+            OrbWeb web = demo.CreateWeb();
+            web.SetProgress(OrbWeb.WebStage.Done, 1f);
+
+            int caught = 0;
+            System.Action<FlyingInsect, OrbWeb> onCaught = (f, w) => caught++;
+            FlyingInsect.AnyCaught += onCaught;
+
+            // Alle Fliegen (inkl. Template) maximale Anziehung.
+            foreach (FlyingInsect f in Object.FindObjectsByType<FlyingInsect>(
+                    FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                f.webAttraction = 1f;
+            }
+
+            Vector3 hub = web.Layout.Hub;
+            Vector3 n = web.PlaneNormal;
+            Debug.Log("[DIAG] hub=" + hub + " normal=" + n + " CanCatch=" + web.CanCatch + " All.Count=" + OrbWeb.All.Count);
+
+            // Testfliege direkt vor dem Netz (auf -Normal-Seite, 0.5 m).
+            Vector3 start = hub - n * 0.5f;
+            start.y = Mathf.Max(start.y, 0.3f);
+            InsectSpawner sp = Object.FindFirstObjectByType<InsectSpawner>();
+            GameObject flyGo = Object.Instantiate(sp.template, start, Quaternion.identity);
+            flyGo.SetActive(true);
+            FlyingInsect fly = flyGo.GetComponent<FlyingInsect>();
+            fly.webAttraction = 1f;
+            fly.home = start;
+
+            float t = 0f;
+            while (t < 10f)
+            {
+                if (Mathf.Abs(t - 2f) < 0.05f || Mathf.Abs(t - 5f) < 0.05f || caught >= 1)
+                {
+                    Debug.Log(string.Format("[DIAG] t={0:F1} state={1} pos={2} caught={3} distToHub={4:F2}",
+                        t, fly.State, fly.transform.position, caught, Vector3.Distance(fly.transform.position, hub)));
+                }
+                t += Time.deltaTime;
+                yield return null;
+            }
+            Debug.Log("[DIAG] END caught=" + caught + " state=" + fly.State);
+            FlyingInsect.AnyCaught -= onCaught;
+            Object.Destroy(flyGo);
+        }
+
         private static IEnumerator LoadScene()
         {
             SceneManager.LoadScene(SceneName);
