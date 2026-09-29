@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Spinnenspiel;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -66,6 +67,17 @@ namespace Spinnenspiel.EditorTools
                 new Vector3(5.72f, 0.02f, 2.0f),
                 new Vector3(5.08f, 0.02f, 2.0f)
             };
+
+            // Insekten 1: Spawner mit Vorlage (deaktivierte Fliege) um das Netz.
+            GameObject insekten = new GameObject("Insekten");
+            InsectSpawner insektenSpawner = insekten.AddComponent<InsectSpawner>();
+            insektenSpawner.count = 4;
+            insektenSpawner.homeOverride = netzplatz.transform;
+            GameObject vorlage = InsectBuilder.CreateFly();
+            vorlage.name = "Vorlage";
+            vorlage.transform.SetParent(insekten.transform, false);
+            vorlage.SetActive(false);
+            insektenSpawner.template = vorlage;
 
             EnsureScenesFolder();
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScenePath);

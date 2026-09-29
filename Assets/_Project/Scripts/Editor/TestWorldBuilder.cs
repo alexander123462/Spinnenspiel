@@ -1,3 +1,4 @@
+using Spinnenspiel;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -60,6 +61,17 @@ namespace Spinnenspiel.EditorTools
             EffectsBuilder.Build(spider);
             SetLayerRecursive(spider, 2); // "Ignore Raycast": Kamera- und Beinstrahlen ignorieren die Spinne
 
+            // Insekten 1: Spawner mit Vorlage (deaktivierte Fliege), Zentrum = Spinne.
+            GameObject insekten = new GameObject("Insekten");
+            InsectSpawner insektenSpawner = insekten.AddComponent<InsectSpawner>();
+            insektenSpawner.count = 8;
+            insektenSpawner.center = spider.transform;
+            GameObject vorlage = InsectBuilder.CreateFly();
+            vorlage.name = "Vorlage";
+            vorlage.transform.SetParent(insekten.transform, false);
+            vorlage.SetActive(false);
+            insektenSpawner.template = vorlage;
+
             CameraBuilder.Bind(cam, spider.transform);
             cam.transform.position = spawn + new Vector3(0f, 0.35f, -0.95f);
             cam.transform.LookAt(spawn + Vector3.up * 0.1f);
@@ -73,11 +85,19 @@ namespace Spinnenspiel.EditorTools
 
             AssetUtil.EnsureFolder("Assets/_Project/Scenes");
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScenePath);
-            EditorBuildSettings.scenes = new[]
+            // Vorhandene Build-Szenen behalten, Testwelt und M1 nur ergaenzen.
+            var scenes = new System.Collections.Generic.List<EditorBuildSettingsScene>();
+            foreach (EditorBuildSettingsScene existing in EditorBuildSettings.scenes)
             {
-                new EditorBuildSettingsScene(ScenePath, true),
-                new EditorBuildSettingsScene(M1ScenePath, true)
-            };
+                if (System.IO.File.Exists(existing.path) &&
+                    existing.path != ScenePath && existing.path != M1ScenePath)
+                {
+                    scenes.Add(existing);
+                }
+            }
+            scenes.Add(new EditorBuildSettingsScene(ScenePath, true));
+            scenes.Add(new EditorBuildSettingsScene(M1ScenePath, true));
+            EditorBuildSettings.scenes = scenes.ToArray();
             AssetDatabase.SaveAssets();
             Debug.Log("[Spinnenspiel] Testwelt gebaut: " + ScenePath);
         }
