@@ -93,6 +93,9 @@ namespace Spinnenspiel.EditorTools
             // Beute 2 (t73a3): zur Beute laufen, einwickeln, zurücktragen, fressen.
             root.AddComponent<SpiderPredation>();
 
+            // Steuerungshilfe (t82): Box oben rechts, F1 schaltet um.
+            root.AddComponent<ControlsHelp>();
+
             return root;
         }
 

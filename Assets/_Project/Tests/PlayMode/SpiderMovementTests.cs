@@ -51,5 +51,18 @@ namespace Spinnenspiel.Tests
             yield return new WaitForSeconds(1f);
             Assert.Less(move.Speed, 0.05f, "Spinne bremst nicht ab: " + move.Speed);
         }
+
+        [UnityTest]
+        public IEnumerator ControlsHelp_Present()
+        {
+            SceneManager.LoadScene(SceneName);
+            yield return null;
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+            ControlsHelp help = spider.GetComponent<ControlsHelp>();
+            Assert.IsNotNull(help, "ControlsHelp fehlt an der Spinne");
+            Assert.IsTrue(help.Visible, "ControlsHelp soll beim Start sichtbar sein");
+        }
     }
 }
