@@ -1,6 +1,9 @@
+using System.Collections;
 using System.Globalization;
 using NUnit.Framework;
 using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.TestTools;
 
 namespace Spinnenspiel.Tests
 {
@@ -138,6 +141,71 @@ namespace Spinnenspiel.Tests
                 "Fangspirale soll bei Done vollständig sein (" + layout.CaptureSpiral.Count + " Punkte), gefunden: " + capture.positionCount + ".");
 
             Object.DestroyImmediate(go);
+        }
+
+        [UnityTest]
+        public IEnumerator Builder_BuildsWebInOrder()
+        {
+            SceneManager.LoadScene("Klettertest");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+            SpiderMovement movement = spider.GetComponent<SpiderMovement>();
+            Assert.IsNotNull(movement, "SpiderMovement fehlt");
+            SpiderSilk silk = spider.GetComponent<SpiderSilk>();
+            Assert.IsNotNull(silk, "SpiderSilk fehlt");
+            SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
+            Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+
+            // Netz wie ScreenshotTool shot_netz.
+            GameObject webGo = new GameObject("BuilderWeb");
+            OrbWeb web = webGo.AddComponent<OrbWeb>();
+            Vector3[] anchors =
+            {
+                new Vector3(5.02f, 1.15f, 2.0f),
+                new Vector3(5.78f, 1.15f, 2.0f),
+                new Vector3(5.72f, 0.02f, 2.0f),
+                new Vector3(5.08f, 0.02f, 2.0f)
+            };
+            OrbWebLayout layout = new OrbWebLayout(anchors, 16, 0.02f, 0.03f, 7);
+            web.Build(layout);
+
+            // Spinne vor das Netz (Ebenen-Seite -Z).
+            movement.SetScripted(true);
+            movement.Teleport(new Vector3(5.4f, 0.6f, 1.9f), Quaternion.LookRotation(Vector3.up, Vector3.back));
+            builder.durationScale = 0.1f;
+            builder.StartBuild(web);
+            Assert.IsTrue(builder.IsBuilding, "StartBuild hat nicht gestartet");
+
+            int lastStage = -1;
+            bool spinningDuringCapture = false;
+            float elapsed = 0f;
+            while (builder.IsBuilding && elapsed < 15f)
+        {
+                Assert.GreaterOrEqual((int)builder.CurrentStage, lastStage,
+                    "Baustufe geht zurück: " + builder.CurrentStage + " < " + lastStage);
+                lastStage = (int)builder.CurrentStage;
+                if (builder.CurrentStage == OrbWeb.WebStage.CaptureSpiral)
+                {
+                    spinningDuringCapture = spinningDuringCapture || silk.IsSpinning;
+                }
+
+                Assert.IsTrue(movement.IsScripted, "movement.IsScripted ist false während IsBuilding");
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            Assert.IsFalse(builder.IsBuilding, "Netzbau nach 15 s noch nicht fertig");
+            Assert.AreEqual(OrbWeb.WebStage.Done, builder.CurrentStage, "CurrentStage != Done");
+            float d = Vector3.Distance(spider.transform.position, layout.Hub);
+            Assert.That(d, Is.LessThan(0.1f),
+                "Spinne liegt " + d.ToString("F3", CultureInfo.InvariantCulture) + " m vom Hub");
+            Assert.IsFalse(silk.IsSpinning, "silk.IsSpinning ist nach dem Bau noch true");
+            Assert.IsTrue(spinningDuringCapture, "silk.IsSpinning war nie true während CaptureSpiral");
+
+            Object.DestroyImmediate(webGo);
         }
     }
 }

@@ -83,6 +83,9 @@ namespace Spinnenspiel.EditorTools
             // Sicherheitsfaden (t55): Dragline mit Anker + Haftscheiben beim Laufen.
             root.AddComponent<SpiderDragline>();
 
+            // Netzbau (t62b2): Spinne baut das Radnetz in der echten Reihenfolge.
+            root.AddComponent<SpiderWebBuilder>();
+
             return root;
         }
 
