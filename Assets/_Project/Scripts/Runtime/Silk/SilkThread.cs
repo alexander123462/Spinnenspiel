@@ -45,11 +45,54 @@ namespace Spinnenspiel
 
         public void Init(Vector3 a, Vector3 b, float sagValue)
         {
+            Init(a, b, sagValue, Vector3.up, Vector3.up);
+        }
+
+        /// <summary>
+        /// Initialisiert den Faden; <paramref name="normalA"/>/<paramref name="normalB"/>
+        /// sind die Normalen der Ankern – dort erscheinen kleine Haftscheiben.
+        /// </summary>
+        public void Init(Vector3 a, Vector3 b, float sagValue, Vector3 normalA, Vector3 normalB)
+        {
             anchorA = a;
             anchorB = b;
             sag = sagValue;
             EnsureLine();
             Refresh();
+
+            foreach (Transform child in transform)
+            {
+                if (child.name == "AdhesionDisc")
+                {
+                    Destroy(child.gameObject);
+                }
+            }
+
+            CreateAdhesionDisc(a, normalA);
+            CreateAdhesionDisc(b, normalB);
+        }
+
+        /// <summary>Kleine abgeflachte Haftscheibe (Sphere ohne Collider) an einem Anker, ausgerichtet nach der Flächennormale.</summary>
+        private void CreateAdhesionDisc(Vector3 center, Vector3 normal)
+        {
+            Vector3 n = normal.sqrMagnitude > 1e-8f ? normal.normalized : Vector3.up;
+            var disc = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            disc.name = "AdhesionDisc";
+            var collider = disc.GetComponent<Collider>();
+            if (collider != null)
+            {
+                Destroy(collider);
+            }
+
+            disc.transform.SetParent(transform, false);
+            disc.transform.position = center + n * 0.001f;
+            disc.transform.rotation = Quaternion.FromToRotation(Vector3.up, n);
+            disc.transform.localScale = new Vector3(0.012f, 0.002f, 0.012f);
+            var renderer = disc.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = SharedMaterial;
+            }
         }
 
         /// <summary>Punkt auf der Fadenkurve bei t (0..1) mit parabolischem Durchhang nach unten.</summary>

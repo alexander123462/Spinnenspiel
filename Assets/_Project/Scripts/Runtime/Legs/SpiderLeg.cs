@@ -46,6 +46,8 @@ namespace Spinnenspiel
         private float _stepArc;
         private float _stepDelay;
         private bool _initialized;
+        private Vector3? _overrideFoot;
+        private bool _pendingSnap;
 
         public int GaitGroup => gaitGroup;
         public int PairIndex => pairIndex;
@@ -100,6 +102,21 @@ namespace Spinnenspiel
             FootSurface = surface;
             IsStepping = false;
             _initialized = true;
+        }
+
+        /// <summary>
+        /// Zwingt den Fuß weich zu einer Welt-Position (z. B. Spinnwarzen beim Seidenziehen):
+        /// LateUpdate lerpt mit 1 − exp(−20·dt) dorthin, das Bein greift nicht (
+        /// IsGrounded = false, kein Schritt). null: Fuß greift ab dem nächsten Frame
+        /// wieder normal auf den Untergrund.
+        /// </summary>
+        public void SetOverrideFoot(Vector3? worldPos)
+        {
+            _overrideFoot = worldPos;
+            if (worldPos == null)
+            {
+                _pendingSnap = true;
+            }
         }
 
         /// <summary>Stellt Fuß und Bein-Visuals sofort in Ruhepose (auch außerhalb des Play-Modus, z. B. nach dem Szenenaufbau).</summary>
@@ -194,7 +211,7 @@ namespace Spinnenspiel
 
         public bool NeedsStep(Vector3 desired, float threshold)
         {
-            if (!_initialized || IsStepping)
+            if (_overrideFoot != null || !_initialized || IsStepping)
             {
                 return false;
             }
@@ -285,6 +302,19 @@ namespace Spinnenspiel
             float resetDistance = MaxReach * 3f;
             if ((FootPosition - HipPosition).sqrMagnitude > resetDistance * resetDistance)
             {
+                SnapToGround();
+            }
+
+            if (_overrideFoot != null)
+            {
+                // Fuß folgt weich der Vorgabe (z. B. Spinnwarzen) und greift nicht.
+                float k = 1f - Mathf.Exp(-20f * Time.deltaTime);
+                FootPosition = Vector3.Lerp(FootPosition, _overrideFoot.Value, k);
+                IsGrounded = false;
+            }
+            else if (_pendingSnap)
+            {
+                _pendingSnap = false;
                 SnapToGround();
             }
 

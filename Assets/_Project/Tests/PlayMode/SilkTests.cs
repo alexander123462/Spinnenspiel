@@ -195,5 +195,82 @@ namespace Spinnenspiel.Tests
             Assert.IsTrue(movement.IsAttached, "Spinne haftet nach dem Fallen nicht wieder: " + stats);
             Assert.IsTrue(spider.transform.position.y < 0.2f, "Spinne haftet nicht am Boden (y < 0.2): " + stats);
         }
+
+        [UnityTest]
+        public IEnumerator Silk_SpinningPose()
+        {
+            yield return Setup();
+
+            movement.Teleport(new Vector3(3f, 0.4f, 0f), Quaternion.LookRotation(Vector3.left, Vector3.up));
+            yield return new WaitForSeconds(0.3f);
+
+            // Ausgangslage des Hinterleibs merken (vor dem Spinn-Anlauf).
+            Transform abdomen = spider.transform.Find("Body/Abdomen");
+            Assert.IsNotNull(abdomen, "Abdomen-Transform fehlt");
+            Vector3 abdStartPos = abdomen.localPosition;
+            Quaternion abdStartRot = abdomen.localRotation;
+
+            // Beide Hinterbeine (PairIndex 3) bestimmen.
+            SpiderLeg[] legs = spider.GetComponentsInChildren<SpiderLeg>();
+            SpiderLeg rearA = null;
+            SpiderLeg rearB = null;
+            for (int i = 0; i < legs.Length; i++)
+            {
+                if (legs[i] != null && legs[i].PairIndex == 3)
+                {
+                    if (rearA == null)
+                    {
+                        rearA = legs[i];
+                    }
+                    else
+                    {
+                        rearB = legs[i];
+                    }
+                }
+            }
+            Assert.IsNotNull(rearA, "Hinterbein (PairIndex 3) fehlt");
+            Assert.IsNotNull(rearB, "Zweites Hinterbein (PairIndex 3) fehlt");
+
+            Vector3 dir = (new Vector3(-3f, 1.0f, 0f) - silk.spinnerets.position).normalized;
+            SilkThread thread = silk.ShootThread(dir);
+            Assert.IsNotNull(thread, "Faden nach Stamm ist null – Treffer erwartet");
+
+            // Erste 0.3 s: Spinn-Animation aktiv, mindestens ein Hinterbein an den Spinnwarzen.
+            bool spinningSeen = false;
+            float bestDist = float.MaxValue;
+            float t = 0f;
+            while (t < 0.3f)
+            {
+                if (silk.IsSpinning)
+                {
+                    spinningSeen = true;
+                }
+
+                Vector3 sp = silk.spinnerets != null ? silk.spinnerets.position : spider.transform.position;
+                bestDist = Mathf.Min(bestDist, (rearA.FootPosition - sp).magnitude);
+                bestDist = Mathf.Min(bestDist, (rearB.FootPosition - sp).magnitude);
+                t += Time.deltaTime;
+                yield return null;
+            }
+
+            string stats = string.Format(CultureInfo.InvariantCulture,
+                "spinningSeen={0} bestDist={1:F4}", spinningSeen, bestDist);
+            Assert.IsTrue(spinningSeen, "IsSpinning war in den ersten 0.3 s nie true");
+            Assert.IsTrue(bestDist <= 0.05f, "Kein Hinterbein innerhalb 0.05 m der Spinnwarzen: " + stats);
+
+            // Nach 1.5 s: Animation beendet, Hinterleib zurück in der Ausgangslage.
+            yield return new WaitForSeconds(1.5f);
+
+            string endStats = string.Format(CultureInfo.InvariantCulture,
+                "IsSpinning={0} posDelta={1:F4} angleDelta={2:F2}",
+                silk.IsSpinning,
+                Vector3.Distance(abdomen.localPosition, abdStartPos),
+                Quaternion.Angle(abdomen.localRotation, abdStartRot));
+            Assert.IsFalse(silk.IsSpinning, "IsSpinning ist nach 1.5 s noch true: " + endStats);
+            Assert.IsTrue(Quaternion.Angle(abdomen.localRotation, abdStartRot) < 2f,
+                "Abdomen weicht in der Rotation von der Ausgangslage ab: " + endStats);
+            Assert.IsTrue(Vector3.Distance(abdomen.localPosition, abdStartPos) < 0.002f,
+                "Abdomen weicht in der Position von der Ausgangslage ab: " + endStats);
+        }
     }
 }

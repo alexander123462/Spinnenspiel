@@ -19,8 +19,14 @@ namespace Spinnenspiel
         public float maxRange = 8f;
 
         private const float ExtendDuration = 0.5f;
+        private const float AbdomenLiftDuration = 0.2f;
+        private const float AbdomenLiftAngle = -25f;
+        private const float LegSwitchInterval = 0.12f;
 
         public SilkThread LastThread { get; private set; }
+
+        /// <summary>True, während ein Faden ausgefahren wird (Spinn-Animation aktiv).</summary>
+        public bool IsSpinning { get; private set; }
 
         /// <summary>Wird nach dem Straffziehen für einen erfolgreichen Faden ausgelöst.</summary>
         public event System.Action<SilkThread> ThreadAttached;
@@ -47,38 +53,160 @@ namespace Spinnenspiel
             var thread = new GameObject("SilkThread").AddComponent<SilkThread>();
             Vector3 anchorA = transform.position;              // Kontaktpunkt der Spinne auf ihrer Fläche
             Vector3 anchorB = hit.point + hit.normal * 0.002f; // End-Anker an der getroffenen Fläche
-            thread.Init(anchorA, anchorB, 0.02f * Vector3.Distance(anchorA, anchorB));
+            SpiderMovement movement = GetComponent<SpiderMovement>();
+            Vector3 normalA = movement != null ? movement.SurfaceNormal : Vector3.up;
+            thread.Init(anchorA, anchorB, 0.02f * Vector3.Distance(anchorA, anchorB), normalA, hit.normal);
 
             LastThread = thread;
             StartCoroutine(ExtendAndTighten(thread));
             return thread;
         }
 
-        /// <summary>Fährt den Faden aus (Extend01 0→1) und zieht ihn danach auf 20 % Durchhang straff.</summary>
+        /// <summary>
+        /// Führt die Spinn-Animation aus: Hinterleib hebt sich (0.2 s), die Hinterbeine
+        /// (PairIndex 3) führen abwechselnd den Faden an die Spinnwarzen, während er
+        /// ausgefahren wird; danach wird er straffgezogen und der Hinterleib senkt sich.
+        /// </summary>
+        /// <summary>
+        /// Stellt die Pose des Hinterleibs absolut aus der Ausgangspose ein: Winkel in Grad
+        /// (0 = Ausgangspose) um die Body-Rechts-Achse, Drehpunkt Pedicel (Body-lokal).
+        /// </summary>
+        private static void ApplyAbdomenPose(Transform abdomen, Vector3 origPos, Quaternion origRot, float angle)
+        {
+            Vector3 pivot = new Vector3(0f, 0.002f, -0.006f);
+            Quaternion q = Quaternion.AngleAxis(angle, Vector3.right);
+            abdomen.localPosition = pivot + q * (origPos - pivot);
+            abdomen.localRotation = q * origRot;
+        }
+
         private IEnumerator ExtendAndTighten(SilkThread thread)
         {
-            float t = 0f;
-            while (t < ExtendDuration)
+            IsSpinning = true;
+
+            Transform spider = transform;
+            Transform abdomen = FindRecursive(spider, "Abdomen");
+            Transform body = abdomen != null ? abdomen.parent : null;
+            Vector3 right = (body != null ? body : spider).right;
+
+            SpiderLeg rearA = null;
+            SpiderLeg rearB = null;
+            foreach (SpiderLeg leg in spider.GetComponentsInChildren<SpiderLeg>())
             {
-                if (thread == null)
+                if (leg == null || leg.PairIndex != 3)
                 {
-                    yield break;
+                    continue;
                 }
 
-                t += Time.deltaTime;
-                thread.Extend01 = Mathf.Clamp01(t / ExtendDuration);
-                thread.Refresh();
+                if (rearA == null)
+                {
+                    rearA = leg;
+                }
+                else
+                {
+                    rearB = leg;
+                }
+            }
+
+            // Ausgangspose des Hinterleibs (lokal zu Body). Die Pose wird jeden Frame
+            // absolut daraus berechnet, damit sich keine Rundungsfehler ansammeln.
+            Vector3 abdOrigPos = Vector3.zero;
+            Quaternion abdOrigRot = Quaternion.identity;
+            if (abdomen != null)
+            {
+                abdOrigPos = abdomen.localPosition;
+                abdOrigRot = abdomen.localRotation;
+            }
+
+            // 1) Hinterleib heben (0.2 s).
+            float liftT = 0f;
+            while (liftT < AbdomenLiftDuration && thread != null)
+            {
+                liftT += Time.deltaTime;
+                float k = Mathf.Clamp01(liftT / AbdomenLiftDuration);
+                if (abdomen != null)
+                {
+                    ApplyAbdomenPose(abdomen, abdOrigPos, abdOrigRot, AbdomenLiftAngle * k);
+                }
+
                 yield return null;
             }
 
             if (thread == null)
             {
+                IsSpinning = false;
                 yield break;
+            }
+
+            // 2) Faden ausfahren; die Hinterbeine führen abwechselnd den Faden an die Spinnwarzen.
+            float t = 0f;
+            int activeLeg = 0;
+            while (t < ExtendDuration && thread != null)
+            {
+                t += Time.deltaTime;
+                thread.Extend01 = Mathf.Clamp01(t / ExtendDuration);
+                thread.Refresh();
+
+                activeLeg = (int)Mathf.Floor(t / LegSwitchInterval) % 2;
+                SpiderLeg active = activeLeg == 0 ? rearA : rearB;
+                SpiderLeg idle = activeLeg == 0 ? rearB : rearA;
+                if (active != null)
+                {
+                    Vector3 spinneretPos = spinnerets != null ? spinnerets.position : spider.position;
+                    Vector3 offset = activeLeg == 0 ? right : -right;
+                    active.SetOverrideFoot(spinneretPos + spider.up * 0.01f + offset * 0.012f);
+                }
+
+                if (idle != null)
+                {
+                    idle.SetOverrideFoot(null);
+                }
+
+                yield return null;
+            }
+
+            if (thread == null)
+            {
+                IsSpinning = false;
+                yield break;
+            }
+
+            // Beide Hinterbeine wieder frei.
+            if (rearA != null)
+            {
+                rearA.SetOverrideFoot(null);
+            }
+
+            if (rearB != null)
+            {
+                rearB.SetOverrideFoot(null);
             }
 
             thread.Extend01 = 1f;
             thread.sag *= 0.2f;
             thread.Refresh();
+
+            // 3) Hinterleib senken (0.2 s).
+            float dropT = 0f;
+            while (dropT < AbdomenLiftDuration)
+            {
+                dropT += Time.deltaTime;
+                float k = Mathf.Clamp01(dropT / AbdomenLiftDuration);
+                if (abdomen != null)
+                {
+                    ApplyAbdomenPose(abdomen, abdOrigPos, abdOrigRot, AbdomenLiftAngle * (1f - k));
+                }
+
+                yield return null;
+            }
+
+            // Exakt auf die Ausgangspose zurücksetzen.
+            if (abdomen != null)
+            {
+                abdomen.localPosition = abdOrigPos;
+                abdomen.localRotation = abdOrigRot;
+            }
+
+            IsSpinning = false;
 
             var evt = ThreadAttached;
             if (evt != null)
@@ -88,12 +216,33 @@ namespace Spinnenspiel
 
             if (autoAttach)
             {
-                var spider = GetComponent<SpiderMovement>();
-                if (spider != null)
+                var movement = GetComponent<SpiderMovement>();
+                if (movement != null)
                 {
-                    spider.AttachToThread(thread, 0f);
+                    movement.AttachToThread(thread, 0f);
                 }
             }
+        }
+
+        /// <summary>Sucht rekursiv ein Kind-Transform mit exaktem Namen (Pfad-unabhängig).</summary>
+        private static Transform FindRecursive(Transform root, string name)
+        {
+            for (int i = 0; i < root.childCount; i++)
+            {
+                Transform child = root.GetChild(i);
+                if (child.name == name)
+                {
+                    return child;
+                }
+
+                Transform found = FindRecursive(child, name);
+                if (found != null)
+                {
+                    return found;
+                }
+            }
+
+            return null;
         }
     }
 }

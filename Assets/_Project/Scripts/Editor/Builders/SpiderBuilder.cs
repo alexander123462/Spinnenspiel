@@ -67,10 +67,12 @@ namespace Spinnenspiel.EditorTools
             root.AddComponent<AudioSource>();
             root.AddComponent<SpiderFootstepAudio>();
 
-            // Seide (Milestone 7): Spinnwarzen an der Spitze des Hinterleibs, leicht unten.
+            // Seide (Milestone 7): Spinnwarzen an der Spitze des Hinterleibs.
+            // Kind des (skalierten) Abdomens: lokal (0, -0.1, -0.5) = untere Spitze.
+            Transform abdomen = body.transform.Find("Abdomen");
             var spinnerets = new GameObject("Spinnerets");
-            spinnerets.transform.SetParent(body.transform, false);
-            spinnerets.transform.localPosition = new Vector3(0f, -0.004f, -0.106f);
+            spinnerets.transform.SetParent(abdomen, false);
+            spinnerets.transform.localPosition = new Vector3(0f, -0.1f, -0.5f);
 
             var silk = root.AddComponent<SpiderSilk>();
             silk.spinnerets = spinnerets.transform;

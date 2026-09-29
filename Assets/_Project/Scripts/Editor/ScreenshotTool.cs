@@ -163,7 +163,47 @@ namespace Spinnenspiel.EditorTools
                 Debug.Log("[Spinnenspiel] Kletter-Kontrollbild: " + pose.name + ".png");
             }
 
+            // Viertes Bild: Spinne hängt mitten an einem Faden zum Stamm (Seide 4).
+            var threadGo = new GameObject("SilkThreadShot");
+            SilkThread thread = threadGo.AddComponent<SilkThread>();
+            Vector3 tA = new Vector3(3f, 0.4f, 0f);
+            Vector3 tB = new Vector3(-2.85f, 1.0f, 0f);
+            thread.Init(tA, tB, 0.02f * Vector3.Distance(tA, tB), Vector3.up, Vector3.right);
+
+            Vector3 mid = thread.PointAt(0.5f);
+            spider.transform.position = mid;
+            spider.transform.rotation = Quaternion.LookRotation(thread.TangentAt(0.5f), Vector3.down);
+            SpiderMovement sm = spider.GetComponent<SpiderMovement>();
+            if (sm != null)
+            {
+                sm.AttachToThread(thread, 0.5f);
+            }
+
+            Physics.SyncTransforms();
+            foreach (SpiderLeg leg in legs)
+            {
+                leg.PoseAtRest();
+            }
+
+            cam.transform.position = mid + Vector3.forward * 0.7f;
+            cam.transform.LookAt(mid);
+            cam.targetTexture = target;
+            cam.Render();
+            RenderTexture.active = target;
+            image.ReadPixels(new Rect(0, 0, 1600, 900), 0, 0);
+            image.Apply();
+            RenderTexture.active = null;
+            cam.targetTexture = null;
+            File.WriteAllBytes(Path.Combine(folder, "shot_faden.png"), image.EncodeToPNG());
+            Debug.Log("[Spinnenspiel] Kletter-Kontrollbild: shot_faden.png");
+
+            if (sm != null)
+            {
+                sm.LetGo();
+            }
+
             Object.DestroyImmediate(camGo);
+            Object.DestroyImmediate(threadGo);
             Object.DestroyImmediate(target);
             Object.DestroyImmediate(image);
         }
