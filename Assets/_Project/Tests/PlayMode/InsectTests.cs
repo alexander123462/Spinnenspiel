@@ -256,6 +256,95 @@ namespace Spinnenspiel.Tests
             Object.Destroy(fly);
         }
 
+        [UnityTest]
+        public IEnumerator Predation_HuntsWrapsAndEats()
+        {
+            yield return LoadScene();
+
+            // Spawner stilllegen und vorhandene Fliegen entfernen (wie in den 7.2-Tests).
+            InsectSpawner spawner = Object.FindFirstObjectByType<InsectSpawner>();
+            Assert.IsNotNull(spawner, "Spawner 'Insekten' nicht gefunden");
+            spawner.enabled = false;
+            foreach (FlyingInsect f in Object.FindObjectsOfType<FlyingInsect>())
+            {
+                f.Remove();
+            }
+
+            WebBuildDemo demo = Object.FindFirstObjectByType<WebBuildDemo>();
+            Assert.IsNotNull(demo, "WebBuildDemo nicht gefunden");
+            OrbWeb web = demo.CreateWeb();
+            Assert.IsNotNull(web, "CreateWeb() lieferte kein Netz");
+            web.SetProgress(OrbWeb.WebStage.Done, 1f);
+
+            SpiderPredation predation = Object.FindFirstObjectByType<SpiderPredation>();
+            Assert.IsNotNull(predation, "SpiderPredation an der Spinne fehlt");
+            Transform spider = predation.transform;
+            SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
+            Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+            SpiderHunger hunger = spider.GetComponent<SpiderHunger>();
+            Assert.IsNotNull(hunger, "SpiderHunger fehlt");
+            SpiderSilk silk = spider.GetComponent<SpiderSilk>();
+            Assert.IsNotNull(silk, "SpiderSilk fehlt");
+
+            spider.position = new Vector3(5.4f, 0.6f, 1.9f);
+            builder.SitAtHub(web);
+            Assert.IsTrue(builder.IsSittingInWeb, "Voraussetzung: Spinne sitzt in der Nabe");
+
+            Vector3 n = builder.Normal;
+            Vector3 right = Vector3.Cross(Vector3.up, n).normalized;
+            Vector3 start = web.Layout.Hub + n * 0.5f + right * 0.2f;
+
+            GameObject fly = Object.Instantiate(spawner.template, start, Quaternion.identity);
+            fly.name = "Testfliege";
+            fly.SetActive(true);
+            FlyingInsect insect = fly.GetComponent<FlyingInsect>();
+            Assert.IsNotNull(insect, "Testfliege hat kein FlyingInsect");
+            insect.home = start;
+            insect.FlyTo(web.Layout.Hub - n * 0.5f + right * 0.2f);
+
+            // Fang abwarten (max. 3 s).
+            float t = 0f;
+            while (t < 3f && insect.State != FlyingInsect.InsectState.Caught)
+            {
+                t += Time.deltaTime;
+                yield return null;
+            }
+            Assert.AreEqual(FlyingInsect.InsectState.Caught, insect.State, "Fliege wurde nicht gefangen");
+            Assert.AreEqual(web, insect.CaughtIn, "CaughtIn ist nicht das Test-Netz");
+
+            hunger.Hunger = 0.8f;
+            predation.durationScale = 0.3f;
+            predation.StartHunt(insect);
+
+            // Jagd verfolgen: mindestens einmal Spinnpose, Fliege darf nie frei fliegen.
+            bool sawSpinning = false;
+            bool neverFlying = true;
+            t = 0f;
+            while (t < 10f && predation.IsHunting)
+            {
+                if (silk.IsSpinning)
+                {
+                    sawSpinning = true;
+                }
+                if (insect != null && insect.State == FlyingInsect.InsectState.Flying)
+                {
+                    neverFlying = false;
+                }
+                t += Time.deltaTime;
+                yield return null;
+            }
+
+            Assert.IsFalse(predation.IsHunting, "Jagd lief nach 10 s nicht zu Ende");
+            Assert.IsTrue(sawSpinning, "IsSpinning war waehrend der Jagd nie true");
+            Assert.IsTrue(neverFlying, "Fliege war waehrend der Jagd frei (State Flying)");
+            Assert.IsTrue(insect == null, "Fliege wurde nicht entfernt");
+            Assert.Less(hunger.Hunger, 0.5f, "Hunger sank nicht beim Fressen: " + hunger.Hunger);
+            float distHub = Vector3.Distance(spider.position, web.Layout.Hub);
+            Assert.Less(distHub, 0.08f, "Spinne ist nicht zurueck an der Nabe: " + distHub);
+            Assert.IsTrue(builder.IsSittingInWeb, "Spinne sitzt nicht wieder in der Nabe");
+            Assert.IsFalse(silk.IsSpinning, "Spinnpose wurde nicht beendet");
+        }
+
         private static IEnumerator LoadScene()
         {
             SceneManager.LoadScene(SceneName);

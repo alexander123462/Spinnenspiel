@@ -89,6 +89,9 @@ namespace Spinnenspiel.EditorTools
             // Hunger (t73a1): steigt langsam, sinkt beim Fressen.
             root.AddComponent<SpiderHunger>();
 
+            // Beute 2 (t73a3): zur Beute laufen, einwickeln, zurücktragen, fressen.
+            root.AddComponent<SpiderPredation>();
+
             return root;
         }
 
