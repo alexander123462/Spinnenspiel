@@ -49,6 +49,9 @@ namespace Spinnenspiel
         private bool _attached = true;
         private float _lastSurfaceTime = float.NegativeInfinity;
         private Vector2? _externalMoveInput;
+        private float _ropeLength;
+        private Vector3 _ropeVel;
+        private float? _externalRope;
         private Vector2? _externalMoveLocal;
         private bool? _externalSprint;
         private float _threadT;
@@ -69,6 +72,9 @@ namespace Spinnenspiel
 
         /// <summary>True, wenn die Spinne an einer Unterlage haftet (Boden, Wand, ...).</summary>
         public bool IsGrounded => IsAttached || CurrentThread != null;
+
+        /// <summary>True, solange die Spinne am Seil (Dragline) hängt.</summary>
+        public bool IsOnRope { get; private set; }
 
         /// <summary>An welchen Seidenfaden die Spinne aktuell hängt/klettert (null = kein Faden).</summary>
         public SilkThread CurrentThread { get; private set; }
@@ -130,6 +136,13 @@ namespace Spinnenspiel
             _lastVelocity = Vector3.zero;
             _attached = true;
             _lastSurfaceTime = Time.time;
+
+            var dl = GetComponent<SpiderDragline>();
+            if (dl != null)
+            {
+                dl.ResetAnchor(position, rotation * Vector3.up);
+            }
+            IsOnRope = false;
         }
 
         /// <summary>
@@ -158,6 +171,111 @@ namespace Spinnenspiel
         {
             DetachFromThread();
             _attached = false;
+            CatchOnDragline();
+        }
+
+        /// <summary>
+        /// Externe Seillänge-Eingabe setzen (+/- 1 = kürzer/länger). null = Tastatur übernehmen.
+        /// </summary>
+        public void SetExternalRopeInput(float? v)
+        {
+            _externalRope = v;
+        }
+
+        /// <summary>
+        /// Beim Loslassen an den Sicherheitsfaden der Dragline hängen,
+        /// wenn sich eine Dragline an der Spinne befindet.
+        /// </summary>
+        private void CatchOnDragline()
+        {
+            var dl = GetComponent<SpiderDragline>();
+            if (dl == null)
+            {
+                return;
+            }
+
+            IsOnRope = true;
+            // Mindestlänge: Spinne sackt sichtbar ab und klebt nicht sofort wieder am Anker.
+            _ropeLength = Mathf.Max(0.15f, Vector3.Distance(transform.position, dl.LastAnchor) + 0.05f);
+            _ropeVel = Vector3.zero;
+        }
+
+        /// <summary>
+        /// Seil-Modus: Pendelphysik mit Seillänge als Restriktion; Seillängen-Eingabe
+        /// zieht die Spinne zum Anker hin. Kontakt mit einer Oberfläche oder
+        /// Hochklettern bis zum Anker beendet den Modus und nimmt Haftung auf.
+        /// </summary>
+        private void UpdateRope(float dt)
+        {
+            var dl = GetComponent<SpiderDragline>();
+            if (dl == null)
+            {
+                IsOnRope = false;
+                return;
+            }
+
+            float ropeIn = _externalRope ?? (input != null
+                ? (input.Move.y > 0.3f ? -1f : input.Move.y < -0.3f ? 1f : 0f)
+                : 0f);
+            _ropeLength = Mathf.Max(0.05f, _ropeLength + ropeIn * 0.35f * dt);
+
+            Vector3 anchor = dl.LastAnchor;
+            Vector3 oldPos = transform.position;
+
+            _ropeVel += Physics.gravity * dt;
+            _ropeVel *= (1f - 0.8f * dt);
+
+            Vector3 pos = oldPos + _ropeVel * dt;
+            Vector3 d = pos - anchor;
+            if (d.magnitude > _ropeLength)
+            {
+                Vector3 n = d.normalized;
+                pos = anchor + n * _ropeLength;
+                float outward = Vector3.Dot(_ropeVel, n);
+                if (outward > 0f)
+                {
+                    _ropeVel -= n * outward;
+                }
+            }
+
+            // Kontakt mit einer Oberfläche: landen und Haftung aufnehmen.
+            Vector3 step = pos - oldPos;
+            if (step.sqrMagnitude > 1e-8f && Physics.SphereCast(
+                    oldPos + transform.up * bodyRadius, bodyRadius * 0.9f, step.normalized,
+                    out RaycastHit hit, step.magnitude + 0.01f, sensor.mask, QueryTriggerInteraction.Ignore))
+            {
+                IsOnRope = false;
+                _attached = true;
+                transform.position = hit.point;
+                transform.rotation = Quaternion.FromToRotation(transform.up, hit.normal) * transform.rotation;
+                _lastSurfaceTime = Time.time;
+                _vel = Vector3.zero;
+                return;
+            }
+
+            // Hochgeklettert bis zum Anker (nur beim aktiven Hochklettern): Haftung aufnehmen.
+            if (ropeIn < 0f && _ropeLength <= 0.06f && Vector3.Distance(pos, anchor) <= 0.07f)
+            {
+                IsOnRope = false;
+                _attached = true;
+                transform.position = anchor;
+                transform.rotation = Quaternion.FromToRotation(transform.up, dl.LastAnchorNormal) * transform.rotation;
+                _lastSurfaceTime = Time.time;
+                _vel = Vector3.zero;
+                return;
+            }
+
+            transform.position = pos;
+
+            // Ausrichtung: Blick zum Anker, Kopf nach oben.
+            Vector3 fwd = -(anchor - pos).normalized;
+            Vector3 upv = Vector3.ProjectOnPlane(transform.up, fwd);
+            if (upv.sqrMagnitude < 1e-6f)
+            {
+                upv = Vector3.forward;
+            }
+            transform.rotation = Quaternion.RotateTowards(transform.rotation,
+                Quaternion.LookRotation(fwd, upv.normalized), turnSpeed * dt);
         }
 
         private void Awake()
@@ -218,6 +336,14 @@ namespace Spinnenspiel
                 return;
             }
 
+            // Seil-Modus (Dragline) hat Vorrang vor freiem Fallen.
+            if (IsOnRope)
+            {
+                UpdateRope(dt);
+                _lastVelocity = (transform.position - oldPos) / dt;
+                return;
+            }
+
             if (_attached)
             {
                 UpdateAttached(dt, dir, up);
@@ -266,6 +392,7 @@ namespace Spinnenspiel
                 if (Time.time - _lastSurfaceTime > detachDelay)
                 {
                     _attached = false;
+                    CatchOnDragline();
                 }
 
                 return;

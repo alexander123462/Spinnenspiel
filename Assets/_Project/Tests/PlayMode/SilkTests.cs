@@ -300,5 +300,80 @@ namespace Spinnenspiel.Tests
             Assert.IsTrue(dist <= dragline.AnchorSpacing + 0.1f, "Abstand LastAnchor↔Spinne > anchorSpacing + 0.1: " + stats);
             Assert.IsTrue(dragline.Line != null && dragline.Line.enabled, "Dragline-LineRenderer ist nicht aktiv: " + stats);
         }
+
+        [UnityTest]
+        public IEnumerator Silk_Dragline_CatchesFall()
+        {
+            yield return Setup();
+
+            // Unterseite des Überhangs, kopfüber: Blick nach hinten (-Z), Up nach unten.
+            movement.Teleport(new Vector3(0f, 2.0f, 2.2f), Quaternion.LookRotation(Vector3.back, Vector3.down));
+            yield return new WaitForSeconds(0.5f);
+
+            movement.LetGo();
+
+            // Nach 1.5 s muss der Sicherheitsfaden die Spinne halten: am Seil, fast in Startshöhe.
+            yield return new WaitForSeconds(1.5f);
+            float yCatched = spider.transform.position.y;
+            bool onRopeAtCatch = movement.IsOnRope;
+            bool attachedAtCatch = movement.IsAttached;
+            string catchStats = string.Format(CultureInfo.InvariantCulture,
+                "y={0:F3} IsOnRope={1} IsAttached={2} (t=1.5s nach LetGo)", yCatched, onRopeAtCatch, attachedAtCatch);
+            Assert.IsTrue(onRopeAtCatch, "Nach 1.5 s ist die Spinne nicht am Seil: " + catchStats);
+            Assert.IsTrue(yCatched > 1.5f && yCatched < 1.99f, "Höhe beim Fang außerhalb 1.5–1.99: " + catchStats);
+
+            // Ablassen, bis wieder angedockt (max. 10 s).
+            movement.SetExternalRopeInput(1f);
+            float wait = 0f;
+            while (!movement.IsAttached && wait < 10f)
+            {
+                yield return null;
+                wait += Time.deltaTime;
+            }
+            movement.SetExternalRopeInput(null);
+
+            float yEnd = spider.transform.position.y;
+            string endStats = string.Format(CultureInfo.InvariantCulture,
+                "y={0:F3} IsOnRope={1} IsAttached={2} WinkelUp={3:F1}° AblassenZeit={4:F1}s",
+                yEnd, movement.IsOnRope, movement.IsAttached, Vector3.Angle(spider.transform.up, Vector3.down), wait);
+            Assert.IsTrue(movement.IsAttached, "Ablassen nicht innerhalb 10 s angedockt: " + endStats);
+            Assert.IsFalse(movement.IsOnRope, "Nach Ablassen immer noch am Seil: " + endStats);
+            Assert.IsTrue(yEnd < 0.15f, "Endhöhe nicht < 0.15: " + endStats);
+        }
+
+        [UnityTest]
+        public IEnumerator Silk_Rope_ClimbBack()
+        {
+            yield return Setup();
+
+            // Unterseite des Überhangs, kopfüber: Blick nach hinten (-Z), Up nach unten.
+            movement.Teleport(new Vector3(0f, 2.0f, 2.2f), Quaternion.LookRotation(Vector3.back, Vector3.down));
+            yield return new WaitForSeconds(0.5f);
+
+            movement.LetGo();
+
+            // 1.0 s am Seil hängen, dann 1.0 s ablassen.
+            yield return new WaitForSeconds(1.0f);
+            movement.SetExternalRopeInput(1f);
+            yield return new WaitForSeconds(1.0f);
+
+            // Hochklettern, bis wieder kopfüber an der Decke angedockt (max. 8 s).
+            movement.SetExternalRopeInput(-1f);
+            float wait = 0f;
+            while (!movement.IsAttached && wait < 8f)
+            {
+                yield return null;
+                wait += Time.deltaTime;
+            }
+            movement.SetExternalRopeInput(null);
+
+            float yEnd = spider.transform.position.y;
+            float angle = Vector3.Angle(spider.transform.up, Vector3.down);
+            string stats = string.Format(CultureInfo.InvariantCulture,
+                "y={0:F3} IsOnRope={1} IsAttached={2} Winkel(Up,down)={3:F1}° KletterZeit={4:F1}s",
+                yEnd, movement.IsOnRope, movement.IsAttached, angle, wait);
+            Assert.IsTrue(movement.IsAttached, "Hochklettern: nicht innerhalb 8 s angedockt: " + stats);
+            Assert.IsTrue(angle < 45f, "Spinne nicht kopfüber an der Decke (Winkel > 45°): " + stats);
+        }
     }
 }
