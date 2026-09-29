@@ -32,6 +32,18 @@ namespace Spinnenspiel
         /// <summary>Normale der Netzebene aus dem Layout (vor Build: +Z).</summary>
         public Vector3 PlaneNormal => Layout != null ? Layout.Normal : Vector3.forward;
 
+        /// <summary>
+        /// Darf das Netz Insekten fangen? Fangspirale muss weit genug gewachsen sein
+        /// (t &gt;= 0.3 in ihrer Phase) oder das Netz ist fertig.
+        /// </summary>
+        public bool CanCatch => (_stage == WebStage.CaptureSpiral && _t >= 0.3f) || _stage == WebStage.Done;
+
+        private WebStage _stage;
+        private float _t;
+        private float _vib;
+        private bool _localSpace;
+        private Vector3 _basePos;
+
         private void OnEnable() => All.Add(this);
         private void OnDisable() => All.Remove(this);
 
@@ -49,6 +61,11 @@ namespace Spinnenspiel
         public void Build(OrbWebLayout layout)
         {
             Layout = layout;
+            _stage = WebStage.Frame;
+            _t = 0f;
+            _vib = 0f;
+            _localSpace = false;
+            _basePos = transform.position;
 
             // Build ist idempotent: frühere Fäden entfernen.
             foreach (Transform child in transform)
@@ -102,6 +119,8 @@ namespace Spinnenspiel
             if (frameLine == null)
                 throw new System.InvalidOperationException("OrbWeb.SetProgress(): zuerst Build() aufrufen.");
             t01 = Mathf.Clamp01(t01);
+            _stage = stage;
+            _t = t01;
 
             // Rahmen und Hub-Ring gehören zur ersten Phase.
             SetPoints(frameLine, fullFrame, stage == WebStage.Frame ? t01 : 1f);
@@ -158,6 +177,84 @@ namespace Spinnenspiel
                 default:
                     return new Vector3[0];
             }
+        }
+
+        /// <summary>
+        /// Schneidet das Segment a→b die Netzebene innerhalb des Rahmens?
+        /// Nur wenn <see cref="CanCatch"/>. Liefert den Schnittpunkt in <paramref name="hit"/>.
+        /// </summary>
+        public bool TryIntersectSegment(Vector3 a, Vector3 b, out Vector3 hit)
+        {
+            hit = a;
+            if (!CanCatch || Layout == null)
+                return false;
+
+            Vector3 n = PlaneNormal;
+            float da = Vector3.Dot(a - Layout.Hub, n);
+            float db = Vector3.Dot(b - Layout.Hub, n);
+
+            // Gleiche Seite der Ebene (oder Segment in der Ebene) → kein Durchgang.
+            if ((da > 0f && db > 0f) || (da < 0f && db < 0f) || Mathf.Abs(db) < 1e-9f)
+                return false;
+
+            hit = a + (b - a) * (da / (da - db));
+
+            // Nur innerhalb des Rahmen-Polygons fangen (Punkt-in-Polygon, 2D-Ebene).
+            return Layout.IsInsideFrame(hit);
+        }
+
+        /// <summary>Regt die Netz-Vibration an (stärkste bisherige Komponente zählt).</summary>
+        public void Vibrate(float strength)
+        {
+            _vib = Mathf.Max(_vib, strength);
+            EnsureLocalSpace();
+        }
+
+        /// <summary>
+        /// Dämpft die Vibration (Exp, ~4/s) und schwingt das Netz um seine Basisposition
+        /// entlang der Netzebene (Sinus 55 rad/s, Amplitude 0.004 · _vib).
+        /// </summary>
+        private void LateUpdate()
+        {
+            if (!_localSpace)
+                return;
+
+            _vib *= Mathf.Exp(-4f * Time.deltaTime);
+            Vector3 offset = PlaneNormal * (Mathf.Sin(Time.time * 55f) * 0.004f * _vib);
+            transform.position = _basePos + offset;
+        }
+
+        /// <summary>
+        /// Stellt die LineRenderer einmalig auf Lokalraum um (Positionen werden umgerechnet),
+        /// damit das Schwingen das ganze Netz-GameObject bewegen kann.
+        /// </summary>
+        private void EnsureLocalSpace()
+        {
+            if (_localSpace)
+                return;
+
+            _localSpace = true;
+            _basePos = transform.position;
+            foreach (LineRenderer line in AllLines())
+            {
+                line.useWorldSpace = false;
+                int n = line.positionCount;
+                for (int i = 0; i < n; i++)
+                {
+                    line.SetPosition(i, transform.InverseTransformPoint(line.GetPosition(i)));
+                }
+            }
+        }
+
+        /// <summary>Alle Faden-LineRenderer dieses Netzes.</summary>
+        private IEnumerable<LineRenderer> AllLines()
+        {
+            if (frameLine != null) yield return frameLine;
+            if (hubRingLine != null) yield return hubRingLine;
+            if (captureLine != null) yield return captureLine;
+            if (auxLine != null) yield return auxLine;
+            foreach (LineRenderer line in radiusLines)
+                yield return line;
         }
 
         /// <summary>
@@ -222,13 +319,16 @@ namespace Spinnenspiel
             return line.useWorldSpace ? pos : line.transform.TransformPoint(pos);
         }
 
-        /// <summary>Zeigt anteilig (t01) die ersten Punkte einer Linie, bei 0 keine.</summary>
-        private static void SetPoints(LineRenderer line, List<Vector3> full, float t01)
+        /// <summary>
+        /// Zeigt anteilig (t01) die ersten Punkte einer Linie, bei 0 keine.
+        /// Im Lokalraum (nach Vibration) werden die Weltkoordinaten umgerechnet.
+        /// </summary>
+        private void SetPoints(LineRenderer line, List<Vector3> full, float t01)
         {
             int n = Mathf.RoundToInt(full.Count * Mathf.Clamp01(t01));
             line.positionCount = n;
             for (int i = 0; i < n; i++)
-                line.SetPosition(i, full[i]);
+                line.SetPosition(i, _localSpace ? transform.InverseTransformPoint(full[i]) : full[i]);
         }
 
         private LineRenderer AddLine(string name, List<Vector3> points, bool loop, Material mat)

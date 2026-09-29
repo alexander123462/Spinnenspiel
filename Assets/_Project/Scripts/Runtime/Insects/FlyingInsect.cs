@@ -25,6 +25,20 @@ namespace Spinnenspiel
         [Tooltip("Heimpunkt, um den das Insekt herumwandert.")]
         public Vector3 home;
 
+        [Tooltip("Wie lange (s) sich das Insekt im Netz zappelt, bevor es sich befreit.")]
+        public float escapeTime = 10f;
+
+        /// <summary>Netz, in dem das Insekt gefangen ist (null wenn frei).</summary>
+        public OrbWeb CaughtIn;
+        /// <summary>Wo es am Fangpunkt sitzt (Zappeln passiert um diesen Punkt).</summary>
+        public Vector3 CaughtPoint;
+
+        private float _caughtAt;
+        private float _ignoreWebsUntil;
+        private float _lastTwitch;
+        private Vector3 _twitchOffset;
+        private float _lastWebVibe;
+
         [SerializeField] private float wanderRadius = 2.5f;
         [SerializeField] private float minHeight = 0.25f;   // über dem Boden
         [SerializeField] private float maxHeight = 1.6f;    // über dem Boden
@@ -37,6 +51,9 @@ namespace Spinnenspiel
 
         /// <summary>Wird ausgelöst, wenn das Insekt die Szene verlässt (vor Destroy).</summary>
         public event System.Action<FlyingInsect> Removed;
+
+        /// <summary>Wird ausgelöst, wenn sich JEDES Insekt in einem Netz verfängt (Spinne → Anlockung).</summary>
+        public static event System.Action<FlyingInsect, OrbWeb> AnyCaught;
 
         private Transform wingLeft;
         private Transform wingRight;
@@ -75,13 +92,118 @@ namespace Spinnenspiel
         private void Update()
         {
             Vector3 previous = transform.position;
-            if (State == InsectState.Flying)
+            switch (State)
             {
-                UpdateFlight();
+                case InsectState.Flying:
+                    UpdateFlight();
+                    // Netz-Kollision: nur wenn kurz nach dem Befreien kein Immunitätsfenster läuft.
+                    if (Time.time >= _ignoreWebsUntil)
+                    {
+                        CheckWebs(previous);
+                    }
+                    break;
+
+                case InsectState.Caught:
+                    UpdateCaught();
+                    break;
+
+                default:
+                    // Wrapped (7.3) und Eaten: keine Bewegung.
+                    break;
             }
 
             LastPosition = previous;
             AnimateWings();
+        }
+
+        /// <summary>Ziel setzen (z. B. für Tests oder spätere Anlockung): direkt dorthin fliegen.</summary>
+        public void FlyTo(Vector3 p)
+        {
+            target = p;
+            nextTargetTime = Time.time + 10f;
+        }
+
+        /// <summary>
+        /// Prüft alle Netze: hat das Segment (vorherige → aktuelle Position) ein
+        /// fangfähiges Netz innerhalb des Rahmens durchquert? Dann fangen.
+        /// </summary>
+        private void CheckWebs(Vector3 from)
+        {
+            Vector3 to = transform.position;
+            foreach (OrbWeb web in OrbWeb.All)
+            {
+                Vector3 hit;
+                if (web.TryIntersectSegment(from, to, out hit))
+                {
+                    Catch(web, hit);
+                    return;
+                }
+            }
+        }
+
+        /// <summary>In das Netz fangen: hinsetzen, Netz vibrieren, allen Bescheid sagen.</summary>
+        private void Catch(OrbWeb web, Vector3 hit)
+        {
+            State = InsectState.Caught;
+            CaughtIn = web;
+            CaughtPoint = hit;
+            transform.position = hit;
+            _caughtAt = Time.time;
+            _lastTwitch = 0f;
+            _lastWebVibe = 0f;
+            web.Vibrate(1f);
+            System.Action<FlyingInsect, OrbWeb> handler = AnyCaught;
+            if (handler != null)
+            {
+                handler(this, web);
+            }
+        }
+
+        /// <summary>
+        /// Gefangen: um den Fangpunkt zappeln (neuer Zufallsversatz alle ~0.08 s),
+        /// Flügel schneller, Netz alle 0.4 s mitvibrieren. Nach escapeTime:
+        /// befreien, kurz vor dem Netz wegfliegen, 2 s nicht fangbar.
+        /// </summary>
+        private void UpdateCaught()
+        {
+            OrbWeb web = CaughtIn;
+            if (web == null)
+            {
+                // Netz wurde zwischenzeitlich entfernt → einfach frei.
+                State = InsectState.Flying;
+                _ignoreWebsUntil = Time.time + 2f;
+                return;
+            }
+
+            // Zappeln: neuer Zufallsversatz (Kugel 3 mm) alle ~0.08 s.
+            if (Time.time - _lastTwitch >= 0.08f)
+            {
+                _lastTwitch = Time.time;
+                _twitchOffset = Random.insideUnitSphere * 0.003f;
+            }
+            transform.position = CaughtPoint + _twitchOffset;
+
+            // Alle 0.4 s das Netz mitvibrieren.
+            if (Time.time - _lastWebVibe >= 0.4f)
+            {
+                _lastWebVibe = Time.time;
+                web.Vibrate(0.6f);
+            }
+
+            if (Time.time - _caughtAt >= escapeTime)
+            {
+                // Befreiung: 8 cm auf der Seite WEG vom Netz (Normal oder ihr Spiegel),
+                // dann fliegen mit 2 s Fang-Immunität, damit es nicht sofort wieder hängen bleibt.
+                Vector3 away = web.PlaneNormal * 0.08f;
+                if (Vector3.Dot(away, transform.position - web.Layout.Hub) < 0f)
+                {
+                    away = -away;
+                }
+                State = InsectState.Flying;
+                transform.position += away;
+                _ignoreWebsUntil = Time.time + 2f;
+                CaughtIn = null;
+            }
         }
 
         /// <summary>Neues Wandern-Ziel: zufälliger Punkt in der Kugel um home, Höhe über Boden geklemmt.</summary>
@@ -195,7 +317,9 @@ namespace Spinnenspiel
                 return;
             }
 
-            float angle = 20f + 55f * Mathf.Sin(Time.time * Mathf.PI * 2f * 28f);
+            // Im Netz gefangen: Flügel schneller schlagen (Faktor 1.6).
+            float freq = State == InsectState.Caught ? 28f * 1.6f : 28f;
+            float angle = 20f + 55f * Mathf.Sin(Time.time * Mathf.PI * 2f * freq);
             if (wingLeft != null)
             {
                 wingLeft.localRotation = Quaternion.Euler(0f, 0f, -angle);

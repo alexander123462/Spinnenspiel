@@ -85,6 +85,132 @@ namespace Spinnenspiel.Tests
                 "Nach Entfernen wurde nicht nachgespawnt: " + spawner.AliveCount + " != " + spawner.count);
         }
 
+        /// <summary>Ergebnis eines Fang-Test-Setups (Iteratoren dürfen keine out-Parameter nehmen).</summary>
+        private class WebTestSetup
+        {
+            public OrbWeb web;
+            public FlyingInsect insect;
+            public Vector3 start;
+        }
+
+        /// <summary>
+        /// Bereitet die Fang-Tests vor: Spawner stilllegen, vorhandene Fliegen entfernen,
+        /// Netz erzeugen und auf die gewünschte Stufe setzen.
+        /// </summary>
+        private static IEnumerator SetupWebTest(OrbWeb.WebStage stage, WebTestSetup result)
+        {
+            result.web = null;
+            result.insect = null;
+            result.start = Vector3.zero;
+
+            yield return LoadScene();
+
+            InsectSpawner spawner = Object.FindFirstObjectByType<InsectSpawner>();
+            if (spawner != null)
+            {
+                spawner.enabled = false;
+            }
+            else
+            {
+                Assert.Fail("Spawner 'Insekten' nicht gefunden");
+                yield break;
+            }
+
+            // Zuvor gespawnte Fliegen entfernen, damit sie nicht stören.
+            foreach (FlyingInsect f in Object.FindObjectsOfType<FlyingInsect>())
+            {
+                f.Remove();
+            }
+
+            WebBuildDemo demo = Object.FindFirstObjectByType<WebBuildDemo>();
+            Assert.IsNotNull(demo, "WebBuildDemo nicht gefunden");
+            result.web = demo.CreateWeb();
+            Assert.IsNotNull(result.web, "CreateWeb() lieferte kein Netz");
+            result.web.SetProgress(stage, 1f);
+
+            Vector3 n = result.web.PlaneNormal;
+            result.start = result.web.Layout.Hub + n * 0.5f;
+
+            GameObject fly = Object.Instantiate(spawner.template, result.start, Quaternion.identity);
+            fly.name = "Testfliege";
+            fly.SetActive(true);
+            result.insect = fly.GetComponent<FlyingInsect>();
+            Assert.IsNotNull(result.insect, "Testfliege hat kein FlyingInsect");
+            result.insect.home = result.start;
+            result.insect.FlyTo(result.web.Layout.Hub - n * 0.5f);
+        }
+
+        [UnityTest]
+        public IEnumerator Fly_GetsCaughtInFinishedWeb()
+        {
+            WebTestSetup s = new WebTestSetup();
+            yield return SetupWebTest(OrbWeb.WebStage.Done, s);
+
+            float t = 0f;
+            while (t < 3f && s.insect.State != FlyingInsect.InsectState.Caught)
+            {
+                t += Time.deltaTime;
+                yield return null;
+            }
+
+            Assert.AreEqual(FlyingInsect.InsectState.Caught, s.insect.State, "Fliege wurde vom fertigen Netz nicht gefangen");
+            Assert.AreEqual(s.web, s.insect.CaughtIn, "CaughtIn ist nicht das Test-Netz");
+            float planeDist = Mathf.Abs(Vector3.Dot(s.insect.CaughtPoint - s.web.Layout.Hub, s.web.PlaneNormal));
+            Assert.Less(planeDist, 0.01f, "Fangpunkt nicht in der Netzebene: " + planeDist);
+
+            Object.Destroy(s.insect.gameObject);
+        }
+
+        [UnityTest]
+        public IEnumerator Fly_PassesUnfinishedWeb()
+        {
+            WebTestSetup s = new WebTestSetup();
+            yield return SetupWebTest(OrbWeb.WebStage.Radii, s);
+
+            float t = 0f;
+            while (t < 2f)
+            {
+                t += Time.deltaTime;
+                yield return null;
+            }
+
+            Assert.AreEqual(FlyingInsect.InsectState.Flying, s.insect.State,
+                "Fliege wurde trotz unvollendetem Netz (Radien) gefangen");
+
+            Object.Destroy(s.insect.gameObject);
+        }
+
+        [UnityTest]
+        public IEnumerator Fly_EscapesAfterTime()
+        {
+            WebTestSetup s = new WebTestSetup();
+            yield return SetupWebTest(OrbWeb.WebStage.Done, s);
+
+            s.insect.escapeTime = 1f;
+
+            // Fangen abwarten (max. 3 s).
+            float t = 0f;
+            while (t < 3f && s.insect.State != FlyingInsect.InsectState.Caught)
+            {
+                t += Time.deltaTime;
+                yield return null;
+            }
+            Assert.AreEqual(FlyingInsect.InsectState.Caught, s.insect.State, "Voraussetzung: Fliege müsste gefangen sein");
+
+            // Nach escapeTime + Puffer muss sie sich befreit haben.
+            t = 0f;
+            while (t < 1.5f && s.insect.State != FlyingInsect.InsectState.Flying)
+            {
+                t += Time.deltaTime;
+                yield return null;
+            }
+
+            Assert.AreEqual(FlyingInsect.InsectState.Flying, s.insect.State,
+                "Fliege hat sich nach escapeTime nicht befreit");
+
+            Object.Destroy(s.insect.gameObject);
+        }
+
         private static IEnumerator LoadScene()
         {
             SceneManager.LoadScene(SceneName);
