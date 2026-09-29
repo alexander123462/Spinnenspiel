@@ -47,7 +47,7 @@ namespace Spinnenspiel
             {
                 Destroy(old.gameObject);
             }
-            OrbWeb web = CreateWeb();
+            OrbWeb web = CreateWebAt(anchors, transform, "Netz");
             if (web != null)
             {
                 builder.StartBuild(web);
@@ -88,21 +88,33 @@ namespace Spinnenspiel
         }
 
         /// <summary>
+        /// Erzeugt ein neues OrbWeb an den vier Ankerpunkten (freie Methode,
+        /// z. B. auch für automatisch gefundene Netzplätze per WebSiteFinder).
+        /// </summary>
+        public static OrbWeb CreateWebAt(Vector3[] anchors, Transform parent, string name)
+        {
+            if (anchors == null || anchors.Length != 4)
+            {
+                Debug.LogWarning("[WebBuildDemo] CreateWebAt: exakt 4 Anker nötig.");
+                return null;
+            }
+            GameObject go = new GameObject(name);
+            if (parent != null)
+            {
+                go.transform.SetParent(parent, false);
+            }
+            OrbWeb web = go.AddComponent<OrbWeb>();
+            web.Build(new OrbWebLayout(anchors, 16, 0.02f, 0.03f, 7));
+            return web;
+        }
+
+        /// <summary>
         /// Erzeugt ein neues Netz-GameObject "Netz" (Kind dieses Objekts) mit
         /// demselben Layout wie im Test Builder_BuildsWebInOrder.
         /// </summary>
         public OrbWeb CreateWeb()
         {
-            if (anchors == null || anchors.Length != 4)
-            {
-                Debug.LogWarning("[WebBuildDemo] CreateWeb: exakt 4 Anker nötig.");
-                return null;
-            }
-            GameObject go = new GameObject("Netz");
-            go.transform.SetParent(transform, false);
-            OrbWeb web = go.AddComponent<OrbWeb>();
-            web.Build(new OrbWebLayout(anchors, 16, 0.02f, 0.03f, 7));
-            return web;
+            return CreateWebAt(anchors, transform, "Netz");
         }
     }
 }

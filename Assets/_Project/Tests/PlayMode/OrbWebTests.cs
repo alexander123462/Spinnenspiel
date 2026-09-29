@@ -446,6 +446,53 @@ namespace Spinnenspiel.Tests
             return n;
         }
 
+        /// <summary>
+        /// Netz 3a: WebSiteFinder findet am Klettertest-Netzplatz (zwei Stäbe bei
+        /// x=5.0/5.8, y=0..1.2) vier Anker und daraus ein brauchbares Netz.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator SiteFinder_FindsNetzplatz()
+        {
+            SceneManager.LoadScene("Klettertest");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            Vector3 center = new Vector3(5.4f, 0.6f, 2.0f);
+            Assert.IsTrue(WebSiteFinder.TryFind(center, Vector3.forward, null, out Vector3[] a),
+                "TryFind findet am Klettertest-Netzplatz (5.4, 0.6, 2.0) keinen Platz");
+            Assert.IsTrue(a[0].x < a[1].x, "TL.x muss kleiner als TR.x sein: " + a[0] + " / " + a[1]);
+            Assert.IsTrue(a[0].y > a[3].y, "TL.y muss größer als BL.y sein: " + a[0] + " / " + a[3]);
+            for (int i = 0; i < a.Length; i++)
+            {
+                float d = Vector3.Distance(center, a[i]);
+                Assert.That(d, Is.LessThan(1.25f), "Anker " + i + " liegt " + d + " m vom Zentrum");
+            }
+
+            OrbWeb web = WebBuildDemo.CreateWebAt(a, null, "TestNetz");
+            Assert.IsNotNull(web, "CreateWebAt lieferte null");
+            float dh = Vector3.Distance(web.Layout.Hub, center);
+            Assert.That(dh, Is.LessThan(0.5f), "Hub liegt " + dh.ToString("F3", CultureInfo.InvariantCulture) + " m vom Zentrum");
+            Object.DestroyImmediate(web.gameObject);
+        }
+
+        /// <summary>
+        /// Netz 3a: In freier Luft findet der Finder nichts. (0, 0.6, -6) ist in
+        /// der Klettertest-Szene frei: der einzige Naheobjekt ist der Boden (Oberkante
+        /// y=0); die flachsten Abwärtsstrahlen (11.25°) treffen ihn erst in
+        /// 0.6/tan(11.25°) ≈ 3.0 m > Reichweite 1.2 m, und TL/TR haben gar keinen Treffer.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator SiteFinder_NothingInOpenSpace()
+        {
+            SceneManager.LoadScene("Klettertest");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            Vector3 p = new Vector3(0f, 0.6f, -6f);
+            Assert.IsFalse(WebSiteFinder.TryFind(p, Vector3.forward, null, out _),
+                "TryFind findet am freien Punkt (0, 0.6, -6) unerwartet einen Netzplatz");
+        }
+
         /// <summary>Render die Kamera in die RenderTexture und speichert als PNG ab.</summary>
         private static void SaveFrame(Camera cam, RenderTexture rt, string file)
         {
