@@ -85,6 +85,7 @@ namespace Spinnenspiel.EditorTools
 
             // Netzbau (t62b2): Spinne baut das Radnetz in der echten Reihenfolge.
             root.AddComponent<SpiderWebBuilder>();
+            root.AddComponent<SpiderWebPlacer>();
 
             // Hunger (t73a1): steigt langsam, sinkt beim Fressen.
             root.AddComponent<SpiderHunger>();

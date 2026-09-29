@@ -17,6 +17,7 @@ namespace Spinnenspiel
 
         private void Update()
         {
+            if (FindFirstObjectByType<SpiderWebPlacer>() != null) return;
             bool pressed = false;
             if (Keyboard.current != null)
             {
@@ -56,6 +57,7 @@ namespace Spinnenspiel
 
         private void OnGUI()
         {
+            if (FindFirstObjectByType<SpiderWebPlacer>() != null) return;
             SpiderWebBuilder builder = FindFirstObjectByType<SpiderWebBuilder>();
             if (builder == null || builder.IsBuilding)
             {

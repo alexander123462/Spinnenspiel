@@ -493,6 +493,79 @@ namespace Spinnenspiel.Tests
                 "TryFind findet am freien Punkt (0, 0.6, -6) unerwartet einen Netzplatz");
         }
 
+        /// <summary>
+        /// Netz 3b: SpiderWebPlacer baut per TryPlaceWebNow ein Netz am
+        /// Klettertest-Netzplatz, die Spinne sitzt danach im fertigen Netz.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Placer_BuildsWebAtNetzplatz()
+        {
+            SceneManager.LoadScene("Klettertest");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+            SpiderWebPlacer placer = spider.GetComponent<SpiderWebPlacer>();
+            Assert.IsNotNull(placer, "SpiderWebPlacer fehlt");
+            SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
+            Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+
+            // z=1.8: damit der erste TryFindNear-Punkt (d=0.2) exakt in der
+            // Stab-Ebene z=2.0 liegt (Stäbe sind nur 0,04 m dünn; z=1.7 würde
+            // alle Gitterpunkte daneben setzen).
+            spider.transform.position = new Vector3(5.4f, 0.05f, 1.8f);
+            spider.transform.rotation = Quaternion.identity;
+            yield return new WaitForSeconds(0.5f);
+
+            placer.viewOverride = Vector3.forward;
+            builder.durationScale = 0.1f;
+
+            Assert.IsTrue(placer.TryPlaceWebNow(), "TryPlaceWebNow scheiterte am Klettertest-Netzplatz");
+            Assert.IsTrue(builder.IsBuilding, "Builder baut nicht");
+
+            float t = 0f;
+            while (builder.CurrentStage != OrbWeb.WebStage.Done && t < 15f)
+            {
+                t += Time.deltaTime;
+                yield return null;
+            }
+            Assert.AreEqual(OrbWeb.WebStage.Done, builder.CurrentStage, "Bau nicht fertig nach 15 s");
+            Assert.AreEqual(1, placer.WebCount, "WebCount != 1: " + placer.WebCount);
+            Assert.IsTrue(builder.IsSittingInWeb, "Spinne sitzt nicht im Netz");
+        }
+
+        /// <summary>
+        /// Netz 3b: SpiderWebPlacer hält maxWebs = 3, das älteste Netz wird
+        /// zerstört.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Placer_KeepsMaxWebs()
+        {
+            SceneManager.LoadScene("Klettertest");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+            SpiderWebPlacer placer = spider.GetComponent<SpiderWebPlacer>();
+            Assert.IsNotNull(placer, "SpiderWebPlacer fehlt");
+
+            GameObject first = new GameObject("TestWeb0");
+            first.AddComponent<OrbWeb>();
+            placer.RegisterWeb(first.GetComponent<OrbWeb>());
+            for (int i = 1; i < 4; i++)
+            {
+                GameObject go = new GameObject("TestWeb" + i);
+                go.AddComponent<OrbWeb>();
+                placer.RegisterWeb(go.GetComponent<OrbWeb>());
+            }
+            yield return null;
+
+            Assert.AreEqual(3, placer.WebCount, "WebCount != 3: " + placer.WebCount);
+            Assert.IsTrue(first == null, "Ältestes Netz wurde nicht entfernt");
+        }
+
         /// <summary>Render die Kamera in die RenderTexture und speichert als PNG ab.</summary>
         private static void SaveFrame(Camera cam, RenderTexture rt, string file)
         {
