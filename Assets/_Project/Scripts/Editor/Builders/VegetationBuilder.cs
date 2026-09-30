@@ -168,17 +168,12 @@ namespace Spinnenspiel.EditorTools
             MeshRenderer crownNearRenderer = AddMesh(tree.transform, "CrownLOD0", crownNear, leaves);
             MeshRenderer crownFarRenderer = AddMesh(tree.transform, "CrownLOD1", crownFar, leaves);
 
-            CapsuleCollider trunkCollider = tree.AddComponent<CapsuleCollider>();
-            trunkCollider.direction = 1;
-            trunkCollider.radius = 0.24f;
-            trunkCollider.height = trunk.bounds.size.y * 0.6f;
-            trunkCollider.center = new Vector3(0f, trunkCollider.height * 0.5f, 0f);
-            // Untere Halbkugel komplett unter y=0 des Baums, Oberkante bleibt gleich.
-            trunkCollider.height += trunkCollider.radius * 2f;
-            Vector3 trunkCenter = trunkCollider.center;
-            trunkCenter.y -= trunkCollider.radius;
-            trunkCollider.center = trunkCenter;
+            // MeshCollider folgt dem sichtbaren, sich verjüngenden Stamm – die Spinne kann nicht in die Kuppe einer festen Kapsel laufen.
+            MeshCollider trunkCollider = trunkRenderer.gameObject.AddComponent<MeshCollider>();
+            trunkCollider.sharedMesh = trunk;
+            trunkCollider.convex = false;
             tree.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Wood;
+            trunkRenderer.gameObject.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Wood;
 
             LODGroup lod = tree.AddComponent<LODGroup>();
             lod.fadeMode = LODFadeMode.CrossFade;
