@@ -181,5 +181,90 @@ namespace Spinnenspiel
 
             return false;
         }
+
+        /// <summary>
+        /// Findet einen Netzplatz unter einem gespannten Faden (wie Radnetzspinnen
+        /// unter einem Brückenfaden): ein Fadenabschnitt wird zur oberen Kante
+        /// (Oberkante), zwei Rahmenfäden führen nach außen unten zu Ankerpunkten.
+        /// </summary>
+        public static bool TryFindFromThread(SilkThread thread, Vector3 near, Transform ignore, out Vector3[] anchors)
+        {
+            anchors = null;
+            if (thread == null)
+            {
+                return false;
+            }
+
+            float t0 = thread.ClosestT(near);
+            float s = Mathf.Min(0.5f, thread.Length * 0.3f);
+            float dt = s / Mathf.Max(0.01f, thread.Length);
+            Vector3 tl = thread.PointAt(Mathf.Clamp01(t0 - dt));
+            Vector3 tr = thread.PointAt(Mathf.Clamp01(t0 + dt));
+
+            // Richtung entlang des Fadens (horizontal); Netzebene enthält den Faden.
+            Vector3 d = tr - tl;
+            d.y = 0f;
+            if (d.sqrMagnitude < 0.0001f)
+            {
+                return false;
+            }
+            d.Normalize();
+            Vector3 n = Vector3.Cross(d, Vector3.up).normalized;
+
+            // Untere Anker: von tl/tr nach außen unten casten (wie Rahmenfäden).
+            Vector3? pbl = CastBelow(tl, (Vector3.down + d * 0.35f).normalized, ignore);
+            Vector3? pbr = CastBelow(tr, (Vector3.down - d * 0.35f).normalized, ignore);
+            if (pbl == null || pbr == null)
+            {
+                return false;
+            }
+
+            // Treffer in die Netzebene projizieren.
+            Vector3 bl = pbl.Value - n * Vector3.Dot(pbl.Value - tl, n);
+            Vector3 br = pbr.Value - n * Vector3.Dot(pbr.Value - tr, n);
+
+            // Beide Anker müssen deutlich unter dem Faden hängen.
+            if (tl.y - bl.y < 0.25f || tr.y - br.y < 0.25f)
+            {
+                return false;
+            }
+
+            // „Links“ = kleinerer Wert von Dot(p, Cross(up, n)); ggf. tauschen.
+            Vector3 leftAxis = Vector3.Cross(Vector3.up, n);
+            if (Vector3.Dot(tl, leftAxis) > Vector3.Dot(tr, leftAxis))
+            {
+                Vector3 tmpT = tl; tl = tr; tr = tmpT;
+                Vector3 tmpB = bl; bl = br; br = tmpB;
+            }
+
+            anchors = new[] { tl, tr, br, bl };
+            return true;
+        }
+
+        /// <summary>
+        /// Castet eine Kugel nach unten und liefert den Punkt des nächsten
+        /// gültigen Treffers (Collider von <paramref name="ignore"> überspringen),
+        /// sonst null.
+        /// </summary>
+        private static Vector3? CastBelow(Vector3 start, Vector3 dir, Transform ignore)
+        {
+            RaycastHit[] hits = Physics.SphereCastAll(start, 0.04f, dir, 2.5f,
+                Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+            Vector3? best = null;
+            float bestDist = float.MaxValue;
+            foreach (RaycastHit h in hits)
+            {
+                if (ignore != null && h.collider != null && h.collider.transform.IsChildOf(ignore))
+                {
+                    continue;
+                }
+                if (h.distance < bestDist)
+                {
+                    bestDist = h.distance;
+                    best = h.point;
+                }
+            }
+            return best;
+        }
     }
 }

@@ -591,6 +591,59 @@ namespace Spinnenspiel.Tests
             Assert.IsTrue(first == null, "Ältestes Netz wurde nicht entfernt");
         }
 
+        /// <summary>
+        /// Netz 3c: Unter einem gespannten Brückenfaden findet die Spinne
+        /// einen Netzplatz (wie echte Radnetzspinnen) und baut ein Netz
+        /// darunter.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Web_FromBridgeThread()
+        {
+            SceneManager.LoadScene("Klettertest");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+            SpiderMovement movement = spider.GetComponent<SpiderMovement>();
+            Assert.IsNotNull(movement, "SpiderMovement fehlt");
+            SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
+            Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+            SpiderWebPlacer placer = spider.GetComponent<SpiderWebPlacer>();
+            Assert.IsNotNull(placer, "SpiderWebPlacer fehlt");
+
+            // Brückenfaden zwischen zwei gleich hohen Punkten.
+            GameObject threadGo = new GameObject("BridgeThread");
+            SilkThread faden = threadGo.AddComponent<SilkThread>();
+            faden.Init(new Vector3(-1.5f, 1.2f, 1.5f), new Vector3(1.5f, 1.2f, 1.5f), 0.01f);
+            yield return new WaitForSeconds(0.3f);
+
+            Assert.IsTrue(WebSiteFinder.TryFindFromThread(faden, new Vector3(0f, 1.2f, 1.5f), spider.transform, out Vector3[] a),
+                "TryFindFromThread findet unter dem Brückenfaden keinen Platz");
+            Assert.IsTrue(a[0].y > 0.9f, "a[0].y muss am Faden hängen: " + a[0]);
+            Assert.IsTrue(a[3].y < 0.3f, "a[3].y muss unten am Boden sein: " + a[3]);
+            Assert.IsTrue(a[0].x < a[1].x, "a[0].x muss kleiner als a[1].x sein: " + a[0] + " / " + a[1]);
+
+            // Spinne auf den Faden: von dort baut TryPlaceWebNow das Netz darunter.
+            movement.AttachToThread(faden, 0.5f);
+            yield return new WaitForSeconds(0.5f);
+            builder.durationScale = 0.1f;
+            Assert.IsTrue(placer.TryPlaceWebNow(), "TryPlaceWebNow scheitert unter dem Brückenfaden");
+            Assert.IsTrue(builder.IsBuilding, "Builder baut nicht");
+
+            float elapsed = 0f;
+            while (builder.IsBuilding && elapsed < 15f)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            Assert.IsFalse(builder.IsBuilding, "Netzbau nach 15 s noch nicht fertig");
+            Assert.AreEqual(OrbWeb.WebStage.Done, builder.CurrentStage, "CurrentStage != Done");
+
+            Object.DestroyImmediate(threadGo);
+        }
+
         /// <summary>Render die Kamera in die RenderTexture und speichert als PNG ab.</summary>
         private static void SaveFrame(Camera cam, RenderTexture rt, string file)
         {

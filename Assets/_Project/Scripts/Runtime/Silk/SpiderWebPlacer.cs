@@ -40,7 +40,7 @@ namespace Spinnenspiel
                 SpiderWebBuilder builder = FindFirstObjectByType<SpiderWebBuilder>();
                 if (builder != null && !builder.IsBuilding && !builder.IsSittingInWeb)
                 {
-                    CanBuild = WebSiteFinder.TryFindNear(transform.position, View(), transform, out _anchors, out _);
+                    CanBuild = TryFindAnchors(out _anchors);
                     if (CanBuild)
                     {
                         _anchorsTime = Time.time;
@@ -118,6 +118,65 @@ namespace Spinnenspiel
         }
 
         /// <summary>
+        /// Spinne am Faden (wenn an einem hängend), sonst null.
+        /// </summary>
+        private SpiderMovement Movement
+        {
+            get
+            {
+                if (_movement == null)
+                {
+                    _movement = GetComponent<SpiderMovement>();
+                }
+                return _movement;
+            }
+        }
+
+        private SpiderMovement _movement;
+
+        /// <summary>
+        /// Netzplatz suchen: ZUERST unter einem gespannten Faden
+        /// (Brückenfaden, wie bei echten Radnetzspinnen) – der Faden, auf dem
+        /// die Spinne hängt, sonst der nächste Faden (nächster Punkt
+        /// höchstens 0.35 m entfernt). Falls das nicht geht, die bisherige
+        /// Collider-Suche (TryFindNear).
+        /// </summary>
+        private bool TryFindAnchors(out Vector3[] anchors)
+        {
+            anchors = null;
+            SilkThread candidate = null;
+            SpiderMovement movement = Movement;
+            if (movement != null)
+            {
+                if (movement.CurrentThread != null)
+                {
+                    candidate = movement.CurrentThread;
+                }
+                else
+                {
+                    foreach (SilkThread th in SilkThread.All)
+                    {
+                        if (th == null)
+                        {
+                            continue;
+                        }
+                        Vector3 cp = th.PointAt(th.ClosestT(transform.position));
+                        if (Vector3.Distance(cp, transform.position) <= 0.35f)
+                        {
+                            candidate = th;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (candidate != null && WebSiteFinder.TryFindFromThread(candidate, transform.position, transform, out anchors))
+            {
+                return true;
+            }
+            return WebSiteFinder.TryFindNear(transform.position, View(), transform, out anchors, out _);
+        }
+
+        /// <summary>
         /// Baut sofort ein Netz am zuletzt gefundenen (frischen) Platz oder
         /// macht eine frische Suche und baut dort. true bei Erfolg.
         /// </summary>
@@ -131,7 +190,7 @@ namespace Spinnenspiel
                 return PlaceWeb(_anchors);
             }
 
-            if (!WebSiteFinder.TryFindNear(transform.position, View(), transform, out Vector3[] anchors, out _))
+            if (!TryFindAnchors(out Vector3[] anchors))
             {
                 return false;
             }
