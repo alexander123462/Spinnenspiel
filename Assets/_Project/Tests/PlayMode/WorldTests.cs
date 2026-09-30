@@ -524,9 +524,10 @@ namespace Spinnenspiel.Tests
 
             // Beute-Position und Startabstand der Spinne zur Nabe (für die Jagd-Schwellen).
             Vector3 beute = insect.CaughtPoint;
-            // Schwelle: Spinne bleibt am Fangpunkt auf toPrey (0.04 m Richtung Nabe)
-            // plus bodyOffset (0.03 m) stehen – also max. ~0.07 m Abstand zur Beute.
-            float jagdSchranke = 0.10f;
+            // Relativschwelle: die Spinne muss sich mindestens 0.03 m auf die Beute
+            // zubewegen (Startabstand ist bereits ~0.10 m, absolute Schranke zu knapp).
+            float startZurBeute = Vector3.Distance(spider.transform.position, beute);
+            float minZurBeute = startZurBeute;
 
             // Jagd: show_6 beim Einwickeln, show_7 beim Fressen in der Nabe.
             SpiderPredation predation = spider.GetComponent<SpiderPredation>();
@@ -538,6 +539,7 @@ namespace Spinnenspiel.Tests
             hunger.Hunger = 0.8f;
             predation.durationScale = 0.5f;
             predation.StartHunt(insect);
+            minZurBeute = Mathf.Min(minZurBeute, Vector3.Distance(spider.transform.position, beute));
 
             // Spinne jagt die Beute und kehrt zur Nabe zurueck; show_6,
             // sobald das Einwickeln losgeht (in derselben Schleife).
@@ -546,7 +548,8 @@ namespace Spinnenspiel.Tests
             t = 0f;
             while (t < 20f)
             {
-                if (Vector3.Distance(spider.transform.position, beute) < jagdSchranke) beiBeute = true;
+                minZurBeute = Mathf.Min(minZurBeute, Vector3.Distance(spider.transform.position, beute));
+                beiBeute = minZurBeute < startZurBeute - 0.03f;
                 if (silk.IsSpinning && !show6)
                 {
                     ShowCamera(cam, builder);
@@ -558,7 +561,7 @@ namespace Spinnenspiel.Tests
                 ShowCamera(cam, builder);
                 yield return null;
             }
-            Assert.IsTrue(beiBeute, "Spinne ist nicht zur Beute gelaufen");
+            Assert.IsTrue(beiBeute, "Spinne ist nicht zur Beute gelaufen: start=" + startZurBeute.ToString("F3") + " min=" + minZurBeute.ToString("F3"));
             yield return new WaitForSeconds(1f); // ca. 1 s nach Rueckkehr: Fressen in der Nabe
             ShowCamera(cam, builder);
             SaveFrame(cam, rt, System.IO.Path.Combine(dir, "show_7.png"));
