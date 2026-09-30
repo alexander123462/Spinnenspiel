@@ -30,6 +30,7 @@ namespace Spinnenspiel
         private float _anchorsTime;
         private float _nextCheck;
         private int _counter;
+        private bool _nearThread;
 
         private void Update()
         {
@@ -49,6 +50,30 @@ namespace Spinnenspiel
                 else
                 {
                     CanBuild = false;
+                }
+
+                // Hinweis "auf den Faden steigen" alle 0,25 s aktualisieren.
+                SpiderMovement m = Movement;
+                if (m != null && m.CurrentThread == null)
+                {
+                    _nearThread = false;
+                    foreach (SilkThread th in SilkThread.All)
+                    {
+                        if (th == null)
+                        {
+                            continue;
+                        }
+                        Vector3 cp = th.PointAt(th.ClosestT(transform.position));
+                        if (Vector3.Distance(cp, transform.position) <= 0.12f)
+                        {
+                            _nearThread = true;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    _nearThread = false;
                 }
             }
 
@@ -73,6 +98,11 @@ namespace Spinnenspiel
             {
                 GUI.Label(new Rect(Screen.width / 2f - 80f, Screen.height - 36f, 160f, 24f),
                     "N / Y: Netz bauen");
+            }
+            else if (_nearThread)
+            {
+                GUI.Label(new Rect(Screen.width / 2f - 160f, Screen.height - 36f, 320f, 24f),
+                    "In Fadenrichtung laufen: auf den Faden steigen");
             }
         }
 

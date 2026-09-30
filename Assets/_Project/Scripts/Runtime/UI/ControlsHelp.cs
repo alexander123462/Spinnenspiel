@@ -18,10 +18,12 @@ namespace Spinnenspiel
             "Shift / Stick drücken – Sprint",
             "Maus / rechter Stick – Kamera",
             "F / rechte Maustaste / rechte Schulter – Faden schießen (Fadenkreuz) / Faden entlangklettern",
+            "Auf einen gespannten Faden steigen: zum Fadenende an der Rinde laufen, dann in Fadenrichtung weiterlaufen",
+            "Netz zwischen zwei Bäumen: Brückenfaden spannen, auf den Faden steigen, dann N / Y – das Netz hängt darunter",
             "Leertaste / B – Loslassen, am Sicherheitsfaden abseilen (am Seil: W/S hoch- oder runterklettern)",
             "N / Y – Netz bauen (wenn „Netz bauen“ angezeigt wird)",
             "E / X – Beute holen (wenn im Netz eine Fliege zappelt)",
-            "Aus dem Netz fallen lassen",
+            "Leertaste / B – Aus dem Netz fallen lassen (Loslassen)",
         };
 
         /// <summary>Sichtbarkeit der Box (F1 / Select schaltet um).</summary>
