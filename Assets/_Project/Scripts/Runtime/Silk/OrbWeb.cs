@@ -38,9 +38,13 @@ namespace Spinnenspiel
         /// </summary>
         public bool CanCatch => (_stage == WebStage.CaptureSpiral && _t >= 0.3f) || _stage == WebStage.Done;
 
+        /// <summary>Radius der Fangspirale um die Nabe (für Tests).</summary>
+        public float CaptureRadius => _captureRadius;
+
         private WebStage _stage;
         private float _t;
         private float _vib;
+        private float _captureRadius;
         private bool _localSpace;
         private Vector3 _basePos;
 
@@ -105,6 +109,11 @@ namespace Spinnenspiel
             // Hilfsspirale: ausgeblendet, außer showAux.
             auxLine = AddLine("AuxSpiral", layout.AuxSpiral, false, mat);
             auxLine.enabled = showAux;
+
+            // Klebrige Zone = Fangspirale: größter Radius von der Nabe.
+            _captureRadius = 0f;
+            foreach (Vector3 p in layout.CaptureSpiral)
+                _captureRadius = Mathf.Max(_captureRadius, Vector3.Distance(p, layout.Hub));
         }
 
         /// <summary>
@@ -200,7 +209,11 @@ namespace Spinnenspiel
             hit = a + (b - a) * (da / (da - db));
 
             // Nur innerhalb des Rahmen-Polygons fangen (Punkt-in-Polygon, 2D-Ebene).
-            return Layout.IsInsideFrame(hit);
+            if (!Layout.IsInsideFrame(hit))
+                return false;
+
+            // Klebrig ist nur die Fangspirale, nicht der ganze Rahmen.
+            return Vector3.Distance(hit, Layout.Hub) <= _captureRadius + 0.02f;
         }
 
         /// <summary>Regt die Netz-Vibration an (stärkste bisherige Komponente zählt).</summary>

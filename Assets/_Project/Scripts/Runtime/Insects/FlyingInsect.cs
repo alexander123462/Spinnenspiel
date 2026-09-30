@@ -127,11 +127,27 @@ namespace Spinnenspiel
             AnimateWings();
         }
 
-        /// <summary>Ziel setzen (z. B. für Tests oder spätere Anlockung): direkt dorthin fliegen.</summary>
-        public void FlyTo(Vector3 p)
+        /// <summary>Ziel setzen (z. B. für Tests oder spätere Anlockung): direkt dorthin fliegen.
+        /// netzSchneise=true: auf dieser Schiene wird Hindernissen nicht ausgewichen (das Netz wird geflogen).</summary>
+        public void FlyTo(Vector3 p, bool netzSchneise = false)
         {
             target = p;
             nextTargetTime = Time.time + 10f;
+            if (netzSchneise)
+            {
+                _webRunUntil = Time.time + 4f;
+            }
+        }
+
+        /// <summary>
+        /// Flugrichtung beim Start setzen (für Tests: die Fliege startet direkt in
+        /// Zielrichtung statt mit der Template-Richtung +Z, was einen weiten
+        /// Kurvenbogen um das Ziel vermeiden kann).
+        /// </summary>
+        public void SetInitialDirection(Vector3 dir)
+        {
+            currentDirection = dir.normalized;
+            hasDirection = true;
         }
 
         /// <summary>
@@ -227,20 +243,7 @@ namespace Spinnenspiel
                 OrbWeb web = FindNearbyCatchingWeb();
                 if (web != null)
                 {
-                    Vector3 hub = web.Layout.Hub;
-                    Vector3 n = web.PlaneNormal;
-                    int side = Vector3.Dot(transform.position - hub, n) >= 0f ? 1 : -1;
-                    Vector3 u = Vector3.Cross(n, Vector3.up).normalized;
-                    if (u.sqrMagnitude < 1e-6f)
-                    {
-                        u = Vector3.right;
-                    }
-
-                    Vector3 v = Vector3.Cross(n, u);
-                    Vector2 o = Random.insideUnitCircle * 0.15f;
-                    target = hub + u * o.x + v * o.y - n * side * 0.6f;
-                    nextTargetTime = Time.time + 4f;
-                    _webRunUntil = Time.time + 4f;
+                    FlyIntoWeb(web);
                     return;
                 }
             }
@@ -252,6 +255,28 @@ namespace Spinnenspiel
 
             // Neues Ziel auch nach 2–4 s, damit das Insekt nicht stillhält.
             nextTargetTime = Time.time + Random.Range(2f, 4f);
+        }
+
+        /// <summary>
+        /// Lenkt die Fliege auf einen Punkt 0.6 m hinter der Netzebene (relativ
+        /// zur aktuellen Seite) – der Weg dorthin kreuzt die Fangspirale.
+        /// </summary>
+        private void FlyIntoWeb(OrbWeb web)
+        {
+            Vector3 hub = web.Layout.Hub;
+            Vector3 n = web.PlaneNormal;
+            int side = Vector3.Dot(transform.position - hub, n) >= 0f ? 1 : -1;
+            Vector3 u = Vector3.Cross(n, Vector3.up).normalized;
+            if (u.sqrMagnitude < 1e-6f)
+            {
+                u = Vector3.right;
+            }
+
+            Vector3 v = Vector3.Cross(n, u);
+            Vector2 o = Random.insideUnitCircle * (web.CaptureRadius * 0.8f);
+            target = hub + u * o.x + v * o.y - n * side * 0.6f;
+            nextTargetTime = Time.time + 4f;
+            _webRunUntil = Time.time + 4f;
         }
 
         /// <summary>Nächstes Netz mit CanCatch und Hub < 4 m Abstand zur Fliege (null wenn keines).</summary>
@@ -302,7 +327,8 @@ namespace Spinnenspiel
             // Hindernis? SphereCast 0.3 m voraus – dann Ziel auf die Gegenseite.
             Vector3 facing = hasDirection ? currentDirection.normalized : transform.forward;
             RaycastHit blocked;
-            if (Physics.SphereCast(transform.position, 0.03f, facing, out blocked, 0.3f,
+            if (Time.time >= _webRunUntil &&
+                Physics.SphereCast(transform.position, 0.03f, facing, out blocked, 0.3f,
                     Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
             {
                 Vector3 away = transform.position + (transform.position - blocked.point).normalized * wanderRadius;

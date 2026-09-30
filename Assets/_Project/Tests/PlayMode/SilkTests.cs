@@ -33,6 +33,46 @@ namespace Spinnenspiel.Tests
         }
 
         [UnityTest]
+        public IEnumerator Thread_BoardExistingThread()
+        {
+            yield return Setup();
+
+            // Vorhandener Faden zwischen zwei Bäumen: Anker A nah am Boden, Anker B darüber.
+            Vector3 a = new Vector3(2f, 0.02f, -1f);
+            Vector3 b = new Vector3(2f, 1.2f, 1.5f);
+            GameObject threadGo = new GameObject("TestFaden");
+            SilkThread faden = threadGo.AddComponent<SilkThread>();
+            faden.Init(a, b, 0.02f);
+            Assert.IsTrue(SilkThread.All.Contains(faden), "Faden ist nicht in SilkThread.All");
+
+            yield return new WaitForSeconds(0.5f);
+
+            // Spinne neben Anker A (0.12 m seitlich), Blickrichtung zu B - aber NICHT am Faden.
+            movement.Teleport(new Vector3(2f, 0.02f, -1.12f),
+                Quaternion.LookRotation(new Vector3(b.x - a.x, 0f, b.z - a.z), Vector3.up));
+            yield return new WaitForSeconds(0.5f);
+            Assert.IsNull(movement.CurrentThread, "Spinne ist direkt nach dem Teleport bereits am Faden");
+
+            // Vorwärts laufen: die Spinne sollte auf den Faden steigen.
+            movement.SetExternalMoveLocal(new Vector2(0f, 1f));
+            float t = 0f;
+            while (t < 3f && movement.CurrentThread != faden)
+            {
+                t += Time.deltaTime;
+                yield return null;
+            }
+            Assert.AreSame(faden, movement.CurrentThread, "Spinne ist nicht auf den vorhandenen Faden gestiegen");
+
+            // Eingabe halten: die Spinne klettert den Faden hinauf.
+            yield return new WaitForSeconds(2f);
+            Assert.IsTrue(movement.transform.position.y > 0.3f,
+                string.Format(CultureInfo.InvariantCulture, "Spinne ist nach dem Einsteigen nicht höher als 0.3 m (y={0:F2})",
+                    movement.transform.position.y));
+
+            movement.SetExternalMoveLocal(null);
+        }
+
+        [UnityTest]
         public IEnumerator Silk_ThreadToTrunk_Attaches()
         {
             yield return Setup();

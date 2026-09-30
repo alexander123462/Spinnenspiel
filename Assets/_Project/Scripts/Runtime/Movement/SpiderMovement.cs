@@ -55,6 +55,7 @@ namespace Spinnenspiel
         private Vector2? _externalMoveLocal;
         private bool? _externalSprint;
         private float _threadT;
+        private float _boardCooldownUntil;
         private bool _warnedNoCamera;
         private SpiderSurfaceDetector _surface;
 
@@ -178,6 +179,7 @@ namespace Spinnenspiel
         public void DetachFromThread()
         {
             CurrentThread = null;
+            _boardCooldownUntil = Time.time + 1f;
         }
 
         /// <summary>
@@ -187,8 +189,38 @@ namespace Spinnenspiel
         public void LetGo()
         {
             DetachFromThread();
+            _boardCooldownUntil = Time.time + 1f;
             _attached = false;
             CatchOnDragline();
+        }
+
+        /// <summary>
+        /// Von der Oberfläche auf einen vorhandenen Faden steigen: Echte Spinnen laufen einfach
+        /// von der Rinde auf einen Faden, wenn sie in dessen Richtung laufen und er in Reichweite ist.
+        /// </summary>
+        private void TryBoardThread(Vector3 moveDirWorld)
+        {
+            if (!_attached || CurrentThread != null || IsScripted) return;
+            if (moveDirWorld.sqrMagnitude <= 0.01f) return;
+            if (Time.time < _boardCooldownUntil) return;
+
+            Vector3 pos = transform.position;
+            Vector3 dir = moveDirWorld.normalized;
+            foreach (SilkThread thread in SilkThread.All)
+            {
+                float t = thread.ClosestT(pos);
+                Vector3 p = thread.PointAt(t);
+                if (Vector3.Distance(p, pos) > 0.08f) continue;
+
+                Vector3 tangent = thread.TangentAt(t).normalized;
+                if (tangent.sqrMagnitude < 0.0001f) continue;
+                // Richtung in den Faden hinein: bei t < 0.5 nach A zu, sonst nach B zu.
+                Vector3 richtung = t < 0.5f ? tangent : -tangent;
+                if (Vector3.Dot(dir, richtung) <= 0.6f) continue;
+
+                AttachToThread(thread, Mathf.Clamp(t, 0.03f, 0.97f));
+                return;
+            }
         }
 
         /// <summary>
@@ -349,6 +381,9 @@ namespace Spinnenspiel
                 : GetCameraRelativeDirection(moveInput, up);
 
             Vector3 oldPos = transform.position;
+
+            // Einsteigen: von der Oberfläche auf einen vorhandenen, vorauseilenden Faden (einmal pro Frame).
+            TryBoardThread(dir);
 
             // Faden-Modus hat Vorrang: entlang des Fadens klettern, Beine greifen auf den Faden.
             if (CurrentThread != null)

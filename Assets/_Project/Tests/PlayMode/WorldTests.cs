@@ -346,6 +346,266 @@ namespace Spinnenspiel.Tests
             Object.DestroyImmediate(rt);
         }
 
+        [UnityTest]
+        public IEnumerator Showcase_WebAndHunt()
+        {
+            yield return LoadWorld();
+            GameObject spider = LoadedSpider();
+            SpiderMovement movement = spider.GetComponent<SpiderMovement>();
+            SpiderWebPlacer placer = spider.GetComponent<SpiderWebPlacer>();
+            SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
+            Assert.IsNotNull(placer, "SpiderWebPlacer fehlt");
+            Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+
+            // Spawner stilllegen und vorhandene Fliegen entfernen (wie in den Predation-Tests).
+            InsectSpawner spawner = Object.FindFirstObjectByType<InsectSpawner>();
+            Assert.IsNotNull(spawner, "InsectSpawner fehlt");
+            Assert.IsNotNull(spawner.template, "Spawner-Vorlage fehlt");
+            spawner.enabled = false;
+            foreach (FlyingInsect f in Object.FindObjectsOfType<FlyingInsect>())
+            {
+                f.Remove();
+            }
+
+            // Pflanzen-Collider vor der Netzplatz-Suche aktivieren (wie in WorldWeb_BuildsBetweenPlants).
+            VegetationColliderPool pool = Object.FindFirstObjectByType<VegetationColliderPool>();
+            Assert.IsNotNull(pool, "VegetationColliderPool fehlt");
+            pool.radius = 12f;
+            pool.maxColliders = 800;
+            pool.focus = spider.transform;
+            pool.ForceRefresh();
+            Physics.SyncTransforms();
+
+            // Ersten Netzplatz suchen (gleiche Rasterlogik wie in WorldWeb_BuildsBetweenPlants).
+            Vector3 start = spider.transform.position;
+            Vector3 fwd = spider.transform.forward;
+            fwd.y = 0f;
+            if (fwd.sqrMagnitude < 0.0001f) fwd = Vector3.forward; else fwd = fwd.normalized;
+            Vector3 rightDir = Vector3.Cross(Vector3.up, fwd);
+            Vector3[] blicke = { fwd, rightDir, -fwd, -rightDir };
+            bool haveFirst = false;
+            Vector3 firstPoint = Vector3.zero;
+            Vector3 firstBlick = fwd;
+            Vector3[] firstAnker = null;
+            for (int gx = -10; gx <= 10 && !haveFirst; gx++)
+            {
+                for (int gz = -10; gz <= 10 && !haveFirst; gz++)
+                {
+                    Vector3 col = new Vector3(start.x + gx, start.y + 20f, start.z + gz);
+                    RaycastHit[] hits = Physics.RaycastAll(col, Vector3.down, 40f,
+                        Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+                    Vector3 ground = Vector3.zero;
+                    bool groundFound = false;
+                    for (int h = 0; h < hits.Length; h++)
+                    {
+                        if (hits[h].collider.transform == spider.transform ||
+                            hits[h].collider.transform.IsChildOf(spider.transform))
+                        {
+                            continue; // eigene Kollider ignorieren
+                        }
+                        ground = hits[h].point;
+                        groundFound = true;
+                        break;
+                    }
+                    if (!groundFound)
+                    {
+                        continue;
+                    }
+
+                    foreach (Vector3 blick in blicke)
+                    {
+                        if (WebSiteFinder.TryFindNear(ground, blick, spider.transform, out Vector3[] anchors, out Vector3 center))
+                        {
+                            firstPoint = ground;
+                            firstBlick = blick;
+                            firstAnker = (Vector3[])anchors.Clone();
+                            haveFirst = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            Assert.IsTrue(haveFirst, "Kein Netzplatz in der Testwelt gefunden");
+
+            // Spinne hinteleportieren und Netz bauen lassen.
+            movement.SetScripted(true);
+            movement.Teleport(firstPoint + Vector3.up * 0.05f, Quaternion.LookRotation(firstBlick, Vector3.up));
+            yield return new WaitForSeconds(0.5f);
+            placer.viewOverride = firstBlick;
+            builder.durationScale = 0.35f;
+            Assert.IsTrue(placer.PlaceWeb(firstAnker), "PlaceWeb am ersten Platz fehlgeschlagen");
+
+            // Aufnahmekamera (1280x720) - wie in WorldWeb_BuildsBetweenPlants.
+            GameObject camGo = new GameObject("ShowcaseCam");
+            Camera cam = camGo.AddComponent<Camera>();
+            cam.fieldOfView = 50f;
+            RenderTexture rt = new RenderTexture(1280, 720, 24);
+            rt.Create();
+            cam.targetTexture = rt;
+            cam.transform.position = spider.transform.position + Vector3.up * 1f;
+            cam.transform.rotation = Quaternion.LookRotation(spider.transform.position - cam.transform.position);
+            string dir = System.IO.Path.Combine(Application.dataPath, "../Logs/ci");
+            System.IO.Directory.CreateDirectory(dir);
+
+            // show_0..show_3: je ein Bild pro Bausstufe, jeweils ~40 % in die Stufe hinein.
+            // Stufendauern 5/12/5/20 s * durationScale 0.35 -> Wartezeit ~40 % davon.
+            OrbWeb.WebStage[] aufnahmen =
+            {
+                OrbWeb.WebStage.Frame,
+                OrbWeb.WebStage.Radii,
+                OrbWeb.WebStage.AuxSpiral,
+                OrbWeb.WebStage.CaptureSpiral
+            };
+            float[] warte = { 0.7f, 1.7f, 0.7f, 2.8f };
+            float t = 0f;
+            for (int s = 0; s < aufnahmen.Length; s++)
+            {
+                t = 0f;
+                while (builder.CurrentStage < aufnahmen[s] && t < 30f)
+                {
+                    t += Time.deltaTime;
+                    ShowCamera(cam, builder); // Kamera jeden Frame neu setzen (n wird erst mit dem Bau bekannt)
+                    yield return null;
+                }
+                t = 0f;
+                while (t < warte[s])
+                {
+                    t += Time.deltaTime;
+                    ShowCamera(cam, builder);
+                    yield return null;
+                }
+                ShowCamera(cam, builder);
+                SaveFrame(cam, rt, System.IO.Path.Combine(dir, "show_" + s + ".png"));
+            }
+
+            // Bis Done warten.
+            t = 0f;
+            while (builder.CurrentStage != OrbWeb.WebStage.Done && t < 60f)
+            {
+                t += Time.deltaTime;
+                ShowCamera(cam, builder);
+                yield return null;
+            }
+            Assert.AreEqual(OrbWeb.WebStage.Done, builder.CurrentStage, "Netzbau nach 60 s nicht fertig");
+            Assert.IsTrue(builder.IsSittingInWeb, "Spinne sitzt nach dem Bau nicht in der Nabe");
+
+            // show_4: Spinne in der Nabe.
+            ShowCamera(cam, builder);
+            SaveFrame(cam, rt, System.IO.Path.Combine(dir, "show_4.png"));
+
+            // Fliege seitlich versetzt durch das Netz (wie in Predation_HuntsWrapsAndEats).
+            Vector3 hub = builder.Web.Layout.Hub;
+            Vector3 n = builder.Normal;
+            Vector3 right = Vector3.Cross(Vector3.up, n).normalized;
+            float seitVersatz = builder.Web.CaptureRadius * 0.8f;
+            Vector3 flyStart = hub + n * 0.5f + right * seitVersatz;
+            Vector3 ziel = hub - n * 0.5f + right * seitVersatz;
+            GameObject fly = Object.Instantiate(spawner.template, flyStart, Quaternion.identity);
+            fly.name = "ShowcaseFliege";
+            fly.SetActive(true);
+            FlyingInsect insect = fly.GetComponent<FlyingInsect>();
+            Assert.IsNotNull(insect, "Fliege hat kein FlyingInsect");
+            insect.home = flyStart;
+            insect.FlyTo(ziel, true);
+            insect.SetInitialDirection(ziel - flyStart);
+
+            t = 0f;
+            while (t < 5f && insect.State != FlyingInsect.InsectState.Caught)
+            {
+                t += Time.deltaTime;
+                ShowCamera(cam, builder);
+                yield return null;
+            }
+            Assert.AreEqual(FlyingInsect.InsectState.Caught, insect.State, "Fliege wurde nicht gefangen");
+
+            // show_5: Fliege im Netz.
+            ShowCamera(cam, builder);
+            SaveFrame(cam, rt, System.IO.Path.Combine(dir, "show_5.png"));
+
+            // Beute-Position und Startabstand der Spinne zur Nabe (für die Jagd-Schwellen).
+            Vector3 beute = insect.CaughtPoint;
+            // Schwelle: Spinne bleibt am Fangpunkt auf toPrey (0.04 m Richtung Nabe)
+            // plus bodyOffset (0.03 m) stehen – also max. ~0.07 m Abstand zur Beute.
+            float jagdSchranke = 0.10f;
+
+            // Jagd: show_6 beim Einwickeln, show_7 beim Fressen in der Nabe.
+            SpiderPredation predation = spider.GetComponent<SpiderPredation>();
+            Assert.IsNotNull(predation, "SpiderPredation fehlt");
+            SpiderHunger hunger = spider.GetComponent<SpiderHunger>();
+            Assert.IsNotNull(hunger, "SpiderHunger fehlt");
+            SpiderSilk silk = spider.GetComponent<SpiderSilk>();
+            Assert.IsNotNull(silk, "SpiderSilk fehlt");
+            hunger.Hunger = 0.8f;
+            predation.durationScale = 0.5f;
+            predation.StartHunt(insect);
+
+            // Spinne jagt die Beute und kehrt zur Nabe zurueck; show_6,
+            // sobald das Einwickeln losgeht (in derselben Schleife).
+            bool beiBeute = false;
+            bool show6 = false;
+            t = 0f;
+            while (t < 20f)
+            {
+                if (Vector3.Distance(spider.transform.position, beute) < jagdSchranke) beiBeute = true;
+                if (silk.IsSpinning && !show6)
+                {
+                    ShowCamera(cam, builder);
+                    SaveFrame(cam, rt, System.IO.Path.Combine(dir, "show_6.png"));
+                    show6 = true;
+                }
+                if (beiBeute && Vector3.Distance(spider.transform.position, hub) < 0.06f) break;
+                t += Time.deltaTime;
+                ShowCamera(cam, builder);
+                yield return null;
+            }
+            Assert.IsTrue(beiBeute, "Spinne ist nicht zur Beute gelaufen");
+            yield return new WaitForSeconds(1f); // ca. 1 s nach Rueckkehr: Fressen in der Nabe
+            ShowCamera(cam, builder);
+            SaveFrame(cam, rt, System.IO.Path.Combine(dir, "show_7.png"));
+
+            // Jagd zu Ende laufen lassen (Fliege wird gefressen).
+            t = 0f;
+            while (t < 30f && predation.IsHunting)
+            {
+                t += Time.deltaTime;
+                yield return null;
+            }
+            Assert.IsFalse(predation.IsHunting, "Jagd lief nach 30 s nicht zu Ende");
+            yield return null;
+
+            // show_8: weite Ansicht.
+            Vector3 weit = hub + n * 2.5f + Vector3.up * 0.8f;
+            cam.transform.position = weit;
+            cam.transform.rotation = Quaternion.LookRotation(hub - weit);
+            SaveFrame(cam, rt, System.IO.Path.Combine(dir, "show_8.png"));
+
+            // 9 Bilder vorhanden, Fliege am Ende gefressen (Unity-FakeNull: destroyed == null).
+            for (int i = 0; i <= 8; i++)
+            {
+                string file = System.IO.Path.Combine(dir, "show_" + i + ".png");
+                Assert.IsTrue(System.IO.File.Exists(file), "Bild fehlt: show_" + i + ".png");
+            }
+            Assert.IsTrue(insect == null, "Fliege wurde nicht gefressen (existiert noch)");
+
+            // Aufräumen: Kamera + RenderTexture.
+            cam.targetTexture = null;
+            RenderTexture.active = null;
+            Object.DestroyImmediate(camGo);
+            Object.DestroyImmediate(rt);
+        }
+
+        /// <summary>Showcase-Kamera aus der Netznormale (n ist erst nach Baubeginn bekannt).</summary>
+        private static void ShowCamera(Camera cam, SpiderWebBuilder builder)
+        {
+            if (builder.Web == null || builder.Web.Layout == null) return;
+            Vector3 hub = builder.Web.Layout.Hub;
+            Vector3 nrm = builder.Normal;
+            if (nrm.sqrMagnitude < 0.0001f) return;
+            Vector3 pos = hub + nrm * 0.8f + Vector3.up * 0.12f;
+            cam.transform.position = pos;
+            cam.transform.rotation = Quaternion.LookRotation(hub - pos); // ohne Up-Vektor, wie im Weltnetz-Test
+        }
+
         /// <summary>Render die Kamera in die RenderTexture und speichert als PNG ab.</summary>
         private static void SaveFrame(Camera cam, RenderTexture rt, string file)
         {
