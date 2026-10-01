@@ -405,6 +405,69 @@ namespace Spinnenspiel.Tests
         }
 
         [UnityTest]
+        public IEnumerator Builder_MovesCalmly()
+        {
+            SceneManager.LoadScene("Klettertest");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+            SpiderMovement movement = spider.GetComponent<SpiderMovement>();
+            Assert.IsNotNull(movement, "SpiderMovement fehlt");
+            SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
+            Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+
+            // Gleiches Netz wie Builder_LegsHoldWebLines, aber durationScale 1.
+            GameObject webGo = new GameObject("MovesCalmlyWeb");
+            OrbWeb web = webGo.AddComponent<OrbWeb>();
+            Vector3[] anchors =
+            {
+                new Vector3(5.02f, 1.15f, 2.0f),
+                new Vector3(5.78f, 1.15f, 2.0f),
+                new Vector3(5.72f, 0.02f, 2.0f),
+                new Vector3(5.08f, 0.02f, 2.0f)
+            };
+            OrbWebLayout layout = new OrbWebLayout(anchors, 16, 0.02f, 0.03f, 7);
+            web.Build(layout);
+
+            movement.SetScripted(true);
+            movement.Teleport(new Vector3(5.4f, 0.6f, 1.9f), Quaternion.LookRotation(Vector3.up, Vector3.back));
+            builder.durationScale = 1f;
+            builder.StartBuild(web);
+            Assert.IsTrue(builder.IsBuilding, "StartBuild hat nicht gestartet");
+
+            // 6 s lang pro Frame die Geschwindigkeit messen (m/s).
+            // Einen Frame warten, damit lastPos nach dem Start gesetzt ist.
+            yield return null;
+            Vector3 lastPos = spider.transform.position;
+            float maxV = 0f;
+            string maxStage = "?";
+            float elapsed = 0f;
+            while (builder.IsBuilding && elapsed < 6f)
+            {
+                yield return null;
+                Vector3 pos = spider.transform.position;
+                if (Time.deltaTime > 0.005f)
+                {
+                    float v = Vector3.Distance(pos, lastPos) / Time.deltaTime;
+                    if (v > maxV)
+                    {
+                        maxV = v;
+                        maxStage = builder.CurrentStage.ToString();
+                    }
+                }
+                lastPos = pos;
+                elapsed += Time.deltaTime;
+            }
+
+            Assert.LessOrEqual(maxV, 0.6f,
+                "Spinne zu schnell beim Netzbau: max v = " + maxV.ToString("F3", CultureInfo.InvariantCulture) + " m/s, Stage: " + maxStage);
+
+            Object.DestroyImmediate(webGo);
+        }
+
+        [UnityTest]
         public IEnumerator Builder_SitAtHub_LegsOnWeb()
         {
             SceneManager.LoadScene("Klettertest");

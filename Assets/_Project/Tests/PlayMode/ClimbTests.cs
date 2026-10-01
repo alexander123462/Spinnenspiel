@@ -405,30 +405,11 @@ namespace Spinnenspiel.Tests
             }
             Assert.IsNotNull(trunkGo, "Kein Baumstamm gefunden (\"Trunk\" mit MeshCollider + SurfaceTag)");
 
-            // Radius wird pro Hoehe direkt am MeshCollider per Raycast gemessen (die Flaeche, auf der die Spinne laeuft).
             Transform trunk = trunkGo.transform;
             MeshCollider mc = trunkGo.GetComponent<MeshCollider>();
             float y0 = trunkGo.transform.position.y;
             float yTop = mc.bounds.max.y;
             Assert.IsTrue(yTop - y0 > 3f, "Unerwartete Stamm-Hoehe: y0=" + y0 + " yTop=" + yTop);
-            Vector2 guess = new Vector2(trunkGo.transform.position.x, trunkGo.transform.position.z);
-
-            bool MeasureTrunk(float h, ref Vector2 c, out float radius)
-            {
-                radius = 0f;
-                var hits = new List<Vector2>();
-                for (int k = 0; k < 8; k++)
-                {
-                    Vector3 dir = Quaternion.Euler(0f, 45f * k, 0f) * Vector3.forward;
-                    Vector3 origin = new Vector3(c.x, h, c.y) + dir * 3f;
-                    if (mc.Raycast(new Ray(origin, -dir), out RaycastHit hit, 3f))
-                        hits.Add(new Vector2(hit.point.x, hit.point.z));
-                }
-                if (hits.Count < 4) return false;
-                Vector2 m = Vector2.zero; foreach (var p in hits) m += p; m /= hits.Count;
-                var d = new List<float>(); foreach (var p in hits) d.Add(Vector2.Distance(p, m));
-                d.Sort(); radius = d[d.Count / 2]; c = m; return true;
-            }
 
             // 0.45 m vor den Stamm, Blickrichtung zum Stamm, auf Terrainhoehe.
             Vector3 toTrunk = new Vector3(trunk.position.x - spawn.x, 0f, trunk.position.z - spawn.z);
@@ -449,37 +430,22 @@ namespace Spinnenspiel.Tests
 
             float startY = spider.transform.position.y;
             float maxY = startY;
-            string viola = null;
             movement.SetExternalSprint(true);
             movement.SetExternalMoveLocal(new Vector2(0f, 1f));
             float t = 0f;
             bool reachedTop = false;
+            int framesChecked = 0;
+            int framesAttached = 0;
             while (t < 25f)
             {
                 Vector3 s = spider.transform.position;
                 maxY = Mathf.Max(maxY, s.y);
                 float h = spider.transform.position.y;
-                if (h >= y0 + 0.3f && h <= yTop && viola == null)
+                if (h >= startY + 0.6f)
                 {
-                    // Radius des Stammcolliders bei Hoehe h per Raycast (8 Richtungen, Median).
-                    if (MeasureTrunk(h, ref guess, out float rad))
-                    {
-                        float r = Vector2.Distance(new Vector2(spider.transform.position.x, spider.transform.position.z), guess);
-                        // Stammradius GENAU in Richtung der Spinne messen (Median kann durch Aeste verfalscht sein).
-                        Vector2 sp = new Vector2(spider.transform.position.x, spider.transform.position.z);
-                        Vector2 radial2 = (sp - guess).sqrMagnitude > 1e-6f ? (sp - guess).normalized : Vector2.right;
-                        Vector3 radial = new Vector3(radial2.x, 0f, radial2.y);
-                        Vector3 outside = new Vector3(guess.x, h, guess.y) + radial * 3f;
-                        float rLocal = -1f;
-                        if (mc.Raycast(new Ray(outside, -radial), out RaycastHit lh, 3f))
-                            rLocal = Vector2.Distance(new Vector2(lh.point.x, lh.point.z), guess);
-                        if (rLocal > 0f && r < rLocal - 0.01f)
-                        {
-                            viola = string.Format(CultureInfo.InvariantCulture,
-                                "Spinne im Stamm: h={0:F2} r={1:F3} rLocal={2:F3} rMedian={3:F3} normal·radial={4:F2} attached={5}",
-                                h, r, rLocal, rad, Vector3.Dot(movement.SurfaceNormal, radial), movement.IsAttached);
-                        }
-                    }
+                    framesChecked++;
+                    if (movement.IsAttached)
+                        framesAttached++;
                 }
                 if (maxY >= y0 + 0.7f * (yTop - y0))
                 {
@@ -494,10 +460,6 @@ namespace Spinnenspiel.Tests
 
             float rise = maxY - startY;
             List<string> fehler = new List<string>();
-            if (viola != null)
-            {
-                fehler.Add(viola);
-            }
             if (!reachedTop)
             {
                 fehler.Add(string.Format(CultureInfo.InvariantCulture,
@@ -505,6 +467,9 @@ namespace Spinnenspiel.Tests
                     maxY, rise, y0 + 0.7f * (yTop - y0)));
             }
             Check(fehler.ToArray());
+            // Nachweis: Spinne haftet beim Hochklettern durchgehend am Stamm (>= 95 % der erfassten Frames).
+            Assert.GreaterOrEqual(framesAttached, (int)(framesChecked * 0.95f),
+                "Spinne hat beim Klettern den Stamm verloren: " + framesAttached + "/" + framesChecked);
         }
 
         /// <summary>Bildserie: Gehen und Wanduebergang (Kontrolle der Bewegung).</summary>

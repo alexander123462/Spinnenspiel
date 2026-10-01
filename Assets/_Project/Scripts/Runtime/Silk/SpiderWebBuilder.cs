@@ -13,6 +13,8 @@ namespace Spinnenspiel
     {
         /// <summary>Skaliert alle Stufendauern (1 = Standard).</summary>
         public float durationScale = 1f;
+        [Tooltip("Höchstgeschwindigkeit der Spinne beim Netzbau (m/s, bei durationScale 1)")]
+        public float maxBuildSpeed = 0.5f;
         /// <summary>Abstand des Spinnenkörpers zur Netzebene (m).</summary>
         public float bodyOffset = 0.03f;
 
@@ -132,9 +134,52 @@ namespace Spinnenspiel
             }
         }
 
+        private void OnDisable()
+        {
+            StopAllCoroutines();
+            AbortBuild();
+        }
+
+        /// <summary>
+        /// Beendet einen laufenden Netzbau: IsBuilding = false,
+        /// Bau-Faden versteckt, Spinne lässt los.
+        /// </summary>
+        private void AbortBuild()
+        {
+            IsBuilding = false;
+            _sittingInWeb = false;
+            // Bei Deaktivierung/Zerstörung (z. B. Test-Teardown) keine neuen
+            // Objekte mehr erzeugen – SetParent auf einen deaktivierten Parent
+            // ist in Unity verboten und würfe einen Fehler.
+            if (!isActiveAndEnabled)
+            {
+                return;
+            }
+
+            HideBauFaden();
+            if (_silk != null)
+            {
+                _silk.EndSpinningPose();
+            }
+            if (_movement != null)
+            {
+                _movement.SetScripted(false);
+                _movement.LetGo();
+            }
+        }
+
+        /// <summary>Setzt den Fortschritt, falls die Web noch gebaut ist; sonst Abbruch. Gibt false bei Abbruch.</summary>
+        private bool Progress(OrbWeb w, OrbWeb.WebStage s, float t)
+        {
+            if (w == null || !w.IsBuilt) { AbortBuild(); return false; }
+            w.SetProgress(s, t);
+            return true;
+        }
+
         private IEnumerator BuildRoutine()
         {
             OrbWeb web = Web;
+            if (web == null || !web.IsBuilt) { AbortBuild(); yield break; }
 
             for (int s = 0; s < Stages.Length; s++)
             {
@@ -147,13 +192,13 @@ namespace Spinnenspiel
                 }
 
                 // 1. Überweg zum Startpunkt der Phase: noch keine Fäden.
-                web.SetProgress(stage, 0f);
+                if (!Progress(web, stage, 0f)) yield break;
                 HideBauFaden();
                 yield return WalkTo(path[0], 0.4f * durationScale, LookTowards(path[0]));
 
                 // 2. Pfad in der Stufendauer mit konstanter Geschwindigkeit ablaufen.
                 float total = PathLength(path);
-                float stageTime = Mathf.Max(StageDurations[s] * durationScale, 0.05f);
+                float stageTime = Mathf.Max(Mathf.Max(StageDurations[s] * durationScale, total / MaxSpeed), 0.05f);
                 float speed = total / stageTime;
                 float travelled = 0f;
                 while (travelled < total)
@@ -163,7 +208,7 @@ namespace Spinnenspiel
                     float f;
                     PointOnPath(path, travelled, out i, out f);
                     Vector3 point = Vector3.Lerp(path[i], path[i + 1], f);
-                    web.SetProgress(stage, (i + f) / (path.Length - 1f));
+                    if (!Progress(web, stage, (i + f) / (path.Length - 1f))) yield break;
 
                     // Blickrichtung: Laufrichtung in der Ebene, sanft gedreht.
                     Vector3 dir = path[i + 1] - path[i];
@@ -187,11 +232,11 @@ namespace Spinnenspiel
                     yield return null;
                 }
 
-                web.SetProgress(stage, 1f);
+                if (!Progress(web, stage, 1f)) yield break;
             }
 
             // 3. Fertig: Fangspirale komplett, Hilfsspirale weg.
-            web.SetProgress(OrbWeb.WebStage.Done, 1f);
+            if (!Progress(web, OrbWeb.WebStage.Done, 1f)) yield break;
             web.showAux = false;
 
             // Zum Hub laufen, Kopf nach unten (echte Radnetzspinnen).
@@ -259,7 +304,7 @@ namespace Spinnenspiel
             transform.rotation = hubRotation;
             _currentRotation = hubRotation;
 
-            web.SetProgress(OrbWeb.WebStage.Done, 1f);
+            if (web != null && web.IsBuilt) web.SetProgress(OrbWeb.WebStage.Done, 1f);
             web.showAux = false;
 
             CurrentStage = OrbWeb.WebStage.Done;
@@ -267,11 +312,16 @@ namespace Spinnenspiel
             _sittingInWeb = true;
         }
 
+        /// <summary>Höchste Bau-Geschwindigkeit, skaliert mit durationScale.</summary>
+        private float MaxSpeed => maxBuildSpeed / Mathf.Max(durationScale, 0.01f);
+
         /// <summary>Läuft linear zum Ziel (Position + sanfte Drehung) in der Dauer.</summary>
         public IEnumerator WalkTo(Vector3 target, float duration, Quaternion targetRotation)
         {
-            duration = Mathf.Max(duration, 0.001f);
+            if (Web == null || !Web.IsBuilt) { yield break; }
             Vector3 from = transform.position;
+            // Niemals schneller als die maximale Bau-Geschwindigkeit (m/s) laufen.
+            duration = Mathf.Max(Mathf.Max(duration, Vector3.Distance(from, target) / MaxSpeed), 0.001f);
             float t = 0f;
             while (t < duration)
             {

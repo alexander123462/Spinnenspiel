@@ -21,6 +21,8 @@ namespace Spinnenspiel
 
         /// <summary>Zuletzt gebaute Geometrie.</summary>
         public OrbWebLayout Layout;
+        /// <summary>True, wenn das Netz gebaut wurde (Layout vorhanden).</summary>
+        public bool IsBuilt => Layout != null && frameLine != null;
         /// <summary>Wird die Hilfsspirale angezeigt (Standard: aus)?</summary>
         public bool showAux = false;
         /// <summary>Linienbreite aller Seidenfäden (m).</summary>
