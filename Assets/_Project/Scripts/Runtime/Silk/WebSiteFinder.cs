@@ -15,6 +15,37 @@ namespace Spinnenspiel
         private const float MinSpreadX = 0.25f;
         private const float MinSpreadY = 0.25f;
 
+        /// <summary>Rahmen höchstens ~1.2 m Diagonale (max. 0.6 m vom Mittelpunkt).</summary>
+        public const float MaxFrameHalf = 0.6f;
+
+        /// <summary>
+        /// Skaliert den Rahmen um seinen Mittelpunkt, bis die größte Ecke
+        /// höchstens <paramref name="maxHalf"/> weit entfernt ist (kleinere
+        /// Rahmen bleiben unverändert).
+        /// </summary>
+        public static Vector3[] FitFrame(Vector3[] anchors, float maxHalf)
+        {
+            if (anchors == null || anchors.Length != 4)
+            {
+                return anchors;
+            }
+
+            Vector3 c = (anchors[0] + anchors[1] + anchors[2] + anchors[3]) * 0.25f;
+            float d = 0f;
+            for (int i = 0; i < 4; i++)
+            {
+                d = Mathf.Max(d, Vector3.Distance(anchors[i], c));
+            }
+
+            float k = d > maxHalf ? maxHalf / d : 1f;
+            var result = new Vector3[4];
+            for (int i = 0; i < 4; i++)
+            {
+                result[i] = c + (anchors[i] - c) * k;
+            }
+            return result;
+        }
+
         /// <summary>
         /// Findet vier Ankerpunkte (TL, TR, BR, BL) um den Mittelpunkt in der
         /// Blick-Ebene. Pro Quadrant gewinnt der Treffer mit der größten
@@ -190,6 +221,24 @@ namespace Spinnenspiel
         public static bool TryFindFromThread(SilkThread thread, Vector3 near, Transform ignore, out Vector3[] anchors)
         {
             anchors = null;
+            if (!TryFindFromThread(thread, near, ignore, out Vector3[] frame, out _))
+            {
+                return false;
+            }
+            anchors = frame;
+            return true;
+        }
+
+        /// <summary>
+        /// Findet einen Netzplatz unter einem gespannten Faden. Liefert
+        /// <paramref name="frame"/> (begrenzter Rahmen, untere Ecken höchstens
+        /// 1.0 m unter ihren oberen Ecken) und <paramref name="anchorPoints"/>
+        /// (die eigentlichen Treffer – lange Stützen werden zu Ankerfäden).
+        /// </summary>
+        public static bool TryFindFromThread(SilkThread thread, Vector3 near, Transform ignore, out Vector3[] frame, out Vector3[] anchorPoints)
+        {
+            frame = null;
+            anchorPoints = null;
             if (thread == null)
             {
                 return false;
@@ -229,15 +278,22 @@ namespace Spinnenspiel
                 return false;
             }
 
+            // Rahmen begrenzen: jede untere Ecke höchstens 1.0 m von ihrer
+            // oberen Ecke entfernt (längere Stützen werden zu Ankerfäden).
+            Vector3 frameBl = tl + Vector3.ClampMagnitude(bl - tl, 1.0f);
+            Vector3 frameBr = tr + Vector3.ClampMagnitude(br - tr, 1.0f);
+
             // „Links“ = kleinerer Wert von Dot(p, Cross(up, n)); ggf. tauschen.
             Vector3 leftAxis = Vector3.Cross(Vector3.up, n);
             if (Vector3.Dot(tl, leftAxis) > Vector3.Dot(tr, leftAxis))
             {
                 Vector3 tmpT = tl; tl = tr; tr = tmpT;
                 Vector3 tmpB = bl; bl = br; br = tmpB;
+                Vector3 tmpF = frameBl; frameBl = frameBr; frameBr = tmpF;
             }
 
-            anchors = new[] { tl, tr, br, bl };
+            frame = new[] { tl, tr, frameBr, frameBl };
+            anchorPoints = new[] { tl, tr, br, bl };
             return true;
         }
 
@@ -248,7 +304,7 @@ namespace Spinnenspiel
         /// </summary>
         private static Vector3? CastBelow(Vector3 start, Vector3 dir, Transform ignore)
         {
-            RaycastHit[] hits = Physics.SphereCastAll(start, 0.04f, dir, 2.5f,
+            RaycastHit[] hits = Physics.SphereCastAll(start, 0.04f, dir, 4f,
                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
             Vector3? best = null;
             float bestDist = float.MaxValue;

@@ -564,6 +564,58 @@ namespace Spinnenspiel.Tests
         }
 
         /// <summary>
+        /// Netz 3a2: SetAnchorLines erzeugt je Rahmen-Ecke einen Ankerfaden
+        /// mit genau den Endpunkten Ecke + Haltepunkt; Paare ohne Abstand
+        /// (<= 0.02 m) werden übersprungen.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator SetAnchorLines_CreatesThreadsToAnchorPoints()
+        {
+            SceneManager.LoadScene("Klettertest");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            Vector3 center = new Vector3(5.4f, 0.6f, 2.0f);
+            Assert.IsTrue(WebSiteFinder.TryFind(center, Vector3.forward, null, out Vector3[] frame),
+                "TryFind findet keinen Netzplatz");
+            OrbWeb web = WebBuildDemo.CreateWebAt(frame, null, "TestNetzAnker");
+            Assert.IsNotNull(web, "CreateWebAt lieferte null");
+
+            // Haltepunkte deutlich außerhalb der Ecken (simuliert entfernte Anker).
+            var anchors = new Vector3[4];
+            for (int i = 0; i < 4; i++)
+            {
+                Vector3 upOrDown = frame[i].y >= center.y ? Vector3.up : Vector3.down;
+                anchors[i] = frame[i] + upOrDown * 0.2f;
+            }
+
+            web.SetAnchorLines(frame, anchors);
+
+            int count = 0;
+            int expected = 0;
+            foreach (Transform child in web.gameObject.transform)
+            {
+                if (!child.name.StartsWith("Anker_"))
+                {
+                    continue;
+                }
+                count++;
+                LineRenderer line = child.GetComponent<LineRenderer>();
+                Assert.IsNotNull(line, child.name + " hat keine LineRenderer");
+                Assert.AreEqual(2, line.positionCount, child.name + " braucht genau 2 Punkte");
+
+                int idx = int.Parse(child.name.Substring("Anker_".Length));
+                Assert.That(Vector3.Distance(line.GetPosition(0), frame[idx]), Is.LessThan(0.001f),
+                    child.name + " Start != Ecke: " + line.GetPosition(0) + " / " + frame[idx]);
+                Assert.That(Vector3.Distance(line.GetPosition(1), anchors[idx]), Is.LessThan(0.001f),
+                    child.name + " Ende != Haltepunkt: " + line.GetPosition(1) + " / " + anchors[idx]);
+                expected++;
+            }
+            Assert.AreEqual(4, count, "Alle 4 Ecken brauchen einen Ankerfaden");
+            Object.DestroyImmediate(web.gameObject);
+        }
+
+        /// <summary>
         /// Netz 3a: In freier Luft findet der Finder nichts. (0, 0.6, -6) ist in
         /// der Klettertest-Szene frei: der einzige Naheobjekt ist der Boden (Oberkante
         /// y=0); die flachsten Abwärtsstrahlen (11.25°) treffen ihn erst in

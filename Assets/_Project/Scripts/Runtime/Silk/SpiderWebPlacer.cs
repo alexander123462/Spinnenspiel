@@ -22,6 +22,12 @@ namespace Spinnenspiel
         /// <summary>Ob aktuell an einem gültigen Netzplatz gebaut werden kann.</summary>
         public bool CanBuild { get; private set; }
 
+        /// <summary>Grund, warum aktuell kein Netz gebaut werden kann (leer = keine).</summary>
+        public string BlockReason = "";
+
+        /// <summary>Ob die weiße Netz-Vorschau gerade sichtbar ist.</summary>
+        public bool PreviewVisible { get; private set; }
+
         /// <summary>Anzahl aktuell registrierter Netze.</summary>
         public int WebCount => _webs.Count;
 
@@ -31,6 +37,16 @@ namespace Spinnenspiel
         private float _nextCheck;
         private int _counter;
         private bool _nearThread;
+        private Vector3[] _anchorPoints;
+        private bool _buildFromThread;
+
+        // Vorschau: Objekt in Weltkoordinaten, kein Collider.
+        private GameObject _previewGo;
+        private LineRenderer _previewFrame;
+        private readonly List<LineRenderer> _previewAnchorLines = new List<LineRenderer>();
+        private Material _previewMat;
+        private Vector3[] _lastPreviewFrame;
+        private Vector3[] _lastPreviewAnchors;
 
         private void Update()
         {
@@ -45,11 +61,17 @@ namespace Spinnenspiel
                     if (CanBuild)
                     {
                         _anchorsTime = Time.time;
+                        UpdatePreview(_anchors, _anchorPoints);
+                    }
+                    else
+                    {
+                        HidePreview();
                     }
                 }
                 else
                 {
                     CanBuild = false;
+                    HidePreview();
                 }
 
                 // Hinweis "auf den Faden steigen" alle 0,25 s aktualisieren.
@@ -94,10 +116,18 @@ namespace Spinnenspiel
 
         private void OnGUI()
         {
+            if (!string.IsNullOrEmpty(BlockReason))
+            {
+                GUI.Label(new Rect(Screen.width / 2f - 160f, Screen.height - 60f, 320f, 24f),
+                    BlockReason);
+            }
             if (CanBuild)
             {
-                GUI.Label(new Rect(Screen.width / 2f - 80f, Screen.height - 36f, 160f, 24f),
-                    "N / Y: Netz bauen");
+                string text = _buildFromThread
+                    ? "N / Y: Netz unter diesem Faden bauen"
+                    : "N / Y: Netz hier bauen (weiße Vorschau)";
+                GUI.Label(new Rect(Screen.width / 2f - 160f, Screen.height - 36f, 320f, 24f),
+                    text);
             }
             else if (_nearThread)
             {
@@ -141,9 +171,12 @@ namespace Spinnenspiel
             {
                 return false;
             }
+            // Ankerfäden: Rahmen-Ecken zu den echten Haltepunkten.
+            web.SetAnchorLines(anchors, _anchorPoints);
             RegisterWeb(web);
             builder.StartBuild(web);
             CanBuild = false;
+            HidePreview();
             return true;
         }
 
@@ -168,12 +201,17 @@ namespace Spinnenspiel
         /// Netzplatz suchen: ZUERST unter einem gespannten Faden
         /// (Brückenfaden, wie bei echten Radnetzspinnen) – der Faden, auf dem
         /// die Spinne hängt, sonst der nächste Faden (nächster Punkt
-        /// höchstens 0.35 m entfernt). Falls das nicht geht, die bisherige
-        /// Collider-Suche (TryFindNear).
+        /// höchstens 0.35 m entfernt). Unter einem Faden gibt es KEINEN
+        /// Rückfall auf die Collider-Suche (BlockReason wird gesetzt).
+        /// Sonst die Collider-Suche (TryFindNear) mit begrenztem Rahmen
+        /// (FitFrame) – die echten Treffer werden zu Ankerfäden.
         /// </summary>
         private bool TryFindAnchors(out Vector3[] anchors)
         {
             anchors = null;
+            _anchorPoints = null;
+            _buildFromThread = false;
+            BlockReason = "";
             SilkThread candidate = null;
             SpiderMovement movement = Movement;
             if (movement != null)
@@ -199,11 +237,121 @@ namespace Spinnenspiel
                     }
                 }
             }
-            if (candidate != null && WebSiteFinder.TryFindFromThread(candidate, transform.position, transform, out anchors))
+            if (candidate != null)
             {
-                return true;
+                _buildFromThread = true;
+                if (WebSiteFinder.TryFindFromThread(candidate, transform.position, transform, out anchors, out _anchorPoints))
+                {
+                    return true;
+                }
+                BlockReason = "Kein Halt unter dem Faden";
+                return false;
             }
-            return WebSiteFinder.TryFindNear(transform.position, View(), transform, out anchors, out _);
+            Vector3[] near;
+            if (!WebSiteFinder.TryFindNear(transform.position, View(), transform, out near, out _))
+            {
+                return false;
+            }
+            anchors = WebSiteFinder.FitFrame(near, WebSiteFinder.MaxFrameHalf);
+            _anchorPoints = near;
+            return true;
+        }
+
+        /// <summary>
+        /// Weiße Vorschau des geplanten Netzes (Rahmen + Ankerfäden) in
+        /// Weltkoordinaten, nur wenn gebaut werden kann. Aktualisiert sich
+        /// bei jeder periodischen Suche, die neue Anker liefert.
+        /// </summary>
+        private void UpdatePreview(Vector3[] frame, Vector3[] anchorPoints)
+        {
+            if (frame == null || frame.Length != 4)
+            {
+                HidePreview();
+                return;
+            }
+            bool changed = !ReferenceEquals(_lastPreviewFrame, frame) || !ReferenceEquals(_lastPreviewAnchors, anchorPoints);
+            if (changed)
+            {
+                EnsurePreviewObject();
+                // Rahmen: TL→TR→BR→BL→TL (5 Punkte).
+                if (_previewFrame == null)
+                {
+                    _previewFrame = AddPreviewLine("Vorschau_Rahmen");
+                }
+                var pts = new List<Vector3> { frame[0], frame[1], frame[2], frame[3], frame[0] };
+                _previewFrame.positionCount = pts.Count;
+                for (int i = 0; i < pts.Count; i++)
+                {
+                    _previewFrame.SetPosition(i, pts[i]);
+                }
+                // Ankerfäden: je einer pro Ecke, nur wenn Abstand > 0.02 m.
+                for (int i = 0; i < 4; i++)
+                {
+                    LineRenderer line = GetPreviewAnchorLine(i);
+                    bool show = anchorPoints != null && Vector3.Distance(frame[i], anchorPoints[i]) > 0.02f;
+                    if (show)
+                    {
+                        line.enabled = true;
+                        line.positionCount = 2;
+                        line.SetPosition(0, frame[i]);
+                        line.SetPosition(1, anchorPoints[i]);
+                    }
+                    else
+                    {
+                        line.enabled = false;
+                    }
+                }
+                _lastPreviewFrame = frame;
+                _lastPreviewAnchors = anchorPoints;
+            }
+            _previewGo.SetActive(true);
+            PreviewVisible = true;
+        }
+
+        private LineRenderer GetPreviewAnchorLine(int i)
+        {
+            while (_previewAnchorLines.Count <= i)
+            {
+                _previewAnchorLines.Add(AddPreviewLine("Vorschau_Anker_" + _previewAnchorLines.Count));
+            }
+            return _previewAnchorLines[i];
+        }
+
+        private void EnsurePreviewObject()
+        {
+            if (_previewGo != null)
+            {
+                return;
+            }
+            _previewGo = new GameObject("NetzVorschau");
+            if (SilkThread.SharedMaterial != null)
+            {
+                _previewMat = new Material(SilkThread.SharedMaterial);
+                _previewMat.color = new Color(1f, 1f, 1f, 0.35f);
+            }
+        }
+
+        private LineRenderer AddPreviewLine(string name)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(_previewGo.transform, false);
+            var line = go.AddComponent<LineRenderer>();
+            line.positionCount = 0;
+            line.startWidth = 0.006f;
+            line.endWidth = 0.006f;
+            line.useWorldSpace = true;
+            line.receiveShadows = false;
+            line.material = _previewMat;
+            return line;
+        }
+
+        private void HidePreview()
+        {
+            if (_previewGo != null)
+            {
+                _previewGo.SetActive(false);
+            }
+            PreviewVisible = false;
         }
 
         /// <summary>

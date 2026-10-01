@@ -54,6 +54,7 @@ namespace Spinnenspiel
         private void OnDisable() => All.Remove(this);
 
         private LineRenderer frameLine;
+        private readonly List<LineRenderer> anchorLines = new List<LineRenderer>();
         private LineRenderer hubRingLine;
         private LineRenderer captureLine;
         private LineRenderer auxLine;
@@ -78,6 +79,7 @@ namespace Spinnenspiel
                 Object.DestroyImmediate(child.gameObject);
 
             frameLine = null;
+            anchorLines.Clear();
             hubRingLine = null;
             captureLine = null;
             auxLine = null;
@@ -91,6 +93,16 @@ namespace Spinnenspiel
 
             // Rahmen: geschlossene Linie.
             frameLine = AddLine("Frame", layout.Frame, true, mat);
+
+            // Ankerfäden neu setzen (vorherige entfernen, da Kinder oben weg sind).
+            foreach (LineRenderer line in anchorLines)
+            {
+                if (line != null)
+                {
+                    Object.DestroyImmediate(line.gameObject);
+                }
+            }
+            anchorLines.Clear();
 
             // Radien: Nabe zu jedem Endpunkt.
             for (int i = 0; i < layout.RadiusEnds.Count; i++)
@@ -119,6 +131,38 @@ namespace Spinnenspiel
         }
 
         /// <summary>
+        /// Fügt Ankerfäden hinzu: für jedes Eck/Punkt-Paar mit Abstand > 0.02 m
+        /// ein zusätzlicher Faden von frameCorners[i] nach anchorPoints[i]
+        /// (so befestigen Radnetzspinnen ihren Rahmen an weit entfernten
+        /// Haltepunkten). Die Ankerfäden haben keinen Collider und werden in
+        /// <see cref="SetProgress"/> mit der Frame-Stufe einge- und ausgeblendet.
+        /// </summary>
+        public void SetAnchorLines(Vector3[] frameCorners, Vector3[] anchorPoints)
+        {
+            if (frameCorners == null || anchorPoints == null)
+            {
+                return;
+            }
+            if (frameCorners.Length != anchorPoints.Length)
+            {
+                return;
+            }
+
+            int count = Mathf.Min(4, frameCorners.Length);
+            for (int i = 0; i < count; i++)
+            {
+                if (Vector3.Distance(frameCorners[i], anchorPoints[i]) <= 0.02f)
+                {
+                    continue;
+                }
+                var pts = new List<Vector3> { frameCorners[i], anchorPoints[i] };
+                var line = AddLine("Anker_" + i, pts, false, SilkThread.SharedMaterial);
+                line.enabled = _stage > WebStage.Frame || (_stage == WebStage.Frame && _t > 0f);
+                anchorLines.Add(line);
+            }
+        }
+
+        /// <summary>
         /// Setzt den Bau-Fortschritt: alles vor <paramref name="stage"/> ist voll sichtbar,
         /// die Stage selbst anteilig (t01 = 0..1), alles danach unsichtbar.
         /// Während CaptureSpiral wird die Hilfsspirale im gleichen Maß abgebaut,
@@ -135,6 +179,13 @@ namespace Spinnenspiel
 
             // Rahmen und Hub-Ring gehören zur ersten Phase.
             SetPoints(frameLine, fullFrame, stage == WebStage.Frame ? t01 : 1f);
+
+            // Ankerfäden: sichtbar, sobald der Rahmen beginnt (wie die Rahmenfäden).
+            bool anchorVisible = stage > WebStage.Frame || (stage == WebStage.Frame && t01 > 0f);
+            foreach (LineRenderer line in anchorLines)
+            {
+                line.enabled = anchorVisible;
+            }
 
             // Radien: Anzahl der sichtbaren Radien.
             int visible = stage < WebStage.Radii ? 0
@@ -265,6 +316,13 @@ namespace Spinnenspiel
         private IEnumerable<LineRenderer> AllLines()
         {
             if (frameLine != null) yield return frameLine;
+            foreach (LineRenderer line in anchorLines)
+            {
+                if (line != null)
+                {
+                    yield return line;
+                }
+            }
             if (hubRingLine != null) yield return hubRingLine;
             if (captureLine != null) yield return captureLine;
             if (auxLine != null) yield return auxLine;
