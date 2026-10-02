@@ -17,6 +17,55 @@ namespace Spinnenspiel.Tests
     {
         private JungleWorldGenerator readyGen;
 
+        /// <summary>Eine Zeile mit den wichtigsten Messwerten der Spinne (Diagnostics).</summary>
+        private static string Diag(SpiderMovement s)
+        {
+            Vector3 pos = s.transform.position;
+            float boden = Terrain.activeTerrain != null
+                ? Terrain.activeTerrain.SampleHeight(pos) + Terrain.activeTerrain.transform.position.y
+                : -999f;
+            int anzahl = Object.FindObjectsOfType<SpiderMovement>().Length;
+
+            RaycastHit[] hits = Physics.RaycastAll(pos + Vector3.up * 2f, Vector3.down, 5f);
+            var beste = new System.Collections.Generic.List<RaycastHit>();
+            foreach (var h in hits)
+            {
+                int k = beste.FindIndex(b => b.distance > h.distance);
+                if (k < 0) k = beste.Count;
+                beste.Insert(k, h);
+                if (beste.Count > 3) beste.RemoveAt(beste.Count - 1);
+            }
+            string strahlen = string.Join(" | ", beste.ConvertAll(h =>
+                h.collider.gameObject.name + "(" + LayerMask.LayerToName(h.collider.gameObject.layer) + ")@"
+                + h.collider.transform.position.y.ToString("F2")));
+
+            return "pos=" + pos.ToString("F2")
+                + " boden=" + boden.ToString("F2")
+                + " grounded=" + s.IsGrounded
+                + " rope=" + s.IsOnRope
+                + " spiders=" + anzahl
+                + " rays=" + strahlen;
+        }
+
+        /// <summary>Loggt [UrwaldDiag] nach 0.1, 0.5, 1 und 2 s (ersetzt die 2-s-Pause).</summary>
+        private static IEnumerator SpiderDiag(SpiderMovement spider)
+        {
+            float[] marks = { 0.1f, 0.5f, 1f, 2f };
+            float start = Time.realtimeSinceStartup;
+            int next = 0;
+            while (next < marks.Length && Time.realtimeSinceStartup - start < marks[next])
+            {
+                yield return null;
+            }
+            while (next < marks.Length)
+            {
+                Debug.Log("[UrwaldDiag] t=" + marks[next].ToString("F1") + " " + Diag(spider));
+                next++;
+                if (next < marks.Length && Time.realtimeSinceStartup - start < marks[next])
+                    yield return null;
+            }
+        }
+
         /// <summary>Bis zu 15 s auf IsReady warten und den Generator merken.</summary>
         private IEnumerator WaitReady()
         {
@@ -76,18 +125,23 @@ namespace Spinnenspiel.Tests
             Vector3 p = spider.transform.position;
             Assert.Greater(p.y, JungleWorld.WaterLevel,
                 "Spinne sollte über dem Wasser spawnen.");
-            float boden = gen.World.Height(p.x, p.z);
-            Assert.Less(p.y - boden, 0.3f, "Spinne spawn zu hoch über dem Boden (> 0.3 m).");
+            float boden = Terrain.activeTerrain.SampleHeight(p) + Terrain.activeTerrain.transform.position.y;
+            Assert.Less(p.y - boden, 0.3f,
+                "Spinne spawn zu hoch über dem Boden (> 0.3 m). " + Diag(spider));
             Assert.IsFalse(gen.World.IsUnderWater(p.x, p.z), "Spinne sollte nicht im Wasser spawnen.");
 
-            yield return new WaitForSeconds(2f);
+            yield return SpiderDiag(spider);
             p = spider.transform.position;
-            float boden2 = gen.World.Height(p.x, p.z);
-            // Toleranz 0,2 m: Spinne bewegt sich über unebenes Terrain – beim
-            // Abstieg über eine leichte Kante kann der Schwerpunkt kurz unter
-            // der lokalen Bodenhöhe liegen. Echte Versinkung wäre deutlich größer.
-            Assert.GreaterOrEqual(p.y, boden2 - 0.2f,
+            float boden2 = Terrain.activeTerrain.SampleHeight(p) + Terrain.activeTerrain.transform.position.y;
+            Assert.GreaterOrEqual(p.y, boden2 - 0.05f,
                 "Spinne ist nach 2 s unter dem Gelände (versinkt).");
+            Assert.IsTrue(spider.IsGrounded, "Spinne haftet nach 2 s nicht am Boden. " + Diag(spider));
+            Assert.IsFalse(spider.IsOnRope, "Spinne hängt am Faden");
+            var mainCam = Camera.main;
+            Assert.IsNotNull(mainCam, "Hauptkamera nicht gefunden.");
+            Vector3 camPos = mainCam.transform.position;
+            float camBoden = Terrain.activeTerrain.SampleHeight(camPos) + Terrain.activeTerrain.transform.position.y;
+            Assert.Greater(camPos.y, camBoden + 0.02f, "Kamera liegt unter dem Gelände.");
 
             // Beweisfotos: Gesamtansicht + Nahaufnahme der Spinne.
             float half = gen.World.Size / 2f;

@@ -20,6 +20,9 @@ namespace Spinnenspiel
 
         public int Seed { get; private set; }
         public JungleWorld World { get; private set; }
+
+        /// <summary>Waagrechter Spawnplatz der Spinne (y wird erst gegen das Terrain gemessen).</summary>
+        private Vector3 _spawnXZ;
         public bool IsReady { get; private set; }
         public float GenerationSeconds { get; private set; }
         public int TreeCount => Trees.Count;
@@ -40,6 +43,8 @@ namespace Spinnenspiel
                 : (fixedSeed != 0 ? fixedSeed : 1 + (System.Environment.TickCount & 0x7fffffff) % 999999);
             NextSeed = 0;
             World = new JungleWorld(Seed);
+            // Spawnplatz früh merken: Bäume, Unterholz, Totholz und Steine halten darum Platz frei.
+            _spawnXZ = World.FindSpawnPoint();
             float size = World.Size;
 
             // 2) Terrain
@@ -100,6 +105,7 @@ namespace Spinnenspiel
                     float x = gx + ox;
                     float z = gz + oz;
                     if (x < 1f || x > size - 1f || z < 1f || z > size - 1f) continue;
+                    if (NearSpawn(x, z, 2.0f)) continue; // 2 m um den Spawnplatz frei
 
                     float h = World.Height(x, z);
                     if (h < JungleWorld.WaterLevel + 0.3f) continue;
@@ -161,6 +167,7 @@ namespace Spinnenspiel
                 float z = 1f + World.Hash01(0, i, 43) * (size - 2f);
                 if (!IsDryFlat(World, x, z)) continue;
                 if (NearAny(treePos, new Vector3(x, 0f, z), 1.5f)) continue;
+                if (NearSpawn(x, z, 2.0f)) continue;
                 float h = World.Height(x, z);
                 CreateProp(totholz.transform, library.logs[placedLogs % Math.Min(3, library.logs.Length)],
                     library.logMat, new Vector3(x, h - 0.05f, z),
@@ -178,6 +185,7 @@ namespace Spinnenspiel
                 float z = 1f + World.Hash01(0, i, 63) * (size - 2f);
                 if (!IsDryFlat(World, x, z)) continue;
                 if (NearAny(treePos, new Vector3(x, 0f, z), 1.5f)) continue;
+                if (NearSpawn(x, z, 2.0f)) continue;
                 float h = World.Height(x, z);
                 CreateProp(steine.transform, library.rocks[placedRocks % Math.Min(5, library.rocks.Length)],
                     library.rockMat, new Vector3(x, h - 0.05f, z),
@@ -190,8 +198,14 @@ namespace Spinnenspiel
             var mv = FindFirstObjectByType<SpiderMovement>();
             if (mv != null)
             {
-                Vector3 spawn = World.FindSpawnPoint() + Vector3.up * 0.03f;
-                mv.transform.position = spawn;
+                // Spinne auf das ECHTE Terrain absetzen (nicht nur World.Height):
+                // SampleHeight liefert die Höhe der erzeugten Terrain-Surface.
+                var terr = t.GetComponent<Terrain>();
+                Vector3 s = _spawnXZ;
+                s.y = terr.SampleHeight(s) + terr.transform.position.y + 0.03f;
+                // Teleport statt roher transform.position: setzt Geschwindigkeit=0,
+                // haftend, Dragline-Anker neu – sonst hängen alte Zustände (48,20,48) in der Luft.
+                mv.Teleport(s, Quaternion.identity);
                 mv.SetWorldBounds(new Vector3(0.5f, -100f, 0.5f), new Vector3(size - 0.5f, 100f, size - 0.5f));
                 Physics.SyncTransforms();
                 foreach (var leg in mv.GetComponentsInChildren<SpiderLeg>(true))
@@ -234,6 +248,7 @@ namespace Spinnenspiel
                     float x = step / 2f + i * step + (World.Hash01(i, j, SaltA(step)) - 0.5f) * (2f * off);
                     float z = step / 2f + j * step + (World.Hash01(i, j, SaltA(step) + 1) - 0.5f) * (2f * off);
                     if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
+                    if (NearSpawn(x, z, 1.0f)) continue; // Unterholz: 1 m um den Spawnplatz frei
                     if (!ok(i, j, x, z)) continue;
                     float rot = World.Hash01(i, j, SaltA(step) + 4) * 360f;
                     AddPlant(parent, mesh, mat, new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale(i, j));
@@ -267,6 +282,13 @@ namespace Spinnenspiel
             float dh = Mathf.Max(Mathf.Abs(world.Height(x + e, z) - h),
                                  Mathf.Abs(world.Height(x, z + e) - h));
             return Mathf.Atan2(dh, e) * Mathf.Rad2Deg < 20f;
+        }
+
+        /// <summary>Wagrechter Abstand zum Spawnplatz kleiner als dist?</summary>
+        private bool NearSpawn(float x, float z, float dist)
+        {
+            float dx = x - _spawnXZ.x, dz = z - _spawnXZ.z;
+            return dx * dx + dz * dz < dist * dist;
         }
 
         private static bool NearAny(List<Vector3> pos, Vector3 p, float dist)

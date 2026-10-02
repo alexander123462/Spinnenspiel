@@ -83,10 +83,11 @@ namespace Spinnenspiel.Tests
             {
                 var w = new JungleWorld(seed);
                 Vector3 p = w.FindSpawnPoint();
-                float half = w.Size * 0.5f;
 
-                Assert.LessOrEqual(Mathf.Abs(p.x), half, $"Seed {seed}: Spawnpunkt x={p.x} außerhalb der Welt");
-                Assert.LessOrEqual(Mathf.Abs(p.z), half, $"Seed {seed}: Spawnpunkt z={p.z} außerhalb der Welt");
+                Assert.GreaterOrEqual(p.x, 8f, $"Seed {seed}: Spawnpunkt x={p.x} zu nah am Weltrand");
+                Assert.LessOrEqual(p.x, w.Size - 8f, $"Seed {seed}: Spawnpunkt x={p.x} zu nah am Weltrand");
+                Assert.GreaterOrEqual(p.z, 8f, $"Seed {seed}: Spawnpunkt z={p.z} zu nah am Weltrand");
+                Assert.LessOrEqual(p.z, w.Size - 8f, $"Seed {seed}: Spawnpunkt z={p.z} zu nah am Weltrand");
                 Assert.GreaterOrEqual(p.y, JungleWorld.WaterLevel + 0.4f,
                     $"Seed {seed}: Spawnpunkt zu nass (y={p.y})");
                 Assert.False(w.IsClearing(p.x, p.z), $"Seed {seed}: Spawnpunkt liegt in einer Lichtung");

@@ -177,7 +177,7 @@ namespace Spinnenspiel
                     for (int dz = -r; dz <= r; dz++)
                     {
                         if (Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dz)) != r) continue;
-                        float x = dx, z = dz;
+                        float x = Size * 0.5f + dx, z = Size * 0.5f + dz;
                         if (!SpawnOk(x, z)) continue;
                         return new Vector3(x, Height(x, z), z);
                     }
@@ -185,7 +185,7 @@ namespace Spinnenspiel
             }
 
             // Fallback (darf praktisch nie vorkommen): Weltmitte
-            return new Vector3(0f, Height(0f, 0f), 0f);
+            return new Vector3(Size * 0.5f, Height(Size * 0.5f, Size * 0.5f), Size * 0.5f);
         }
 
         private bool SpawnOk(float x, float z)
