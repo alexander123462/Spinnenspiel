@@ -43,6 +43,14 @@ namespace Spinnenspiel
         [SerializeField] private Vector3 worldBoundsMin;
         [SerializeField] private Vector3 worldBoundsMax;
 
+        /// <summary>Weltgrenzen zur Laufzeit setzen (z. B. von der Urwald-Generierung).</summary>
+        public void SetWorldBounds(Vector3 min, Vector3 max)
+        {
+            useWorldBounds = true;
+            worldBoundsMin = min;
+            worldBoundsMax = max;
+        }
+
         private Vector3 _vel;
         private Vector3 _lastVelocity;
         private Vector3 _surfaceNormal = Vector3.up;

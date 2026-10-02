@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 04c5e3182d74aaa4786180dbe5995eba, type: 3}
+  m_Name: JungleAssetLibrary
+  m_EditorClassIdentifier: Spinnenspiel.Runtime::Spinnenspiel.JungleAssetLibrary
+  trunks:
+  - {fileID: 4300000, guid: 3b8d5659283004441b6c8f7dea698f1b, type: 2}
+  - {fileID: 4300000, guid: 4b0740ea3ae6b3040bc9e4f5aea27e04, type: 2}
+  - {fileID: 4300000, guid: d683afd9276ec304d830dd1f66875199, type: 2}
+  crownsNear:
+  - {fileID: 4300000, guid: 2036a5c59396a7145a50e9f8cd2aebc0, type: 2}
+  - {fileID: 4300000, guid: 3c4f4b6e63d63294196f0c9387d149a4, type: 2}
+  - {fileID: 4300000, guid: 153dea5d76a9c524897437a63aed7965, type: 2}
+  crownsFar:
+  - {fileID: 4300000, guid: ae4cddcc24afe474a88926846150a805, type: 2}
+  - {fileID: 4300000, guid: 4f110d009113c474eba21ea6a9d0f45d, type: 2}
+  - {fileID: 4300000, guid: 46737ff632534a744bc9b4c147362f2c, type: 2}
+  bark: {fileID: 2100000, guid: 9e3fe11cc73b9234388b25bbd070411d, type: 2}
+  leaves: {fileID: 2100000, guid: a46c96ba1710d64419efcf8aebfb6dfb, type: 2}
+  bush: {fileID: 4300000, guid: b2c50a4a869109e419c99eb3e31a7dd9, type: 2}
+  fern: {fileID: 4300000, guid: 099c400881e49e1428d48976c9f03cf5, type: 2}
+  reed: {fileID: 4300000, guid: d5f4178a636866445847a11af0d805fc, type: 2}
+  bushMat: {fileID: 2100000, guid: 44be9c60907eb4d41811209be803912f, type: 2}
+  fernMat: {fileID: 2100000, guid: 52fcbfef4efd9de418cf7f2a0e280308, type: 2}
+  reedMat: {fileID: 2100000, guid: a1391c9790a7e514d924d89d8373348d, type: 2}
+  logs:
+  - {fileID: 4300000, guid: cc578cc4491c562498645ea4e928559b, type: 2}
+  - {fileID: 4300000, guid: 50a11b4b795adf44cbf08fd3195849b4, type: 2}
+  - {fileID: 4300000, guid: 422974a483d7eb740948808db70e14de, type: 2}
+  rocks:
+  - {fileID: 4300000, guid: a2f49e9cc284c4e489d8ef20efe2e208, type: 2}
+  - {fileID: 4300000, guid: e8da8e4504ad68f49ac75bee0b390ae3, type: 2}
+  - {fileID: 4300000, guid: db668d96075273b41890f37732c950f6, type: 2}
+  - {fileID: 4300000, guid: f0a987fdc915dab44b8afb767843a33b, type: 2}
+  - {fileID: 4300000, guid: 9bcb3dae0334d2d4aadd5e9c3389fef4, type: 2}
+  logMat: {fileID: 2100000, guid: 5707ec1e7d27c7d44bcc2dc8c0648eca, type: 2}
+  rockMat: {fileID: 2100000, guid: f73936a0f83636949ab76f7470a1bc61, type: 2}
+  terrainLayers:
+  - {fileID: 8574412962073106934, guid: b369785cce6718143bd1f3a00fcdb5e2, type: 2}
+  - {fileID: 8574412962073106934, guid: a4e038e32bdba024a8e6658244c344bb, type: 2}
+  - {fileID: 8574412962073106934, guid: 8eb5e057f01b9df43b792a563abd2fdd, type: 2}
+  - {fileID: 8574412962073106934, guid: 33d98d1af8c096446b7e771ed6994e51, type: 2}
+  water: {fileID: 2100000, guid: f22966d172d703241a5cb2082a58977f, type: 2}
