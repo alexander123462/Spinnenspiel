@@ -733,9 +733,12 @@ namespace Spinnenspiel.Tests
             faden.Init(new Vector3(-1.5f, 1.2f, 1.5f), new Vector3(1.5f, 1.2f, 1.5f), 0.01f);
             yield return new WaitForSeconds(0.3f);
 
-            Assert.IsTrue(WebSiteFinder.TryFindFromThread(faden, new Vector3(0f, 1.2f, 1.5f), spider.transform, out Vector3[] a),
+            Assert.IsTrue(WebSiteFinder.TryFindFromThread(faden, new Vector3(0f, 1.2f, 1.5f), spider.transform, out Vector3[] a, out Vector3[] anchorPoints),
                 "TryFindFromThread findet unter dem Brückenfaden keinen Platz");
             Assert.IsTrue(a[0].y > 0.9f, "a[0].y muss am Faden hängen: " + a[0]);
+            Vector3 rechts = (a[1] - a[0]).normalized;
+            Assert.Less(Vector3.Dot(anchorPoints[3] - a[0], rechts), 0.01f, "Linker Anker muss nach links-außen gehen: " + anchorPoints[3]);
+            Assert.Greater(Vector3.Dot(anchorPoints[2] - a[1], rechts), -0.01f, "Rechter Anker muss nach rechts-außen gehen: " + anchorPoints[2]);
             Assert.IsTrue(a[3].y < 0.3f, "a[3].y muss unten am Boden sein: " + a[3]);
             Assert.IsTrue(a[0].x < a[1].x, "a[0].x muss kleiner als a[1].x sein: " + a[0] + " / " + a[1]);
 
@@ -757,6 +760,186 @@ namespace Spinnenspiel.Tests
             Assert.AreEqual(OrbWeb.WebStage.Done, builder.CurrentStage, "CurrentStage != Done");
 
             Object.DestroyImmediate(threadGo);
+        }
+
+        /// <summary>
+        /// Netz 9.5: FitFrame begrenzt große Rahmen auf MaxFrameHalf
+        /// (alle Ecken höchstens so weit vom Mittelpunkt), kleine Rahmen
+        /// bleiben unverändert.
+        /// </summary>
+        [Test]
+        public void Web_FrameIsLimited()
+        {
+            Vector3 c = new Vector3(1f, 2f, 3f);
+
+            // Großer Rahmen: Ecken 2 m vom Mittelpunkt (Diagonale ~2,8 m).
+            float r = 2f;
+            var big = new[]
+            {
+                c + new Vector3(-r, -r, 0f),
+                c + new Vector3(r, -r, 0f),
+                c + new Vector3(r, r, 0f),
+                c + new Vector3(-r, r, 0f)
+            };
+            Vector3[] fit = WebSiteFinder.FitFrame(big, WebSiteFinder.MaxFrameHalf);
+            Assert.IsNotNull(fit, "FitFrame lieferte null");
+            for (int i = 0; i < 4; i++)
+            {
+                float d = Vector3.Distance(fit[i], c);
+                Assert.That(d, Is.LessThanOrEqualTo(WebSiteFinder.MaxFrameHalf + 0.001f),
+                    "Ecke " + i + " liegt " + d.ToString("F3", CultureInfo.InvariantCulture) +
+                    " m vom Mittelpunkt, Limit " + WebSiteFinder.MaxFrameHalf);
+            }
+
+            // Kleiner Rahmen (Ecken 0,14 m vom Mittelpunkt): bleibt unverändert.
+            float s = 0.1f;
+            var small = new[]
+            {
+                c + new Vector3(-s, -s, 0f),
+                c + new Vector3(s, -s, 0f),
+                c + new Vector3(s, s, 0f),
+                c + new Vector3(-s, s, 0f)
+            };
+            Vector3[] fitSmall = WebSiteFinder.FitFrame(small, WebSiteFinder.MaxFrameHalf);
+            for (int i = 0; i < 4; i++)
+            {
+                Assert.AreEqual(small[i], fitSmall[i],
+                    "Kleine Ecke " + i + " wurde verändert: " + small[i] + " -> " + fitSmall[i]);
+            }
+        }
+
+        /// <summary>
+        /// Netz 9.5: Unter einem Hohen Brückenfaden (2 m) findet die Spinne
+        /// einen Netzplatz, die unteren Rahmen-Ecken hängen höchstens 1 m unter
+        /// dem Faden, die Ankerpunkte erreichen den Boden; Foto: brueckennetz.png.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Web_FromHighBridgeThread()
+        {
+            SceneManager.LoadScene("Klettertest");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+            SpiderMovement movement = spider.GetComponent<SpiderMovement>();
+            Assert.IsNotNull(movement, "SpiderMovement fehlt");
+            SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
+            Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+            SpiderWebPlacer placer = spider.GetComponent<SpiderWebPlacer>();
+            Assert.IsNotNull(placer, "SpiderWebPlacer fehlt");
+
+            // Hoher Brückenfaden in 2 m Höhe.
+            float threadY = 2.0f;
+            GameObject threadGo = new GameObject("HighBridgeThread");
+            SilkThread faden = threadGo.AddComponent<SilkThread>();
+            faden.Init(new Vector3(-1.5f, threadY, 1.5f), new Vector3(1.5f, threadY, 1.5f), 0.01f);
+            yield return new WaitForSeconds(0.3f);
+
+            Vector3 near = new Vector3(0f, threadY, 1.5f);
+            Assert.IsTrue(WebSiteFinder.TryFindFromThread(faden, near, spider.transform, out Vector3[] frame, out Vector3[] anchorPoints),
+                "TryFindFromThread findet unter dem hohen Faden (y=2,0) keinen Platz");
+            Assert.IsTrue(frame[0].y > threadY - 0.05f, "Obere Ecke muss am Faden hängen: " + frame[0]);
+            Assert.That(frame[3].y, Is.LessThan(threadY - 0.25f),
+                "Untere Ecke muss deutlich unter dem Faden hängen: " + frame[3]);
+            Assert.That(frame[3].y, Is.GreaterThan(threadY - 1.05f),
+                "Untere Ecke darf höchstens 1 m unter dem Faden liegen: " + frame[3]);
+            Assert.That(anchorPoints[3].y, Is.LessThan(0.3f),
+                "Ankerpunkt muss am Boden sein: " + anchorPoints[3]);
+            Vector3 rechts = (frame[1] - frame[0]).normalized;
+            Assert.Less(Vector3.Dot(anchorPoints[3] - frame[0], rechts), 0.01f, "Linker Anker muss nach links-außen gehen: " + anchorPoints[3]);
+            Assert.Greater(Vector3.Dot(anchorPoints[2] - frame[1], rechts), -0.01f, "Rechter Anker muss nach rechts-außen gehen: " + anchorPoints[2]);
+
+            // Spinne auf den Faden: von dort baut TryPlaceWebNow das Netz darunter.
+            movement.AttachToThread(faden, 0.5f);
+            yield return new WaitForSeconds(0.5f);
+            builder.durationScale = 0.1f;
+            Assert.IsTrue(placer.TryPlaceWebNow(), "TryPlaceWebNow scheitert unter dem hohen Faden");
+            Assert.IsTrue(builder.IsBuilding, "Builder baut nicht");
+
+            float elapsed = 0f;
+            while (builder.IsBuilding && elapsed < 15f)
+            {
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+            Assert.IsFalse(builder.IsBuilding, "Netzbau nach 15 s noch nicht fertig");
+            Assert.AreEqual(OrbWeb.WebStage.Done, builder.CurrentStage, "CurrentStage != Done");
+
+            // Beweisfoto: Netz unter dem hohen Brückenfaden.
+            GameObject camGo = new GameObject("HighBridgeCam");
+            Camera cam = camGo.AddComponent<Camera>();
+            camGo.transform.position = new Vector3(0f, 1.6f, -1.2f);
+            camGo.transform.LookAt(new Vector3(0f, 1.3f, 1.5f));
+            var rt = new RenderTexture(960, 540, 24);
+            rt.Create();
+            cam.targetTexture = rt;
+            SaveFrame(cam, rt, "Logs/ci/brueckennetz.png");
+            Object.DestroyImmediate(camGo);
+            Object.DestroyImmediate(rt);
+            Object.DestroyImmediate(threadGo);
+        }
+
+        /// <summary>
+        /// Netz 9.5: Vor dem Netzbau ist die Vorschau sichtbar (PreviewVisible
+        /// true), nach TryPlaceWebNow ist sie entfernt (false); Foto: vorschau.png.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Placer_ShowsPreview()
+        {
+            SceneManager.LoadScene("Klettertest");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+            SpiderWebPlacer placer = spider.GetComponent<SpiderWebPlacer>();
+            Assert.IsNotNull(placer, "SpiderWebPlacer fehlt");
+            SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
+            Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+
+            // Spinne am Klettertest-Netzplatz (wie in Placer_BuildsWebAtNetzplatz).
+            spider.transform.position = new Vector3(5.4f, 0.05f, 1.8f);
+            spider.transform.rotation = Quaternion.identity;
+            placer.viewOverride = Vector3.forward;
+            yield return new WaitForSeconds(0.5f);
+
+            // Platzsuche läuft alle 0,25 s: warten, bis CanBuild true wird.
+            float t = 0f;
+            while (!placer.CanBuild && t < 3f)
+            {
+                t += Time.deltaTime;
+                yield return null;
+            }
+            Assert.IsTrue(placer.CanBuild, "placer.CanBuild wird am Klettertest-Netzplatz nicht true");
+            Assert.IsTrue(placer.PreviewVisible, "PreviewVisible ist vor dem Bauen nicht true");
+
+            // Beweisfoto: Vorschau im Blickfeld, Kamera 1,5 m vor dem Netzplatz.
+            Vector3 webCenter = new Vector3(5.4f, 0.6f, 2.0f);
+            GameObject camGo = new GameObject("PreviewCam");
+            Camera cam = camGo.AddComponent<Camera>();
+            camGo.transform.position = webCenter + new Vector3(0f, 0.4f, 1.5f);
+            camGo.transform.LookAt(webCenter);
+            var rt = new RenderTexture(960, 540, 24);
+            rt.Create();
+            cam.targetTexture = rt;
+            SaveFrame(cam, rt, "Logs/ci/vorschau.png");
+            Object.DestroyImmediate(camGo);
+            Object.DestroyImmediate(rt);
+
+            // Bau starten: Vorschau verschwindet, Netz entsteht.
+            builder.durationScale = 0.1f;
+            Assert.IsTrue(placer.TryPlaceWebNow(), "TryPlaceWebNow scheiterte am Klettertest-Netzplatz");
+            Assert.IsFalse(placer.PreviewVisible, "PreviewVisible ist nach TryPlaceWebNow noch true");
+
+            float e = 0f;
+            while (builder.IsBuilding && e < 15f)
+            {
+                e += Time.deltaTime;
+                yield return null;
+            }
+            Assert.IsFalse(builder.IsBuilding, "Netzbau nach 15 s noch nicht fertig");
+            Assert.AreEqual(1, placer.WebCount, "WebCount != 1: " + placer.WebCount);
         }
 
         /// <summary>Render die Kamera in die RenderTexture und speichert als PNG ab.</summary>

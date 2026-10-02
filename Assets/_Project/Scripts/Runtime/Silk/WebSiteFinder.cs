@@ -93,7 +93,7 @@ namespace Spinnenspiel
                     {
                         continue;
                     }
-                    if (hits[h].distance <= 0f)
+                    if (hits[h].distance <= 0.0001f)
                     {
                         continue; // Ueberlappung am Start, z.B. eigener Kollider
                     }
@@ -261,8 +261,10 @@ namespace Spinnenspiel
             Vector3 n = Vector3.Cross(d, Vector3.up).normalized;
 
             // Untere Anker: von tl/tr nach außen unten casten (wie Rahmenfäden).
-            Vector3? pbl = CastBelow(tl, (Vector3.down + d * 0.35f).normalized, ignore);
-            Vector3? pbr = CastBelow(tr, (Vector3.down - d * 0.35f).normalized, ignore);
+            // Start 0.06 m unter dem Faden: Kugel (r=0.04) darf keine
+            // Decke/Ast ueber dem Faden am Start beruehren.
+            Vector3? pbl = CastBelow(tl + Vector3.down * 0.06f, (Vector3.down - d * 0.35f).normalized, ignore);
+            Vector3? pbr = CastBelow(tr + Vector3.down * 0.06f, (Vector3.down + d * 0.35f).normalized, ignore);
             if (pbl == null || pbr == null)
             {
                 return false;
@@ -313,6 +315,10 @@ namespace Spinnenspiel
                 if (ignore != null && h.collider != null && h.collider.transform.IsChildOf(ignore))
                 {
                     continue;
+                }
+                if (h.distance <= 0.0001f)
+                {
+                    continue; // Start-Ueberlappung liefert point == (0,0,0)
                 }
                 if (h.distance < bestDist)
                 {
