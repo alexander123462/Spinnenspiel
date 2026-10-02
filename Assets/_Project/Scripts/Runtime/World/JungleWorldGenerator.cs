@@ -24,6 +24,11 @@ namespace Spinnenspiel
         public float GenerationSeconds { get; private set; }
         public int TreeCount => Trees.Count;
         public List<Transform> Trees { get; } = new List<Transform>();
+        public int BushCount { get; private set; }
+        public int FernCount { get; private set; }
+        public int ReedCount { get; private set; }
+        public int LogCount { get; private set; }
+        public int RockCount { get; private set; }
 
         private void Awake()
         {
@@ -127,7 +132,61 @@ namespace Spinnenspiel
                 }
             }
 
-            // 5) Spinne + Kamera
+            // 5) Unterholz: Büsche, Farne, Schilf (nur Mesh, keine Collider, statisch gebatcht)
+            GameObject unterholz = new GameObject("Unterholz");
+            BushCount = PlaceGrid(unterholz.transform, size, 1.5f, library.bush, library.bushMat,
+                (i, j, x, z) => World.Height(x, z) >= JungleWorld.WaterLevel + 0.2f
+                    && World.Hash01(i, j, 13) < World.Density(x, z) * 0.6f,
+                (i, j) => 0.7f + World.Hash01(i, j, 14) * 0.7f, 1500);
+            FernCount = PlaceGrid(unterholz.transform, size, 1.0f, library.fern, library.fernMat,
+                (i, j, x, z) => World.Hash01(i, j, 23) < World.Density(x, z) * 0.7f,
+                (i, j) => 0.8f + World.Hash01(i, j, 24) * 0.8f, 1500);
+            ReedCount = PlaceGrid(unterholz.transform, size, 0.7f, library.reed, library.reedMat,
+                (i, j, x, z) => World.Height(x, z) >= JungleWorld.WaterLevel - 0.3f
+                    && World.Height(x, z) <= JungleWorld.WaterLevel + 0.2f
+                    && World.Hash01(i, j, 33) < 0.9f,
+                (i, j) => 0.8f + World.Hash01(i, j, 34) * 0.7f, 1500);
+            StaticBatchingUtility.Combine(unterholz);
+
+            // 6) Totholz und Steine (mit Convex-Collider und SurfaceTag)
+            var treePos = new List<Vector3>(Trees.Count);
+            foreach (var tree in Trees) treePos.Add(tree.position);
+
+            GameObject totholz = new GameObject("Totholz");
+            int logCount = 12 + (int)(World.Hash01(0, 0, 41) * 9f);
+            int placedLogs = 0;
+            for (int i = 0; i < 300 && placedLogs < logCount; i++)
+            {
+                float x = 1f + World.Hash01(0, i, 42) * (size - 2f);
+                float z = 1f + World.Hash01(0, i, 43) * (size - 2f);
+                if (!IsDryFlat(World, x, z)) continue;
+                if (NearAny(treePos, new Vector3(x, 0f, z), 1.5f)) continue;
+                float h = World.Height(x, z);
+                CreateProp(totholz.transform, library.logs[placedLogs % Math.Min(3, library.logs.Length)],
+                    library.logMat, new Vector3(x, h - 0.05f, z),
+                    World.Hash01(0, i, 44) * 360f, 0.8f + World.Hash01(0, i, 45) * 0.4f, SurfaceType.Wood);
+                placedLogs++;
+            }
+            LogCount = placedLogs;
+
+            GameObject steine = new GameObject("Steine");
+            int rockCount = 25 + (int)(World.Hash01(0, 0, 61) * 16f);
+            int placedRocks = 0;
+            for (int i = 0; i < 300 && placedRocks < rockCount; i++)
+            {
+                float x = 1f + World.Hash01(0, i, 62) * (size - 2f);
+                float z = 1f + World.Hash01(0, i, 63) * (size - 2f);
+                if (!IsDryFlat(World, x, z)) continue;
+                if (NearAny(treePos, new Vector3(x, 0f, z), 1.5f)) continue;
+                float h = World.Height(x, z);
+                CreateProp(steine.transform, library.rocks[placedRocks % Math.Min(5, library.rocks.Length)],
+                    library.rockMat, new Vector3(x, h - 0.05f, z),
+                    World.Hash01(0, i, 64) * 360f, 0.5f + World.Hash01(0, i, 65) * 1.0f, SurfaceType.Rock);
+                placedRocks++;
+            }
+            RockCount = placedRocks;
+
+            // 7) Spinne + Kamera
             var mv = FindFirstObjectByType<SpiderMovement>();
             if (mv != null)
             {
@@ -146,11 +205,92 @@ namespace Spinnenspiel
                 }
             }
 
-            // 6) Fertig
+            // 8) Fertig
             sw.Stop();
             GenerationSeconds = (float)sw.Elapsed.TotalSeconds;
             IsReady = true;
-            UnityEngine.Debug.Log("[Urwald] Seed " + Seed + ": " + TreeCount + " Bäume, " + GenerationSeconds.ToString("F2") + " s");
+            UnityEngine.Debug.Log("[Urwald] Seed " + Seed + ": " + TreeCount + " Bäume, "
+                + BushCount + " Büsche, " + FernCount + " Farne, " + ReedCount + " Schilf, "
+                + LogCount + " Stämme, " + RockCount + " Steine, " + GenerationSeconds.ToString("F2") + " s");
+        }
+
+        private delegate bool PlantPredicate(int i, int j, float x, float z);
+        private delegate float PlantScale(int i, int j);
+
+        /// <summary>
+        /// Pflanzt ein Mesh auf einem quadratischen Raster (Rastermaß 1.0 m Grundzelle
+        /// für Farne, davor Versatz per Hash01). Maximal maxCount Exemplare.
+        /// </summary>
+        private int PlaceGrid(Transform parent, float size, float step, Mesh mesh, Material mat,
+            PlantPredicate ok, PlantScale scale, int maxCount)
+        {
+            int n = 0;
+            int cells = Mathf.FloorToInt(size / step);
+            for (int i = 0; i < cells && n < maxCount; i++)
+            {
+                for (int j = 0; j < cells && n < maxCount; j++)
+                {
+                    float off = 0.5f;
+                    float x = step / 2f + i * step + (World.Hash01(i, j, SaltA(step)) - 0.5f) * (2f * off);
+                    float z = step / 2f + j * step + (World.Hash01(i, j, SaltA(step) + 1) - 0.5f) * (2f * off);
+                    if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
+                    if (!ok(i, j, x, z)) continue;
+                    float rot = World.Hash01(i, j, SaltA(step) + 4) * 360f;
+                    AddPlant(parent, mesh, mat, new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale(i, j));
+                    n++;
+                }
+            }
+            return n;
+        }
+
+        /// <summary>Rastergröße auf Salzpaar abbilden: 1.5 → 11, 1.0 → 21, 0.7 → 31.</summary>
+        private static int SaltA(float step) => step >= 1.4f ? 11 : step >= 0.9f ? 21 : 31;
+
+        /// <summary>Mesh-Objekt ohne Collider (nur Darstellung) erzeugen.</summary>
+        private static void AddPlant(Transform parent, Mesh mesh, Material mat, Vector3 pos, float rotY, float scale)
+        {
+            GameObject g = new GameObject();
+            g.transform.SetParent(parent, false);
+            g.transform.position = pos;
+            g.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
+            g.transform.localScale = Vector3.one * scale;
+            g.AddComponent<MeshFilter>().sharedMesh = mesh;
+            g.AddComponent<MeshRenderer>().sharedMaterial = mat;
+        }
+
+        /// <summary>Kann ein Objekt an (x,z) stehen: trocken und Steigung < 20°?</summary>
+        private static bool IsDryFlat(JungleWorld world, float x, float z)
+        {
+            float h = world.Height(x, z);
+            if (h < JungleWorld.WaterLevel + 0.3f) return false;
+            float e = 0.5f;
+            float dh = Mathf.Max(Mathf.Abs(world.Height(x + e, z) - h),
+                                 Mathf.Abs(world.Height(x, z + e) - h));
+            return Mathf.Atan2(dh, e) * Mathf.Rad2Deg < 20f;
+        }
+
+        private static bool NearAny(List<Vector3> pos, Vector3 p, float dist)
+        {
+            float d2 = dist * dist;
+            foreach (Vector3 q in pos)
+                if ((q - p).sqrMagnitude < d2) return true;
+            return false;
+        }
+
+        /// <summary>Stamm/Stein mit Convex-Collider und SurfaceTag erzeugen.</summary>
+        private static void CreateProp(Transform parent, Mesh mesh, Material mat, Vector3 pos, float rotY, float scale, SurfaceType surface)
+        {
+            GameObject g = new GameObject();
+            g.transform.SetParent(parent, false);
+            g.transform.position = pos;
+            g.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
+            g.transform.localScale = Vector3.one * scale;
+            g.AddComponent<MeshFilter>().sharedMesh = mesh;
+            g.AddComponent<MeshRenderer>().sharedMaterial = mat;
+            var mc = g.AddComponent<MeshCollider>();
+            mc.sharedMesh = mesh;
+            mc.convex = true;
+            g.AddComponent<SurfaceTag>().surfaceType = surface;
         }
 
         private static bool HasNearbyTree(Dictionary<Vector2Int, List<Vector3>> placed, Vector2Int cell, Vector3 pos)
