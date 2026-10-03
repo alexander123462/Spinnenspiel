@@ -145,5 +145,62 @@ namespace Spinnenspiel
 
             return mesh;
         }
+
+        // Hängende Liane: dünnes 5-seitiges Rohr, das von oben (y≈top) nach unten (y≈0)
+        // mit seitlicher Sinus-Schwingung hängt.
+        public static Mesh HangingLiana(int seed)
+        {
+            var rng = new System.Random(seed);
+            float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+
+            int seg = rng.Next(10, 18);
+            float top = R(2.5f, 4.0f);
+            float amp = R(0.05f, 0.3f);
+            float ph = R(0f, 6.28f);
+            float r = R(0.010f, 0.022f);
+            int sides = 5;
+
+            var v = new List<Vector3>();
+            var t = new List<int>();
+            var uv = new List<Vector2>();
+
+            for (int j = 0; j <= seg; j++)
+            {
+                float f = (float)j / seg;
+                Vector3 c = new Vector3(
+                    Mathf.Sin(ph + f * 3.14159f) * amp * f,
+                    top * (1f - f),
+                    Mathf.Cos(ph + f * 3.14159f) * amp * f * 0.5f);
+                for (int s = 0; s < sides; s++)
+                {
+                    float a = s / (float)sides * 6.2831855f;
+                    v.Add(c + new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r));
+                    uv.Add(new Vector2(s / (float)sides, f));
+                }
+                if (j > 0)
+                {
+                    int cur = j * sides;
+                    int prev = (j - 1) * sides;
+                    for (int s = 0; s < sides; s++)
+                    {
+                        int s2 = (s + 1) % sides;
+                        t.Add(prev + s);
+                        t.Add(prev + s2);
+                        t.Add(cur + s);
+                        t.Add(prev + s2);
+                        t.Add(cur + s2);
+                        t.Add(cur + s);
+                    }
+                }
+            }
+
+            var m = new Mesh { name = "HangingLiana_" + seed };
+            m.SetVertices(v);
+            m.SetTriangles(t, 0);
+            m.SetUVs(0, uv);
+            m.RecalculateNormals();
+            m.RecalculateBounds();
+            return m;
+        }
     }
 }

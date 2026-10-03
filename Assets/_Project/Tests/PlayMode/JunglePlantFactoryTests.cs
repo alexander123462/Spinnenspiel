@@ -65,5 +65,55 @@ namespace Spinnenspiel.Tests
             
             Assert.That(differing, Is.GreaterThanOrEqualTo(4));
         }
+
+        [Test]
+        public void Liana_HasGeometry()
+        {
+            var mesh = JunglePlantFactory.HangingLiana(1);
+            Assert.That(mesh, Is.Not.Null);
+            Assert.That(mesh.vertexCount > 50);
+            Assert.That(mesh.triangles.Length % 3 == 0);
+            Assert.That(mesh.bounds.size.y >= 2.0f && mesh.bounds.size.y <= 4.5f);
+            Assert.That(mesh.bounds.size.x < 1.2f);
+            Assert.That(mesh.bounds.size.z < 1.2f);
+        }
+
+        [Test]
+        public void Liana_Deterministic()
+        {
+            var a = JunglePlantFactory.HangingLiana(42);
+            var b = JunglePlantFactory.HangingLiana(42);
+            Assert.That(a.vertexCount == b.vertexCount);
+            var va = a.vertices;
+            var vb = b.vertices;
+            for (int i = 0; i < 10; i++)
+            {
+                Assert.That(Mathf.Approximately(va[i].x, vb[i].x));
+                Assert.That(Mathf.Approximately(va[i].y, vb[i].y));
+                Assert.That(Mathf.Approximately(va[i].z, vb[i].z));
+            }
+        }
+
+        [Test]
+        public void Liana_VariantsDiffer()
+        {
+            var meshes = new List<Mesh>();
+            for (int s = 1; s <= 6; s++)
+                meshes.Add(JunglePlantFactory.HangingLiana(s));
+            int differing = 0;
+            for (int i = 0; i < 6; i++)
+            {
+                for (int j = i + 1; j < 6; j++)
+                {
+                    var m1 = meshes[i];
+                    var m2 = meshes[j];
+                    if (m1.vertexCount != m2.vertexCount ||
+                        Mathf.Abs(m1.bounds.size.y - m2.bounds.size.y) > 0.05f ||
+                        Mathf.Abs(m1.bounds.size.x - m2.bounds.size.x) > 0.05f)
+                        differing++;
+                }
+            }
+            Assert.That(differing >= 4);
+        }
     }
 }
