@@ -431,9 +431,8 @@ namespace Spinnenspiel
                 go.name = "Kokon";
                 go.transform.SetParent(transform, false);
                 go.transform.localPosition = Vector3.zero;
-                Material mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                mat.color = new Color(0.92f, 0.92f, 0.88f);
-                mat.SetFloat("_Smoothness", 0.6f);
+                Material mat = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.92f, 0.92f, 0.88f));
+                Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(mat, 0.6f);
                 go.GetComponent<MeshRenderer>().sharedMaterial = mat;
                 cocoon = go.transform;
             }

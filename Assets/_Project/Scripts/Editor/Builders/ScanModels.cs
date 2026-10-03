@@ -230,11 +230,9 @@ namespace Spinnenspiel.EditorTools
         /// </summary>
         public static Material CreateSolidMaterial(string id)
         {
-            Material material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            material.SetTexture("_BaseMap", BaseTexture(id));
-            material.SetTexture("_BumpMap", TextureOf(id, "nor_gl"));
-            material.EnableKeyword("_NORMALMAP");
-            material.SetFloat("_Smoothness", 0.2f);
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(Color.white, BaseTexture(id));
+            Spinnenspiel.Rendering.PipelineMaterials.SetNormalMap(material, TextureOf(id, "nor_gl"));
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.2f);
             material.enableInstancing = true;
 
             AssetUtil.ReplaceAsset(material, MaterialRoot + "/M_" + id + ".mat");

@@ -96,9 +96,8 @@ namespace Spinnenspiel.EditorTools
         /// <summary>Dunkelgrau-metallisch (URP Lit) als Asset MAT_FlyBody.</summary>
         private static Material CreateBodyMaterial()
         {
-            Material material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            material.SetColor("_BaseColor", new Color(0.22f, 0.23f, 0.25f));
-            material.SetFloat("_Smoothness", 0.7f);
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.22f, 0.23f, 0.25f));
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.7f);
             material.SetFloat("_Metallic", 0.6f);
             material.enableInstancing = true;
             return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_FlyBody.mat");
@@ -107,23 +106,16 @@ namespace Spinnenspiel.EditorTools
         /// <summary>URP Unlit Transparent, hellgrau, Alpha 0.35 (wie SilkThread) als Asset MAT_FlyWing.</summary>
         private static Material CreateWingMaterial()
         {
-            Material material = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-            material.color = new Color(0.85f, 0.87f, 0.9f, 0.35f);
-            material.SetFloat("_Surface", 1f);
-            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            material.SetInt("_ZWrite", 0);
-            material.renderQueue = 3000;
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Unlit(new Color(0.85f, 0.87f, 0.9f, 0.35f));
+            Spinnenspiel.Rendering.PipelineMaterials.SetTransparent(material, true);
             return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_FlyWing.mat");
         }
 
         /// <summary>Rotbraun (URP Lit) als Asset MAT_FlyEye.</summary>
         private static Material CreateEyeMaterial()
         {
-            Material material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            material.SetColor("_BaseColor", new Color(0.32f, 0.16f, 0.10f));
-            material.SetFloat("_Smoothness", 0.8f);
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.32f, 0.16f, 0.10f));
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.8f);
             material.enableInstancing = true;
             return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_FlyEye.mat");
         }

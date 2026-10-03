@@ -117,9 +117,8 @@ namespace Spinnenspiel.EditorTools
                 AssetDatabase.CreateFolder(parent, "Materials");
             }
 
-            mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            mat.SetColor("_BaseColor", new Color(0.18f, 0.12f, 0.08f));
-            mat.SetFloat("_Smoothness", 0.35f);
+            mat = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.18f, 0.12f, 0.08f));
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(mat, 0.35f);
             AssetDatabase.CreateAsset(mat, BodyMaterialPath);
             return mat;
         }

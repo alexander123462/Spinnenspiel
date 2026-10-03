@@ -9,16 +9,9 @@ namespace Spinnenspiel.EditorTools
 
         public static void Build(GameObject spider)
         {
-            Shader particleShader = Shader.Find("Universal Render Pipeline/Particles/Unlit");
-            if (particleShader == null)
-            {
-                Debug.LogError("[Spinnenspiel] URP-Partikelshader nicht gefunden – Fußeffekte werden nicht gebaut.");
-                return;
-            }
-
             Texture2D circle = TextureFactory.SoftCircle();
-            Material rippleMaterial = ParticleMaterial("MAT_Ripple", particleShader, circle, new Color(0.85f, 0.92f, 0.95f, 0.5f));
-            Material dustMaterial = ParticleMaterial("MAT_Dust", particleShader, circle, new Color(0.45f, 0.38f, 0.28f, 0.35f));
+            Material rippleMaterial = ParticleMaterial("MAT_Ripple", circle, new Color(0.85f, 0.92f, 0.95f, 0.5f));
+            Material dustMaterial = ParticleMaterial("MAT_Dust", circle, new Color(0.45f, 0.38f, 0.28f, 0.35f));
 
             Transform root = new GameObject("FootEffects").transform;
             ParticleSystem ripples = CreateSystem(root, "Ripples", rippleMaterial, true);
@@ -67,20 +60,10 @@ namespace Spinnenspiel.EditorTools
             return system;
         }
 
-        private static Material ParticleMaterial(string name, Shader shader, Texture2D texture, Color color)
+        private static Material ParticleMaterial(string name, Texture2D texture, Color color)
         {
-            Material material = new Material(shader);
-            material.SetTexture("_BaseMap", texture);
-            material.SetColor("_BaseColor", color);
-            // Transparent, Alpha-Blending
-            material.SetFloat("_Surface", 1f);
-            material.SetFloat("_Blend", 0f);
-            material.SetOverrideTag("RenderType", "Transparent");
-            material.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            material.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            material.SetInt("_ZWrite", 0);
-            material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-            material.renderQueue = 3000;
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(color, texture);
+            Spinnenspiel.Rendering.PipelineMaterials.SetTransparent(material, true);
             return AssetUtil.ReplaceAsset(material, MaterialFolder + "/" + name + ".mat");
         }
     }

@@ -112,15 +112,10 @@ namespace Spinnenspiel.EditorTools
                 AssetDatabase.DeleteAsset(materialPath);
             }
 
-            Material material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            material.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(TargetDiff(id)));
-            material.SetTexture("_BumpMap", AssetDatabase.LoadAssetAtPath<Texture2D>(TargetNormal(id)));
-            material.EnableKeyword("_NORMALMAP");
-            material.SetTexture("_MetallicGlossMap", AssetDatabase.LoadAssetAtPath<Texture2D>(TargetMask(id)));
-            material.EnableKeyword("_METALLICSPECGLOSSMAP");
-            material.SetTexture("_OcclusionMap", AssetDatabase.LoadAssetAtPath<Texture2D>(TargetMask(id)));
-            material.EnableKeyword("_OCCLUSIONMAP");
-            material.SetFloat("_Smoothness", 1f);
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(Color.white, AssetDatabase.LoadAssetAtPath<Texture2D>(TargetDiff(id)));
+            Spinnenspiel.Rendering.PipelineMaterials.SetNormalMap(material, AssetDatabase.LoadAssetAtPath<Texture2D>(TargetNormal(id)));
+            material.SetFloat("_Metallic", 1f);
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 1f);
             material.mainTextureScale = tiling;
             material.enableInstancing = true;
 

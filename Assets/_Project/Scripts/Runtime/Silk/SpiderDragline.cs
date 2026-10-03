@@ -163,15 +163,8 @@ namespace Spinnenspiel
             {
                 if (draglineMaterial == null)
                 {
-                    var mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-                    mat.color = new Color(1f, 1f, 1f, alpha);
-                    // URP: Surface Type Transparent + Blend-Einstellungen
-                    mat.SetFloat("_Surface", 1f);
-                    mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-                    mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);        // 5
-                    mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha); // 10
-                    mat.SetInt("_ZWrite", 0);
-                    mat.renderQueue = 3000;
+                    var mat = Spinnenspiel.Rendering.PipelineMaterials.Unlit(new Color(1f, 1f, 1f, alpha));
+                    Spinnenspiel.Rendering.PipelineMaterials.SetTransparent(mat, true);
                     draglineMaterial = mat;
                 }
 
