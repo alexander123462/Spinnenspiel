@@ -31,6 +31,7 @@ namespace Spinnenspiel
         public int FernCount { get; private set; }
         public int ReedCount { get; private set; }
         public int PlantColliderCount { get; private set; }
+        public int LianaCount { get; private set; }
         public int LogCount { get; private set; }
         public int RockCount { get; private set; }
 
@@ -159,6 +160,35 @@ namespace Spinnenspiel
                 (i, j) => 0.8f + World.Hash01(i, j, 34) * 0.7f, 1500);
             StaticBatchingUtility.Combine(unterholz);
 
+            // 5b) Lianen: dünne senkrechte Überkopf-Halte für Netz-Anker.
+            // Eigener Eltern-Node (nicht in das statische Batching der Unterhölzer),
+            // 5 Mesh-Varianten, Variante und Skalierung pro Zelle per Hash.
+            GameObject lianen = new GameObject("Lianen");
+            var lianaMeshes = new Mesh[5];
+            for (int k = 0; k < 5; k++) lianaMeshes[k] = JunglePlantFactory.HangingLiana(Seed * 7 + k + 1);
+            float lianaStep = 1.3f;
+            int lianaCells = Mathf.FloorToInt(size / lianaStep);
+            int lianaN = 0;
+            for (int i = 0; i < lianaCells && lianaN < 1500; i++)
+            {
+                for (int j = 0; j < lianaCells && lianaN < 1500; j++)
+                {
+                    float x = lianaStep / 2f + i * lianaStep + (World.Hash01(i, j, 51) - 0.5f);
+                    float z = lianaStep / 2f + j * lianaStep + (World.Hash01(i, j, 52) - 0.5f);
+                    if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
+                    if (NearSpawn(x, z, 1.0f)) continue;
+                    if (!IsDryFlat(World, x, z)) continue; // enthält Height >= WaterLevel + 0.3 und Steigung < 20°
+                    if (World.IsClearing(x, z)) continue;
+                    int variant = Mathf.FloorToInt(World.Hash01(i, j, 53) * 5f);
+                    float rot = World.Hash01(i, j, 54) * 360f;
+                    float scale = 0.8f + World.Hash01(i, j, 55) * 0.5f;
+                    AddPlant(lianen.transform, lianaMeshes[variant], library.logMat,
+                        new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale);
+                    lianaN++;
+                }
+            }
+            LianaCount = lianaN;
+
             // 6) Totholz und Steine (mit Convex-Collider und SurfaceTag)
             var treePos = new List<Vector3>(Trees.Count);
             foreach (var tree in Trees) treePos.Add(tree.position);
@@ -230,6 +260,7 @@ namespace Spinnenspiel
             IsReady = true;
             UnityEngine.Debug.Log("[Urwald] Seed " + Seed + ": " + TreeCount + " Bäume, "
                 + BushCount + " Büsche, " + FernCount + " Farne, " + ReedCount + " Schilf, "
+                + LianaCount + " Lianen, "
                 + LogCount + " Stämme, " + RockCount + " Steine, "
                 + PlantColliderCount + " Pflanzen-Collider, "
                 + GenerationSeconds.ToString("F2") + " s");

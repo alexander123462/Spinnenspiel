@@ -267,7 +267,7 @@ namespace Spinnenspiel.Tests
         /// Netz-Abnahmetest: an 50 %+ der trockenen, nicht-Clairing-Punkte muss
         /// WebSiteFinder in mindestens einer von vier Richtungen einen Netzplatz finden.
         /// </summary>
-        [Ignore("M7-Abnahmeziel: Netze fast ueberall - aktuell ~16%, wird mit dichter Urwald-Flora (Lianen, Baumfarne) in 10.3/10.4 erreicht")]
+        [Ignore("M7-Ziel: Netze fast ueberall - aktuell 28%")]
         [UnityTest]
         public IEnumerator Urwald_WebSitesAlmostEverywhere()
         {
