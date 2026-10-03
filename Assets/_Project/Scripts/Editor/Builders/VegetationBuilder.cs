@@ -14,22 +14,22 @@ namespace Spinnenspiel.EditorTools
 
         public static void Build(Terrain terrain, int seed)
         {
-            Shader foliage = Shader.Find("Spinnenspiel/Foliage");
+            Shader foliage = Shader.Find("HDRP/Lit");
             if (foliage == null)
             {
-                Debug.LogError("[Spinnenspiel] Shader 'Spinnenspiel/Foliage' nicht gefunden – Vegetation wird nicht gebaut.");
+                Debug.LogError("[Spinnenspiel] Shader 'HDRP/Lit' nicht gefunden – Vegetation wird nicht gebaut.");
                 return;
             }
 
             Texture2D leafAtlas = TextureFactory.LeafCluster();
 
-            Material grass = FoliageMaterial("MAT_Grass", foliage, null, new Color(0.20f, 0.33f, 0.10f), new Color(0.52f, 0.62f, 0.24f), 0.09f, 0.3f, false);
-            Material grassDry = FoliageMaterial("MAT_GrassDry", foliage, null, new Color(0.33f, 0.33f, 0.14f), new Color(0.72f, 0.66f, 0.36f), 0.1f, 0.25f, false);
-            Material flower = FoliageMaterial("MAT_Flower", foliage, null, Color.white, Color.white, 0.07f, 0.15f, false);
-            Material fern = FoliageMaterial("MAT_Fern", foliage, null, new Color(0.14f, 0.28f, 0.08f), new Color(0.30f, 0.48f, 0.14f), 0.05f, 0.35f, false);
-            Material litter = FoliageMaterial("MAT_Litter", foliage, null, Color.white, Color.white, 0f, 0.2f, false);
-            Material leaves = FoliageMaterial("MAT_Leaves", foliage, leafAtlas, new Color(0.75f, 0.85f, 0.7f), new Color(1f, 1f, 0.85f), 0.05f, 0.35f, true);
-            Material reed = FoliageMaterial("MAT_Reed", foliage, null, new Color(0.25f, 0.33f, 0.14f), new Color(0.55f, 0.55f, 0.3f), 0.12f, 0.2f, false);
+            Material grass = FoliageMaterial("MAT_Grass", null, new Color(0.20f, 0.33f, 0.10f));
+            Material grassDry = FoliageMaterial("MAT_GrassDry", null, new Color(0.33f, 0.33f, 0.14f));
+            Material flower = FoliageMaterial("MAT_Flower", null, Color.white);
+            Material fern = FoliageMaterial("MAT_Fern", null, new Color(0.14f, 0.28f, 0.08f));
+            Material litter = FoliageMaterial("MAT_Litter", null, Color.white);
+            Material leaves = FoliageMaterial("MAT_Leaves", leafAtlas, new Color(0.75f, 0.85f, 0.7f));
+            Material reed = FoliageMaterial("MAT_Reed", null, new Color(0.25f, 0.33f, 0.14f));
 
             Mesh grassFine = VegetationMeshFactory.GrassClump("VM_GrassFine", 16, 0.025f, 0.07f, 7);
             Mesh grassA = VegetationMeshFactory.GrassClump("VM_GrassA", 10, 0.06f, 0.13f, 1);
@@ -268,25 +268,13 @@ namespace Spinnenspiel.EditorTools
             };
         }
 
-        private static Material FoliageMaterial(string name, Shader shader, Texture2D texture, Color baseColor, Color tipColor,
-            float windStrength, float translucency, bool alphaClip)
+        /// <summary>
+        /// Erzeugt ein Foliage-Material als HDRP/Lit (Ersatz für „Spinnenspiel/Foliage") über
+        /// PipelineMaterials.Foliage: Tönung, optionale Albedo-Textur, Alpha-Clip, beidseitig.
+        /// </summary>
+        private static Material FoliageMaterial(string name, Texture2D texture, Color baseColor)
         {
-            Material material = new Material(shader);
-            material.SetColor("_BaseColor", baseColor);
-            material.SetColor("_TipColor", tipColor);
-            material.SetFloat("_WindStrength", windStrength);
-            material.SetFloat("_Translucency", translucency);
-            if (texture != null)
-            {
-                material.SetTexture("_BaseMap", texture);
-            }
-
-            if (alphaClip)
-            {
-                material.SetFloat("_AlphaClip", 1f);
-                material.EnableKeyword("_ALPHATEST_ON");
-            }
-
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Foliage(texture, null, baseColor);
             material.enableInstancing = true;
             return AssetUtil.ReplaceAsset(material, MaterialFolder + "/" + name + ".mat");
         }

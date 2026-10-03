@@ -203,21 +203,7 @@ namespace Spinnenspiel.EditorTools
         /// </summary>
         public static Material CreateFoliageMaterial(string id)
         {
-            Shader shader = Shader.Find("Spinnenspiel/Foliage");
-            if (shader == null)
-            {
-                throw new InvalidOperationException("[Spinnenspiel] Shader nicht gefunden: Spinnenspiel/Foliage");
-            }
-
-            Material material = new Material(shader);
-            material.SetTexture("_BaseMap", BaseTexture(id));
-            material.SetFloat("_AlphaClip", 1f);
-            material.EnableKeyword("_ALPHATEST_ON");
-            material.SetFloat("_Cutoff", 0.4f);
-            material.SetColor("_BaseColor", Color.white);
-            material.SetColor("_TipColor", Color.white);
-            material.SetFloat("_VariationAmount", 0.1f);
-            material.SetFloat("_Smoothness", 0.25f);
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Foliage(BaseTexture(id), null, Color.white, 0.4f);
             material.enableInstancing = true;
 
             AssetUtil.ReplaceAsset(material, MaterialRoot + "/M_" + id + ".mat");

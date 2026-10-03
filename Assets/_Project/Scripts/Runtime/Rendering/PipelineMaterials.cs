@@ -96,5 +96,41 @@ namespace Spinnenspiel.Rendering
             m.SetFloat("_DoubleSidedEnable", on ? 1f : 0f);
             HDMaterial.ValidateMaterial(m);
         }
+
+        /// <summary>
+        /// Erzeugt ein HDRP/Lit-Foliage-Material (Ersatz für den URP-Shader „Spinnenspiel/Foliage"): 
+        /// Albedo/Tönung, optionale Normal-Map, Alpha-Clipping, beidseitig mit gespiegelter Normalen.
+        /// </summary>
+        public static Material Foliage(Texture albedo, Texture normal, Color tint, float cutoff = 0.5f)
+        {
+            Material m = Lit(tint, albedo);
+            SetNormalMap(m, normal);
+            SetSmoothness(m, 0.35f);
+            SetAlphaClip(m, cutoff);
+            SetDoubleSided(m, true);
+            m.SetFloat("_DoubleSidedNormalMode", 1f); // 1 = Mirror (beidseitig gespiegelte Normalen)
+            HDMaterial.ValidateMaterial(m);
+            return m;
+        }
+
+        /// <summary>
+        /// Erzeugt ein transparentes HDRP/Lit-Wasser (Ersatz für den URP-Shader „Spinnenspiel/Water"): 
+        /// flache Farbe mit Alpha ~0.6, Normal-Map mit Tiling, hohe Härte.
+        /// </summary>
+        public static Material Water(Color shallow, Texture normal, float tiling)
+        {
+            Material m = Lit(Color.white, null);
+            m.SetColor("_BaseColor", new Color(shallow.r, shallow.g, shallow.b, 0.6f));
+            if (normal != null)
+            {
+                m.SetTexture("_NormalMap", normal);
+                m.SetTextureScale("_NormalMap", new Vector2(tiling, tiling));
+                m.SetFloat("_NormalScale", 1f);
+            }
+            SetSmoothness(m, 0.95f);
+            SetTransparent(m, true);
+            HDMaterial.ValidateMaterial(m);
+            return m;
+        }
     }
 }
