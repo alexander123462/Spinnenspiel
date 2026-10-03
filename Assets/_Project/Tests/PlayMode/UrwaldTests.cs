@@ -108,12 +108,19 @@ namespace Spinnenspiel.Tests
 
             GameObject water = GameObject.Find("Sumpfwasser");
             Assert.IsNotNull(water, "Sumpfwasser nicht gefunden.");
-            Assert.IsNull(water.GetComponent<Collider>(), "Sumpfwasser darf keinen Collider haben.");
+            Assert.IsNotNull(water.GetComponent<Collider>(), "Sumpfwasser hat keinen Collider.");
+            Assert.IsNotNull(water.GetComponent<WaterBody>(), "Sumpfwasser hat keine WaterBody.");
+            var waterTag = water.GetComponent<SurfaceTag>();
+            Assert.IsNotNull(waterTag, "Sumpfwasser hat kein SurfaceTag.");
+            Assert.AreEqual(SurfaceType.Water, waterTag.surfaceType, "Sumpfwasser-SurfaceTag ist nicht Water.");
 
             GameObject unterholz = GameObject.Find("Unterholz");
             Assert.IsNotNull(unterholz, "Unterholz-Gruppe nicht gefunden.");
-            Assert.IsNull(unterholz.GetComponentInChildren<Collider>(),
-                "Unterholz darf keine Collider haben.");
+            int plantColliders = unterholz.GetComponentsInChildren<Collider>().Length;
+            Assert.AreEqual(gen.PlantColliderCount, plantColliders,
+                "Pflanzen-Collider in Unterholz stimmen nicht mit PlantColliderCount überein.");
+            Assert.GreaterOrEqual(gen.PlantColliderCount, 200,
+                "Zu wenige Pflanzen-Collider (< 200).");
 
             Assert.IsNotNull(GameObject.Find("Totholz"), "Totholz-Gruppe nicht gefunden.");
             Assert.IsNotNull(GameObject.Find("Steine"), "Steine-Gruppe nicht gefunden.");
@@ -208,6 +215,89 @@ namespace Spinnenspiel.Tests
             }
             Assert.IsFalse(gleicheZahl && gleichePositionen,
                 "Seed 778 erzeugt identische Bäume wie Seed 777.");
+        }
+
+        /// <summary>
+        /// Spinne ins Sumpfwasser teleportieren: SurfaceDetector muss IsOnWater melden
+        /// und die Spinne darf nicht unter den Wasserspiegel sinken.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Urwald_WaterIsDetected()
+        {
+            JungleWorldGenerator.NextSeed = 4242;
+            SceneManager.LoadScene("Urwald");
+            yield return null;
+            yield return WaitReady();
+            Assert.IsNotNull(readyGen, "Welt (Seed 4242) nicht fertig.");
+            JungleWorld world = readyGen.World;
+            float half = world.Size / 2f;
+
+            // Raster 1 m ab Weltmitte: Punkt mit Wassertiefe 0.1–0.4 m suchen.
+            Vector3? spot = null;
+            for (int dx = -20; dx <= 20 && spot == null; dx++)
+            {
+                for (int dz = -20; dz <= 20 && spot == null; dz++)
+                {
+                    float x = half + dx;
+                    float z = half + dz;
+                    if (!world.IsUnderWater(x, z)) continue;
+                    float tiefe = JungleWorld.WaterLevel - world.Height(x, z);
+                    if (tiefe < 0.1f || tiefe > 0.4f) continue;
+                    spot = new Vector3(x, 0f, z);
+                }
+            }
+            Assert.IsTrue(spot != null, "Keinen Punkt mit Wassertiefe 0.1–0.4 m gefunden.");
+
+            SpiderMovement spider = Object.FindFirstObjectByType<SpiderMovement>();
+            Assert.IsNotNull(spider, "Spinne nicht gefunden.");
+            Vector3 s = spot.Value;
+            spider.Teleport(new Vector3(s.x, JungleWorld.WaterLevel + 0.03f, s.z), Quaternion.identity);
+            float start = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - start < 1f) yield return null;
+
+            var det = spider.GetComponent<SpiderSurfaceDetector>();
+            Assert.IsNotNull(det, "SpiderSurfaceDetector fehlt an der Spinne.");
+            Assert.IsTrue(det.IsOnWater, "Spinne im Wasser, aber IsOnWater ist falsch. " + Diag(spider));
+            Vector3 p = spider.transform.position;
+            Assert.GreaterOrEqual(p.y, JungleWorld.WaterLevel - 0.05f,
+                "Spinne ist unter den Wasserspiegel gesunken. " + Diag(spider));
+        }
+
+        /// <summary>
+        /// Netz-Abnahmetest: an 50 %+ der trockenen, nicht-Clairing-Punkte muss
+        /// WebSiteFinder in mindestens einer von vier Richtungen einen Netzplatz finden.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Urwald_WebSitesAlmostEverywhere()
+        {
+            JungleWorldGenerator.NextSeed = 4242;
+            SceneManager.LoadScene("Urwald");
+            yield return null;
+            yield return WaitReady();
+            Assert.IsNotNull(readyGen, "Welt (Seed 4242) nicht fertig.");
+            JungleWorld world = readyGen.World;
+            float limit = world.Size / 2f - 8f; // 8 m Abstand zum Weltrand
+
+            var rnd = new System.Random(1);
+            int gesamt = 0, treffer = 0;
+            for (int i = 0; i < 60; i++)
+            {
+                float x = limit * ((float)rnd.NextDouble() * 2f - 1f);
+                float z = limit * ((float)rnd.NextDouble() * 2f - 1f);
+                float h = world.Height(x, z);
+                if (h < JungleWorld.WaterLevel + 0.3f || world.IsClearing(x, z)) continue;
+                Vector3 p = new Vector3(x, h + 0.1f, z);
+                bool ok = WebSiteFinder.TryFindNear(p, Vector3.forward, null, out _, out _)
+                    || WebSiteFinder.TryFindNear(p, Vector3.right, null, out _, out _)
+                    || WebSiteFinder.TryFindNear(p, Vector3.back, null, out _, out _)
+                    || WebSiteFinder.TryFindNear(p, Vector3.left, null, out _, out _);
+                gesamt++;
+                if (ok) treffer++;
+            }
+            Assert.Greater(gesamt, 0, "Kein einziger Prüfpunkt gefunden (alle im Wasser/Clairing?).");
+            float anteil = (float)treffer / gesamt;
+            Debug.Log("[Urwald] Netzplätze: " + anteil.ToString("P0"));
+            Assert.GreaterOrEqual(anteil, 0.5f, "Nur " + anteil.ToString("P0") + " Netzplätze");
         }
 
         /// <summary>Render die Kamera in die RenderTexture und speichert als PNG ab.</summary>

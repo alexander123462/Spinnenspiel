@@ -30,6 +30,7 @@ namespace Spinnenspiel
         public int BushCount { get; private set; }
         public int FernCount { get; private set; }
         public int ReedCount { get; private set; }
+        public int PlantColliderCount { get; private set; }
         public int LogCount { get; private set; }
         public int RockCount { get; private set; }
 
@@ -84,14 +85,18 @@ namespace Spinnenspiel
             t.GetComponent<Terrain>().drawInstanced = true;
             t.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Ground;
 
-            // 3) Sumpfwasser
+            // 3) Sumpfwasser (als Wasser erkennbar: dünner BoxCollider + SurfaceTag Water + WaterBody)
             GameObject water = GameObject.CreatePrimitive(PrimitiveType.Quad);
             UnityEngine.Object.Destroy(water.GetComponent<Collider>());
+            var wbox = water.AddComponent<BoxCollider>();
+            wbox.size = new Vector3(1f, 1f, 0.02f); // im lokalen Quad-Raum dünn (Z)
             water.name = "Sumpfwasser";
             water.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
             water.transform.position = new Vector3(size / 2f, JungleWorld.WaterLevel, size / 2f);
             water.transform.localScale = new Vector3(size, size, 1f);
             water.GetComponent<MeshRenderer>().sharedMaterial = library.water;
+            water.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Water;
+            water.AddComponent<WaterBody>();
 
             // 4) Bäume
             Transform treesRoot = new GameObject("Bäume").transform;
@@ -225,7 +230,9 @@ namespace Spinnenspiel
             IsReady = true;
             UnityEngine.Debug.Log("[Urwald] Seed " + Seed + ": " + TreeCount + " Bäume, "
                 + BushCount + " Büsche, " + FernCount + " Farne, " + ReedCount + " Schilf, "
-                + LogCount + " Stämme, " + RockCount + " Steine, " + GenerationSeconds.ToString("F2") + " s");
+                + LogCount + " Stämme, " + RockCount + " Steine, "
+                + PlantColliderCount + " Pflanzen-Collider, "
+                + GenerationSeconds.ToString("F2") + " s");
         }
 
         private delegate bool PlantPredicate(int i, int j, float x, float z);
@@ -252,6 +259,7 @@ namespace Spinnenspiel
                     if (!ok(i, j, x, z)) continue;
                     float rot = World.Hash01(i, j, SaltA(step) + 4) * 360f;
                     AddPlant(parent, mesh, mat, new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale(i, j));
+                    PlantColliderCount++;
                     n++;
                 }
             }
@@ -261,8 +269,8 @@ namespace Spinnenspiel
         /// <summary>Rastergröße auf Salzpaar abbilden: 1.5 → 11, 1.0 → 21, 0.7 → 31.</summary>
         private static int SaltA(float step) => step >= 1.4f ? 11 : step >= 0.9f ? 21 : 31;
 
-        /// <summary>Mesh-Objekt ohne Collider (nur Darstellung) erzeugen.</summary>
-        private static void AddPlant(Transform parent, Mesh mesh, Material mat, Vector3 pos, float rotY, float scale)
+        /// <summary>Mesh-Objekt mit Kind „PflanzenCollider“ erzeugen (Spinne/Netze können andocken).</summary>
+        private static GameObject AddPlant(Transform parent, Mesh mesh, Material mat, Vector3 pos, float rotY, float scale)
         {
             GameObject g = new GameObject();
             g.transform.SetParent(parent, false);
@@ -271,6 +279,20 @@ namespace Spinnenspiel
             g.transform.localScale = Vector3.one * scale;
             g.AddComponent<MeshFilter>().sharedMesh = mesh;
             g.AddComponent<MeshRenderer>().sharedMaterial = mat;
+
+            // Dünnkapsel in der Mesh-Mitte: klein genug, dass die Spinne nicht feststeckt,
+            // groß genug, dass Netz-Anker und Beine andocken können.
+            GameObject c = new GameObject("PflanzenCollider");
+            c.transform.SetParent(g.transform, false);
+            c.layer = GameLayers.Plants;
+            Bounds b = mesh.bounds;
+            Vector3 s = g.transform.localScale;
+            var cc = c.AddComponent<CapsuleCollider>();
+            cc.direction = 1; // Y-Achse
+            cc.height = b.size.y * s.y;
+            cc.radius = Mathf.Clamp(0.25f * Mathf.Min(b.size.x * s.x, b.size.z * s.z), 0.015f, 0.12f);
+            c.transform.position = g.transform.TransformPoint(b.center);
+            return g;
         }
 
         /// <summary>Kann ein Objekt an (x,z) stehen: trocken und Steigung < 20°?</summary>
