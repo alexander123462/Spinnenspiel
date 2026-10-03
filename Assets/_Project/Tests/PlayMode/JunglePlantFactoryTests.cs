@@ -15,8 +15,8 @@ namespace Spinnenspiel.Tests
             Assert.That(mesh, Is.Not.Null);
             Assert.That(mesh.vertexCount, Is.GreaterThan(100));
             Assert.That(mesh.triangles.Length % 3, Is.EqualTo(0));
-            Assert.That(mesh.bounds.size.y, Is.Between(0.3f, 1.8f));
-            Assert.That(mesh.bounds.size.x, Is.Between(0.3f, 2.5f));
+            Assert.That(mesh.bounds.size.y >= 0.3f && mesh.bounds.size.y <= 1.8f);
+            Assert.That(mesh.bounds.size.x >= 0.3f && mesh.bounds.size.x <= 2.5f);
         }
 
         [Test]
