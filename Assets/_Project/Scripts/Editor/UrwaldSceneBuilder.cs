@@ -43,17 +43,28 @@ namespace Spinnenspiel.EditorTools
             lib.logs = LoadMeshes(new[] { "M_Log0", "M_Log1", "M_Log2" });
             lib.rocks = LoadMeshes(new[] { "M_Rock0", "M_Rock1", "M_Rock2", "M_Rock3", "M_Rock4" });
 
-            lib.bark = LoadMaterial("MAT_TreeBark");
             lib.leaves = LoadMaterial("MAT_Leaves");
-            lib.bushMat = LoadMaterial("MAT_Grass");
-            lib.fernMat = LoadMaterial("MAT_Fern");
             lib.reedMat = LoadMaterial("MAT_Reed");
-            lib.logMat = LoadMaterial("MAT_Bark");
-            lib.rockMat = LoadMaterial("MAT_Rock");
             lib.water = LoadMaterial("MAT_WaterPond");
 
+            // Scan-Assets (Poly Haven) ersetzen die prozeduralen Klötzchen; fehlt einer, bleibt der bisherige Wert.
+            lib.bark = ScanBark(LoadMaterial("MAT_TreeBark"));
+            lib.logMat = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_dead_tree_trunk.mat", LoadMaterial("MAT_Bark"));
+            lib.rockMat = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_mossy_rock.mat", LoadMaterial("MAT_Rock"));
+            lib.fern = ScanMesh("Assets/_Project/Art/Scans/Models/fern_02/fern_02_1k.fbx", LoadMesh("VM_Fern"));
+            lib.fernMat = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_fern_02.mat", LoadMaterial("MAT_Fern"));
+            lib.bush = ScanMesh("Assets/_Project/Art/Scans/Models/shrub_02/shrub_02_2k.fbx", LoadMesh("VM_Bush"));
+            lib.bushMat = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_shrub_02.mat", LoadMaterial("MAT_Grass"));
+
+            // Boden: Scan-TerrainLayer (TileSize 2 m, ca. 1 Kachel pro 2 m); Fallback: prozedurale Layer.
             // Reihenfolge: Earth, Grass, Mud, Rock.
-            lib.terrainLayers = LoadLayers(new[] { "TL_Earth", "TL_Grass", "TL_Mud", "TL_Rock" });
+            lib.terrainLayers = ScanLayers(new[]
+            {
+                "Assets/_Project/Art/Scans/Layers/TL_forest_ground_04.terrainlayer",
+                "Assets/_Project/Art/Scans/Layers/TL_sparse_grass.terrainlayer",
+                "Assets/_Project/Art/Scans/Layers/TL_brown_mud_leaves_01.terrainlayer",
+                "Assets/_Project/Art/Scans/Layers/TL_rocky_trail.terrainlayer",
+            }, new[] { "TL_Earth", "TL_Grass", "TL_Mud", "TL_Rock" });
 
             EditorUtility.SetDirty(lib);
             AssetDatabase.SaveAssets();
@@ -169,6 +180,80 @@ namespace Spinnenspiel.EditorTools
                     continue;
                 }
                 result[i] = AssetDatabase.LoadAssetAtPath<TerrainLayer>(path);
+            }
+            return result;
+        }
+
+        /// <summary>Kopie der Scan-Rinde unter Art/Generated mit Tiling gegen Streckung (Scan-Material bleibt unverändert).</summary>
+        private static Material ScanBark(Material fallback)
+        {
+            const string src = "Assets/_Project/Art/Scans/Materials/M_pine_bark.mat";
+            if (!System.IO.File.Exists(src))
+            {
+                Debug.LogWarning("[Urwald] Scan-Material fehlt, prozedurale Rinde bleibt: " + src);
+                return fallback;
+            }
+            string copyPath = MatFolder + "MAT_ScanBark.mat";
+            Material scan = AssetDatabase.LoadAssetAtPath<Material>(src);
+            Material copy = AssetDatabase.LoadAssetAtPath<Material>(copyPath);
+            if (copy == null)
+            {
+                copy = new Material(scan) { name = "MAT_ScanBark" };
+                AssetDatabase.CreateAsset(copy, copyPath);
+            }
+            copy.CopyPropertiesFromMaterial(scan);
+            copy.mainTextureScale = new Vector2(2f, 1f); // Rinde um den Stamm dichter, Vertikalfasern bleiben
+            EditorUtility.SetDirty(copy);
+            AssetDatabase.SaveAssets();
+            return copy;
+        }
+
+        private static Material ScanMaterial(string path, Material fallback)
+        {
+            if (!System.IO.File.Exists(path))
+            {
+                Debug.LogWarning("[Urwald] Scan-Material fehlt, prozedurales bleibt: " + path);
+                return fallback;
+            }
+            Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                Debug.LogWarning("[Urwald] Scan-Material nicht lesbar, prozedurales bleibt: " + path);
+                return fallback;
+            }
+            return mat;
+        }
+
+        private static Mesh ScanMesh(string fbxPath, Mesh fallback)
+        {
+            if (!System.IO.File.Exists(fbxPath))
+            {
+                Debug.LogWarning("[Urwald] Scan-Modell fehlt, prozedurales bleibt: " + fbxPath);
+                return fallback;
+            }
+            foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(fbxPath))
+            {
+                if (obj is Mesh mesh)
+                    return mesh;
+            }
+            Debug.LogWarning("[Urwald] Kein Mesh im Scan-Modell: " + fbxPath);
+            return fallback;
+        }
+
+        private static TerrainLayer[] ScanLayers(string[] paths, string[] fallbackNames)
+        {
+            TerrainLayer[] result = new TerrainLayer[paths.Length];
+            for (int i = 0; i < paths.Length; i++)
+            {
+                TerrainLayer layer = null;
+                if (System.IO.File.Exists(paths[i]))
+                    layer = AssetDatabase.LoadAssetAtPath<TerrainLayer>(paths[i]);
+                if (layer == null)
+                {
+                    Debug.LogWarning("[Urwald] Scan-TerrainLayer fehlt, prozeduraler bleibt: " + paths[i]);
+                    layer = LoadLayers(new[] { fallbackNames[i] })[0];
+                }
+                result[i] = layer;
             }
             return result;
         }
