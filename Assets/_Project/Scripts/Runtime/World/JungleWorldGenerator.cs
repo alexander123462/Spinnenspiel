@@ -222,7 +222,9 @@ namespace Spinnenspiel
                         if (mesh == null || mat == null) continue;
 
                         float rot = World.Hash01(i, j, 74) * 360f;
-                        float scale = 0.5f + World.Hash01(i, j, 75) * 0.6f;
+                        float targetH = 0.25f + World.Hash01(i, j, 75) * 0.35f; // 0.25–0.60 m
+                        float meshH = Mathf.Max(mesh.bounds.size.y, 0.01f);
+                        float scale = targetH / meshH;
                         float h = World.Height(x, z);
 
                         GameObject g = new GameObject();
@@ -241,6 +243,7 @@ namespace Spinnenspiel
 
                 StaticBatchingUtility.Combine(bodendecker);
                 GroundCoverCount = groundN;
+                UnityEngine.Debug.Log($"[Jungle] Bodendecker: {groundN} Objekte, mittlere Höhe 0.25–0.60 m (bounds-basiert)");
             }
 
             // 5b) Lianen: hängen aus dem Kronendach, dünne senkrechte Halte für Netz-Anker.

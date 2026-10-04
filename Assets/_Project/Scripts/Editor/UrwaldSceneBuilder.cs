@@ -210,7 +210,9 @@ namespace Spinnenspiel.EditorTools
                 AssetDatabase.CreateAsset(copy, copyPath);
             }
             copy.CopyPropertiesFromMaterial(scan);
-            copy.mainTextureScale = new Vector2(2f, 1f); // Rinde um den Stamm dichter, Vertikalfasern bleiben
+            copy.mainTextureScale = new Vector2(1f, 0.35f); // Rinde gröber: weniger Wiederholungen, längere Fasern
+            if (copy.HasProperty("_NormalMap") && copy.GetTexture("_NormalMap") != null)
+                copy.SetFloat("_NormalScale", 1.5f);
             EditorUtility.SetDirty(copy);
             AssetDatabase.SaveAssets();
             return copy;
