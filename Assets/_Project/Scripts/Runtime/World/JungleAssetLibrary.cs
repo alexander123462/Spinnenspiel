@@ -26,7 +26,7 @@ namespace Spinnenspiel
         public Mesh[] giantLeaves;
         public Material[] giantLeafMats;
 
-        /// <summary>Blender-Baumfarne, 3 Varianten (index 0..2), je 2 Submeshes: 0 = Blatt, 1 = Stamm.</summary>
+        /// <summary>Blender-Baumfarne, 3 Varianten (index 0..2), je 2 Submeshes: 0 = Stamm, 1 = Blatt.</summary>
         public Mesh[] treeFerns;
         public Material treeFernLeafMat;
         public Material treeFernStemMat;

@@ -2,6 +2,7 @@ using Spinnenspiel;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Rendering.HighDefinition;
 using UnityEngine.Rendering.Universal;
 
 namespace Spinnenspiel.EditorTools
@@ -329,9 +330,9 @@ namespace Spinnenspiel.EditorTools
 
             Material leaf = CreateBaumfarnMat("MAT_Baumfarn_Leaf", hdrpLit,
                 tex + "Baumfarn_Leaf_Albedo.png", tex + "Baumfarn_Leaf_Mask.png", tex + "Baumfarn_Leaf_Normal.png");
-            leaf.SetFloat("_SurfaceType", 1f); // Cutout (Blattschnitt)
-            leaf.SetFloat("_AlphaCutoffEnable", 1f);
-            leaf.SetFloat("_AlphaCutoff", 0.5f);
+            // Fiederblaetter sind echte Geometrie -> opak, kein Alpha-Cutout (Cutout schnitt die Wedel weg)
+            leaf.SetFloat("_SurfaceType", 0f);
+            leaf.SetFloat("_AlphaCutoffEnable", 0f);
             leaf.SetFloat("_Smoothness", 0.35f);
             // F3b: Wedel wieder doppelseitig (Rueckseiten sichtbar, Flip-Normalen).
             leaf.SetFloat("_DoubleSidedEnable", 1f);
@@ -341,6 +342,9 @@ namespace Spinnenspiel.EditorTools
             Material stem = CreateBaumfarnMat("MAT_Baumfarn_Stem", hdrpLit,
                 tex + "Baumfarn_Stem_Albedo.png", null, null);
             stem.SetFloat("_Smoothness", 0.2f);
+
+            HDMaterial.ValidateMaterial(leaf);
+            HDMaterial.ValidateMaterial(stem);
 
             EditorUtility.SetDirty(leaf);
             EditorUtility.SetDirty(stem);
