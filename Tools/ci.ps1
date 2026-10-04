@@ -1,9 +1,11 @@
 # Spinnenspiel CI: optional Editor-Methode ausfuehren, kompilieren, PlayMode-Tests laufen lassen.
 # Aufruf: powershell -ExecutionPolicy Bypass -File C:\Users\vorau\dev\Spinnenspiel\Tools\ci.ps1 -Name m2 -Method Spinnenspiel.EditorTools.Milestone1SceneBuilder.Build -Tests
+# Optional: -Filter "Spinnenspiel.Tests.Climb*" nur Teilmenge der Tests (schnelle Einzellaeufe; vor Commits immer ohne Filter).
 param(
     [string]$Name = "ci",
     [string[]]$Method = @(),
-    [switch]$Tests
+    [switch]$Tests,
+    [string]$Filter = ""
 )
 
 $ErrorActionPreference = 'Continue'
@@ -50,7 +52,9 @@ if ($Tests) {
     $log = "$logDir\$Name-tests.log"
     $xml = "$logDir\$Name-tests.xml"
     Remove-Item $xml -ErrorAction SilentlyContinue
-    $code = Invoke-Unity @('-runTests', '-testPlatform', 'PlayMode', '-testResults', "`"$xml`"") $log
+    $testArgs = @('-runTests', '-testPlatform', 'PlayMode', '-testResults', "`"$xml`"")
+    if ($Filter) { $testArgs += @('-testFilter', $Filter) }
+    $code = Invoke-Unity $testArgs $log
     $summary += "TESTS -> Exit $code"
     if (Test-Path $xml) {
         [xml]$r = Get-Content $xml

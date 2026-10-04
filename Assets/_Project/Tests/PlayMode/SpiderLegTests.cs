@@ -16,6 +16,16 @@ namespace Spinnenspiel.Tests
         private const string SceneName = "M1_Testgelaende";
         private const float GroundTolerance = 0.015f;
 
+        // Gait-Messung braucht Echtzeit: Die Zeitraffer-Fixture (TestSpeed) gibt
+        // jeder Frame eine feste 20 ms Spielzeit, das aendert das
+        // Physik/IK-Verhaeltnis beim Gehen/Sprinten. Deshalb hier wieder auf
+        // 0 zuruecksetzen (Echtzeit) und danach den Fixture-Wert wiederherstellen.
+        [SetUp]
+        public void ResetToRealtime() { Time.captureDeltaTime = 0f; }
+
+        [TearDown]
+        public void RestoreTimeLapse() { Time.captureDeltaTime = 1f / 50f; }
+
         private static float GroundHeightAt(Vector3 position)
         {
             Vector3 origin = position + Vector3.up * 0.5f;
