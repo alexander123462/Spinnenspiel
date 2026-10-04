@@ -61,7 +61,7 @@ namespace Spinnenspiel.EditorTools
             lib.giantLeaves = LoadRiesenblattMeshes();
             lib.giantLeafMats = CreateRiesenblattMats();
 
-            // Baumfarne (Blender, 3 Varianten): 2 Submeshes pro FBX (0 = Blatt, 1 = Stamm).
+            // Baumfarne (Blender, 3 Varianten): 2 Submeshes pro FBX (0 = Stamm, 1 = Blatt).
             lib.treeFerns = LoadBaumfarnMeshes();
             var baumfarnMats = CreateBaumfarnMats();
             lib.treeFernLeafMat = baumfarnMats[0];
@@ -306,7 +306,7 @@ namespace Spinnenspiel.EditorTools
                     {
                         result[i] = mesh;
                         Debug.Log("[Urwald] Baumfarn subMeshCount " + (i + 1) + ": " + mesh.subMeshCount
-                            + " (erwartet 2: 0 = Blatt, 1 = Stamm)");
+                            + " (erwartet 2: 0 = Stamm, 1 = Blatt)");
                         break;
                     }
                 }
@@ -333,7 +333,10 @@ namespace Spinnenspiel.EditorTools
             leaf.SetFloat("_AlphaCutoffEnable", 1f);
             leaf.SetFloat("_AlphaCutoff", 0.5f);
             leaf.SetFloat("_Smoothness", 0.35f);
+            // F3b: Wedel wieder doppelseitig (Rueckseiten sichtbar, Flip-Normalen).
             leaf.SetFloat("_DoubleSidedEnable", 1f);
+            leaf.SetFloat("_CullMode", 0f);
+            leaf.SetFloat("_DoubleSidedNormalMode", 0f);
 
             Material stem = CreateBaumfarnMat("MAT_Baumfarn_Stem", hdrpLit,
                 tex + "Baumfarn_Stem_Albedo.png", null, null);

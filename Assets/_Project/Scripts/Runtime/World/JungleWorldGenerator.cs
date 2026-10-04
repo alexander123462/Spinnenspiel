@@ -505,7 +505,7 @@ namespace Spinnenspiel
         }
 
         /// <summary>
-        /// Baumfarn erzeugen: ein MeshRenderer mit 2 sharedMaterials (0 = Blatt, 1 = Stamm,
+        /// Baumfarn erzeugen: ein MeshRenderer mit 2 sharedMaterials (0 = Stamm, 1 = Blatt,
         /// Submesh-Reihenfolge) + dünner Capsule-Kollider am Stamm (Spinne kann klettern).
         /// Die Wedel selbst bekommen keinen Collider.
         /// </summary>
@@ -518,7 +518,7 @@ namespace Spinnenspiel
             g.transform.localScale = Vector3.one * scale;
             g.AddComponent<MeshFilter>().sharedMesh = mesh;
             var r = g.AddComponent<MeshRenderer>();
-            r.sharedMaterials = new[] { library.treeFernLeafMat, library.treeFernStemMat };
+            r.sharedMaterials = new[] { library.treeFernStemMat, library.treeFernLeafMat };
 
             // Kletter-Stamm: dünne Kapsel an der Basis (Radius 0.16, Höhe = bounds.y * 0.75 * scale).
             // Die Wedel (oberes Viertel) bleiben kollisionsfrei.
