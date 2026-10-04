@@ -147,11 +147,12 @@ namespace Spinnenspiel
 
             // 5) Unterholz: Büsche, Farne, Schilf (nur Mesh, keine Collider, statisch gebatcht)
             GameObject unterholz = new GameObject("Unterholz");
-            BushCount = PlaceGrid(unterholz.transform, size, 1.5f, library.bush, library.bushMat,
+            // G4: dichtereres Unterholz (Schritt 1.5→1.0 bzw. 1.0→0.6); Zufallsrotation/-skalierung kommen aus PlaceGrid.
+            BushCount = PlaceGrid(unterholz.transform, size, 1.0f, library.bush, library.bushMat,
                 (i, j, x, z) => World.Height(x, z) >= JungleWorld.WaterLevel + 0.2f
                     && World.Hash01(i, j, 13) < World.Density(x, z) * 0.6f,
                 (i, j) => 0.7f + World.Hash01(i, j, 14) * 0.7f, 1500);
-            FernCount = PlaceGrid(unterholz.transform, size, 1.0f, library.fern, library.fernMat,
+            FernCount = PlaceGrid(unterholz.transform, size, 0.6f, library.fern, library.fernMat,
                 (i, j, x, z) => World.Hash01(i, j, 23) < World.Density(x, z) * 0.7f,
                 (i, j) => 0.8f + World.Hash01(i, j, 24) * 0.8f, 1500);
             ReedCount = PlaceGrid(unterholz.transform, size, 0.7f, library.reed, library.reedMat,

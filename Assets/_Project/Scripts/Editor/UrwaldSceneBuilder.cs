@@ -52,9 +52,10 @@ namespace Spinnenspiel.EditorTools
             lib.logMat = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_dead_tree_trunk.mat", LoadMaterial("MAT_Bark"));
             lib.rockMat = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_mossy_rock.mat", LoadMaterial("MAT_Rock"));
             lib.fern = ScanMesh("Assets/_Project/Art/Scans/Models/fern_02/fern_02_1k.fbx", LoadMesh("VM_Fern"));
-            lib.fernMat = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_fern_02.mat", LoadMaterial("MAT_Fern"));
+            // G4: Scan-Farn/-Strauch wirken mitteleuropäisch-braun → grün getönte Kopien (Originale bleiben unverändert).
+            lib.fernMat = TropischMaterial(ScanMaterial("Assets/_Project/Art/Scans/Materials/M_fern_02.mat", LoadMaterial("MAT_Fern")), "MAT_FernTropisch");
             lib.bush = ScanMesh("Assets/_Project/Art/Scans/Models/shrub_02/shrub_02_2k.fbx", LoadMesh("VM_Bush"));
-            lib.bushMat = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_shrub_02.mat", LoadMaterial("MAT_Grass"));
+            lib.bushMat = TropischMaterial(ScanMaterial("Assets/_Project/Art/Scans/Materials/M_shrub_02.mat", LoadMaterial("MAT_Grass")), "MAT_BushTropisch");
 
             // Riesenbläter (Blender, 3 Varianten): tropische Pflanze mit Blattschnitt-Mask und Normal.
             lib.giantLeaves = LoadRiesenblattMeshes();
@@ -274,6 +275,20 @@ namespace Spinnenspiel.EditorTools
             }
             AssetDatabase.SaveAssets();
             return result;
+        }
+
+        private static Material TropischMaterial(Material src, string name)
+        {
+            if (src == null)
+            {
+                return null;
+            }
+            string path = "Assets/_Project/Art/Generated/Materials/" + name + ".mat";
+            AssetUtil.EnsureFolder("Assets/_Project/Art/Generated/Materials");
+            Material copy = AssetDatabase.LoadAssetAtPath<Material>(path) ?? new Material(src);
+            // Tropisch-grüne Tönung als _BaseColor (Multiplikator der Scan-Textur).
+            copy.color = new Color(0.55f, 0.95f, 0.40f, 1f);
+            return AssetUtil.ReplaceAsset(copy, path);
         }
 
         private static Material ScanMaterial(string path, Material fallback)

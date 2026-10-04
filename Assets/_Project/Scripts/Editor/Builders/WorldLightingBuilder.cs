@@ -102,6 +102,8 @@ namespace Spinnenspiel.EditorTools
             var sh = profile.Add<HDShadowSettings>(true); sh.maxShadowDistance.Override(80f);
             var cs = profile.Add<ContactShadows>(true); cs.enable.Override(true);
             var ao = profile.Add<ScreenSpaceAmbientOcclusion>(true); ao.intensity.Override(1f);
+            // G4: leichte Makro-Tiefenunschärfe (manueller Fokus, nicht Physikalische-Kamera-Modus).
+            var dof = profile.Add<DepthOfField>(true); dof.focusMode.Override(DepthOfFieldMode.Manual); dof.nearFocusStart.Override(0f); dof.nearFocusEnd.Override(0.15f); dof.farFocusStart.Override(2.5f); dof.farFocusEnd.Override(12f);
 
             foreach (VolumeComponent component in profile.components)
             {

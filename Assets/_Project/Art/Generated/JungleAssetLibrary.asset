@@ -29,8 +29,8 @@ MonoBehaviour:
   bush: {fileID: 830114310455821501, guid: 23db4f26732adef488a509c637ed9591, type: 3}
   fern: {fileID: -1101056946369687347, guid: f46ac9d82e0940946b3ea00c2fd89a4d, type: 3}
   reed: {fileID: 4300000, guid: d5f4178a636866445847a11af0d805fc, type: 2}
-  bushMat: {fileID: 2100000, guid: 05b6b9fa0854b604b8eed03ed2f53900, type: 2}
-  fernMat: {fileID: 2100000, guid: 3d4bd12a390173c49b9915fea434c8af, type: 2}
+  bushMat: {fileID: 2100000, guid: a3704bb223b7af24b9c1bf8ed6d08a84, type: 2}
+  fernMat: {fileID: 2100000, guid: cfbee492ef092bb47b00c93c85225dfe, type: 2}
   reedMat: {fileID: 2100000, guid: a1391c9790a7e514d924d89d8373348d, type: 2}
   giantLeaves:
   - {fileID: 1593906062978676987, guid: e39360f3f430b2a429bb44da7c4cfe75, type: 3}
