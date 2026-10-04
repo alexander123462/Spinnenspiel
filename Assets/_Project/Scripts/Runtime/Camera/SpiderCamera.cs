@@ -15,19 +15,19 @@ namespace Spinnenspiel
     {
         [Header("Referenzen")]
         [SerializeField] private Transform target;
-        [SerializeField] private Vector3 targetOffset = new Vector3(0f, 0.12f, 0f);
+        [SerializeField] private Vector3 targetOffset = new Vector3(0f, 0.09f, 0f); // C1: näher/tiefer für Referenzlook
         [SerializeField] private SpiderInput input;
 
         [Header("Orbit")]
         [SerializeField] private float yaw = 0f;
-        [SerializeField] private float pitch = 12f; // G4: tiefer (flacher Blick), näher an der Spinne
+        [SerializeField] private float pitch = 9f; // C1: näher/tiefer für Referenzlook
         [SerializeField] private float minPitch = -25f;
         [SerializeField] private float maxPitch = 75f;
         [Tooltip("Grad pro Input-Einheit (Maus-Delta in Pixeln, Stick in -1..1).")]
         [SerializeField] private float lookSensitivity = 0.15f;
 
         [Header("Distanz / Zoom")]
-        [SerializeField] private float desiredDistance = 0.55f; // G4: näher ran
+        [SerializeField] private float desiredDistance = 0.38f; // C1: näher/tiefer für Referenzlook
         [SerializeField] private float minDistance = 0.18f;
         [SerializeField] private float minZoomDistance = 0.25f;
         [SerializeField] private float maxZoomDistance = 3.5f;
@@ -46,7 +46,7 @@ namespace Spinnenspiel
         [SerializeField] private float groundClearance = 0.05f;
 
         [Header("Sprint")]
-        [SerializeField] private float baseFieldOfView = 60f;
+        [SerializeField] private float baseFieldOfView = 55f; // C1: näher/tiefer für Referenzlook
         [SerializeField] private float sprintFieldOfViewBoost = 7f;
         [SerializeField] private float fieldOfViewSmoothing = 5f;
 
