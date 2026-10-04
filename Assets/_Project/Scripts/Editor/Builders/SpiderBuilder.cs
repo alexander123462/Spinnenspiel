@@ -1,5 +1,7 @@
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Rendering.HighDefinition;
 
 namespace Spinnenspiel.EditorTools
 {
@@ -40,10 +42,20 @@ namespace Spinnenspiel.EditorTools
             Material thoraxMat = AssetUtil.CreateLitMaterial(folder + "/MAT_SpiderThorax.mat", new Color(0.16f, 0.11f, 0.075f), 0.5f);
             Material legMat = AssetUtil.CreateLitMaterial(folder + "/MAT_SpiderLeg.mat", Color.white, 0.35f, TextureFactory.SpiderLegBands());
             Material eyeMat = AssetUtil.CreateLitMaterial(folder + "/MAT_SpiderEye.mat", new Color(0.02f, 0.02f, 0.025f), 0.95f);
+            Material abdomenScanMat = CreateScanMaterial("MAT_SpiderAbdomenScan",
+                "Assets/_Project/Art/Spider/Spinne_Abdomen_Albedo.png",
+                "Assets/_Project/Art/Spider/Spinne_Abdomen_Mask.png",
+                "Assets/_Project/Art/Spider/Spinne_Abdomen_Normal.png");
+            Material carapaceMat = CreateScanMaterial("MAT_SpiderCarapace",
+                "Assets/_Project/Art/Spider/Spinne_Cephalothorax_Albedo.png",
+                "Assets/_Project/Art/Spider/Spinne_Cephalothorax_Mask.png",
+                "Assets/_Project/Art/Spider/Spinne_Cephalothorax_Normal.png");
 
             AddPart(body.transform, "Abdomen", new Vector3(0f, 0.008f, -0.052f), new Vector3(0.085f, 0.068f, 0.11f), abdomenMat);
+            ApplyScanMesh(body.transform.Find("Abdomen"), "Assets/_Project/Art/Spider/Spinne_Abdomen.fbx", abdomenScanMat);
             AddPart(body.transform, "Pedicel", new Vector3(0f, 0.002f, -0.006f), new Vector3(0.022f, 0.02f, 0.03f), thoraxMat);
             AddPart(body.transform, "Cephalothorax", new Vector3(0f, 0f, 0.025f), new Vector3(0.058f, 0.04f, 0.065f), thoraxMat);
+            ApplyScanMesh(body.transform.Find("Cephalothorax"), "Assets/_Project/Art/Spider/Spinne_Cephalothorax.fbx", carapaceMat);
 
             // Augen: zwei große vordere Mittelaugen, zwei kleinere darüber, zwei seitliche.
             AddPart(body.transform, "Eye_AL", new Vector3(-0.007f, 0.011f, 0.055f), Vector3.one * 0.009f, eyeMat);
@@ -145,6 +157,126 @@ namespace Spinnenspiel.EditorTools
             go.transform.localScale = localScale;
             Object.DestroyImmediate(go.GetComponent<Collider>());
             go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        }
+
+        /// <summary>
+        /// Erzeugt ein HDRP/Lit-Material aus Albedo/Mask/Normal-Textur.
+        /// Opak, einseitig, Smoothness 0.42.
+        /// </summary>
+        private static Material CreateScanMaterial(string name, string albedo, string mask, string normal)
+        {
+            string path = AssetUtil.GeneratedRoot + "/Materials/" + name + ".mat";
+            AssetUtil.EnsureFolder(AssetUtil.GeneratedRoot + "/Materials");
+
+            Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+            Shader hdrpLit = Shader.Find("HDRP/Lit");
+            if (hdrpLit == null)
+                throw new System.InvalidOperationException("[Spider] Shader nicht gefunden: HDRP/Lit");
+
+            Material mat = existing ?? new Material(hdrpLit) { name = name };
+            mat.SetTexture("_BaseColorMap", AssetDatabase.LoadAssetAtPath<Texture2D>(albedo));
+            mat.SetTexture("_MaskMap", AssetDatabase.LoadAssetAtPath<Texture2D>(mask));
+            mat.SetTexture("_NormalMap", AssetDatabase.LoadAssetAtPath<Texture2D>(normal));
+            mat.SetFloat("_SurfaceType", 0f);          // Opak
+            mat.SetFloat("_AlphaCutoffEnable", 0f);    // Kein Cutout
+            mat.SetFloat("_DoubleSidedEnable", 0f);    // Einseitig
+            mat.SetFloat("_Smoothness", 0.42f);
+            mat.color = Color.white;
+
+            HDMaterial.ValidateMaterial(mat);
+            EditorUtility.SetDirty(mat);
+
+            if (existing == null)
+                AssetDatabase.CreateAsset(mat, path);
+            else
+                AssetDatabase.SaveAssets();
+
+            return mat;
+        }
+
+        /// <summary>
+        /// Lädt das erste Mesh aus einer FBX-Datei, setzt es auf die MeshFilter
+        /// des Teils und misst die Ausrichtung (vorne = +Z in Unity).
+        /// Bei Fehlausrichtung: 180° Y-Rotation.
+        /// Fehlt die Datei: Debug.LogWarning, Kugel bleibt.
+        /// </summary>
+        private static void ApplyScanMesh(Transform part, string fbxPath, Material mat)
+        {
+            if (part == null)
+            {
+                Debug.LogWarning("[Spider] ApplyScanMesh: Part-Transform ist null");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(fbxPath) || AssetDatabase.LoadAssetAtPath<Object>(fbxPath) == null)
+            {
+                Debug.LogWarning("[Spider] FBX nicht gefunden: " + fbxPath + " – Kugel bleibt");
+                return;
+            }
+
+            var assets = AssetDatabase.LoadAllAssetsAtPath(fbxPath);
+            Mesh mesh = assets.OfType<Mesh>().FirstOrDefault();
+            if (mesh == null)
+            {
+                Debug.LogWarning("[Spider] Kein Mesh in: " + fbxPath + " – Kugel bleibt");
+                return;
+            }
+
+            // Messung 1: bounds.size
+            Debug.Log("[Spider] " + part.name + " bounds.size: " + mesh.bounds.size.ToString("F4"));
+
+            Vector3[] verts = mesh.vertices;
+            string partName = part.name;
+
+            if (partName == "Abdomen")
+            {
+                // Breite (x-Spanne) für z > 0.3 (vorne) und z < -0.3 (hinten)
+                var vFront = verts.Where(v => v.z > 0.3f).ToArray();
+                var vBack  = verts.Where(v => v.z < -0.3f).ToArray();
+
+                float xFront = vFront.Length > 0 ? vFront.Max(v => v.x) - vFront.Min(v => v.x) : -1f;
+                float xBack  = vBack.Length  > 0 ? vBack.Max(v => v.x)  - vBack.Min(v => v.x)  : -1f;
+
+                Debug.Log("[Spider] Abdomen Breite z>0.3 (vorne): " + xFront.ToString("F4") + "  (n=" + vFront.Length + ")");
+                Debug.Log("[Spider] Abdomen Breite z<-0.3 (hinten): " + xBack.ToString("F4") + "  (n=" + vBack.Length + ")");
+                // Kriterium: hinten schmaler -> xBack < xFront
+                bool correct = xBack < xFront && xBack > 0f && xFront > 0f;
+                if (!correct)
+                {
+                    Debug.Log("[Spider] Abdomen: Ausrichtung falsch -> 180° Y-Rotation");
+                    part.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                    // Neu messen nach Rotation (Bounds sind unabhängig von Rotation, daher nur Hinweis)
+                    Debug.Log("[Spider] Abdomen: localRotation = " + part.localRotation.eulerAngles.ToString("F2"));
+                }
+            }
+            else if (partName == "Cephalothorax")
+            {
+                // 5% höchste Vertices (größtes y), dann z-Mittelwert
+                int count = Mathf.Max(1, verts.Length / 20);
+                var top = verts
+                    .OrderByDescending(v => v.y)
+                    .Take(count)
+                    .ToArray();
+                float zTop = top.Average(v => v.z);
+                Debug.Log("[Spider] Cephalothorax 5% höchste Vertices: n=" + count + "  z-Mittel=" + zTop.ToString("F4"));
+                // Kriterium: Augenhügel vorne -> z-Mittel > 0
+                bool correct = zTop > 0f;
+                if (!correct)
+                {
+                    Debug.Log("[Spider] Cephalothorax: Ausrichtung falsch -> 180° Y-Rotation");
+                    part.localRotation = Quaternion.Euler(0f, 180f, 0f);
+                    Debug.Log("[Spider] Cephalothorax: localRotation = " + part.localRotation.eulerAngles.ToString("F2"));
+                }
+            }
+
+            // Mesh und Material zuweisen
+            MeshFilter mf = part.GetComponent<MeshFilter>();
+            if (mf == null) mf = part.gameObject.AddComponent<MeshFilter>();
+            mf.sharedMesh = mesh;
+
+            MeshRenderer mr = part.GetComponent<MeshRenderer>();
+            if (mr == null) mr = part.gameObject.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = mat;
         }
     }
 }
