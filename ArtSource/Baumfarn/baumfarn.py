@@ -1,8 +1,8 @@
-# Baumfarn (Cyathea-artig) prozedural bauen, FBX fuer Unity exportieren, Vorschau rendern.
-# Aufruf: blender -b -P baumfarn.py -- <outdir> <seed> [render]   (Texturen vorher: python tex_farn.py <outdir>/Textures)
+# Baumfarn (Cyathea-artig) prozedural bauen, FBX exportieren, Vorschau rendern.
+# Aufruf: blender -b -P baumfarn.py -- <outdir> <seed> [render]
 import bpy, math, sys, os
 import numpy as np
-from mathutils import Matrix, Vector
+from mathutils import Vector
 
 A = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
 out = os.path.abspath(A[0]); seed = int(A[1]); do_render = len(A) > 2
@@ -10,96 +10,135 @@ tex = os.path.join(out, "Textures")
 rng = np.random.default_rng(seed)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
-# ---------------- Geometrie ----------------
+# ---------------- Geometrie-Helfer ----------------
 V, F, UV, MAT = [], [], [], []
 def add(v, f, uv, m):
     o = len(V); V.extend(v); UV.extend(uv)
     for fc in f: F.append(tuple(x + o for x in fc)); MAT.append(m)
 
-def tube(P0, C, P1, r0, r1, rings=18, seg=8):
-    verts, uvs, faces = [], [], []
+def _frame(p, tan):
+    side = np.cross(tan, [0, 0, 1.0])
+    if np.linalg.norm(side) < 1e-4: side = np.array([1.0, 0, 0])
+    side /= np.linalg.norm(side)
+    up = np.cross(side, tan)
+    return side, up
+
+def tube_bezier(P0, C, P1, r0, r1, rings=16, seg=7):
     P0, C, P1 = map(np.array, (P0, C, P1))
-    pts = [(1 - k) ** 2 * P0 + 2 * (1 - k) * k * C + k ** 2 * P1 for k in np.linspace(0, 1, rings)]
+    pts = [(1-k)**2*P0 + 2*(1-k)*k*C + k**2*P1 for k in np.linspace(0, 1, rings)]
+    return _tube_pts(pts, r0, r1, seg)
+
+def tube_points(pts, r0, r1, seg=7):
+    pts = [np.array(p, dtype=float) for p in pts]
+    return _tube_pts(pts, r0, r1, seg)
+
+def _tube_pts(pts, r0, r1, seg):
+    verts, uvs, faces = [], [], []
+    n = len(pts)
     for i, p in enumerate(pts):
-        tan = pts[min(i + 1, rings - 1)] - pts[max(i - 1, 0)]; tan /= np.linalg.norm(tan)
-        side = np.cross(tan, [0, 0, 1.0])
-        if np.linalg.norm(side) < 1e-4: side = np.array([1.0, 0, 0])
-        side /= np.linalg.norm(side); up = np.cross(side, tan)
-        r = r0 + (r1 - r0) * i / (rings - 1)
+        tan = pts[min(i+1, n-1)] - pts[max(i-1, 0)]
+        tan /= (np.linalg.norm(tan) + 1e-9)
+        side, up = _frame(p, tan)
+        r = r0 + (r1 - r0) * i / (n - 1)
         for j in range(seg + 1):
             a = j / seg * 6.283
-            verts.append(tuple(p + r * (math.cos(a) * side + math.sin(a) * up)))
-            uvs.append((j / seg, i / (rings - 1)))
-    for i in range(rings - 1):
+            verts.append(tuple(p + r * (math.cos(a)*side + math.sin(a)*up)))
+            uvs.append((j/seg, i/(n-1)))
+    for i in range(n - 1):
         for j in range(seg):
-            a = i * (seg + 1) + j
-            faces.append((a, a + seg + 1, a + seg + 2, a + 1))
+            a = i*(seg+1) + j
+            faces.append((a, a+seg+1, a+seg+2, a+1))
     return verts, faces, uvs
 
-# --- Stamm: 2.5-4.5 m, leicht gebogen, raue Faserrinde (Textur) ----------
-H = rng.uniform(2.5, 4.5)
-r0 = rng.uniform(0.11, 0.14)
-bend = np.array([rng.uniform(-0.35, 0.35), rng.uniform(-0.35, 0.35), 0.0])
+# ---------------- Stamm ----------------
+H = float(rng.uniform(2.5, 4.5))
+r_bot = 0.16
+r_top = 0.11
+bend = np.array([float(rng.uniform(-0.3, 0.3)), float(rng.uniform(-0.3, 0.3)), 0.0])
 P0t = np.array([0.0, 0.0, 0.0])
 P1t = np.array([0.0, 0.0, H]) + bend
-Ct = (P0t + P1t) / 2 + bend * 0.6
-sv, sf, su = tube(P0t, Ct, P1t, r0, r0 * 0.55, rings=16, seg=8)
+Ct = (P0t + P1t) / 2 + bend * 0.5
+sv, sf, su = tube_bezier(P0t, Ct, P1t, r_bot, r_top, rings=14, seg=7)
 add(sv, sf, su, 1)
+print(f"Stamm: H={H:.2f}m r_bot={r_bot} r_top={r_top} bend={bend.round(2)}")
 
-# --- Krone: 9-14 Wedel, sternfoermig, erst aufwaerts dann hangend --------
+# ---------------- Wedel (Krone) ----------------
 top = P1t
 n = int(rng.integers(9, 15))
+upv = np.array([0.0, 0.0, 1.0])
+print(f"Wedel: {n} Stueck")
+
 for k in range(n):
-    yaw = k / n * 6.283 + rng.uniform(-0.25, 0.25)
-    L = rng.uniform(1.8, 2.6)
-    th0 = math.radians(rng.uniform(20, 40))          # zuerst leicht aufwaerts
-    th1 = math.radians(-rng.uniform(55, 85))         # dann bogig nach unten
+    yaw = k / n * 6.283 + float(rng.uniform(-0.2, 0.2))
+    L = float(rng.uniform(1.8, 2.6))
+    th0 = math.radians(float(rng.uniform(20, 35)))
+    th1 = math.radians(-float(rng.uniform(50, 80)))
     d = np.array([math.cos(yaw), math.sin(yaw), 0.0])
-    upv = np.array([0.0, 0.0, 1.0])
-    R0 = L * 0.5
-    Cloc = R0 * np.array([math.cos(th0), math.sin(th0)])
-    Ploc = 2 * Cloc - R0 * np.array([math.cos(th1), math.sin(th1)])
-    def to3(p):
-        return top + d * p[0] + upv * p[1]
+
+    # Kreisbogen: Starttangente th0, Endtangente th1, Bogenlaenge L
+    dtheta = th1 - th0
+    R = L / abs(dtheta)
+    cx = R * math.sin(th0)
+    cz = -R * math.cos(th0)
+    start_ang = math.atan2(0 - cz, 0 - cx)
+
+    n_arc = 14
+    arc2d = []
+    for i in range(n_arc + 1):
+        t = i / n_arc
+        ang = start_ang + dtheta * t
+        arc2d.append((cx + R * math.cos(ang), cz + R * math.sin(ang)))
+
+    arc3d = [top + d * p[0] + upv * p[1] for p in arc2d]
+    tip = arc3d[-1]
+    print(f"  Wedel {k+1}: L={L:.2f}m anfang={math.degrees(th0):.0f}° ende={math.degrees(th1):.0f}° Spitze_Z={tip[2]:.2f}m Ansatz_Z={top[2]:.2f}m")
+
     # Mittelrippe
-    rv, rf, ru = tube(np.array([top[0], top[1], top[2]]), to3(Cloc), to3(Ploc), 0.020, 0.007, rings=12, seg=5)
+    rv, rf, ru = tube_points(arc3d, 0.022, 0.008, seg=4)
     add(rv, rf, ru, 0)
-    # Fiederblaettchen: beidseitig, schmale Streifen, zur Spitze kuezer
-    nrm_f = np.cross(d, upv)                                               # Wedel-Normalenvektor
-    nrm_f /= np.linalg.norm(nrm_f)
-    N = int(rng.integers(18, 25))
+
+    # Fiederblaettchen
+    nrm_f = np.cross(d, upv); nrm_f /= (np.linalg.norm(nrm_f) + 1e-9)
+    Np = int(rng.integers(18, 24))
+    l_mid = float(rng.uniform(0.25, 0.35))
+
     for side in (-1, 1):
-        for k2 in range(N):
-            u = (k2 + (0.0 if side > 0 else 0.5)) / N
-            s = 0.07 + 0.86 * u
-            B = 2 * (1 - s) * s * Cloc + s ** 2 * Ploc                     # Punkt (quadratische Bezier)
-            T2 = 2 * (1 - s) * Cloc + 2 * s * (Ploc - Cloc)                # Tangente (2D, Wedelplan)
-            T2 /= np.linalg.norm(T2)
-            T3 = d * T2[0] + upv * T2[1]                                   # in 3D
-            q = np.cross(T3, nrm_f) * side                                 # waagerecht zur Mittelrippe
-            q /= np.linalg.norm(q)
-            # leichte Verdrehung um die Fiederachse (Nase zur Spitze)
-            dl = math.radians(rng.uniform(-10, 25)) * (0.3 + 0.7 * u)
-            t2 = math.cos(dl)
-            q = q * t2 + nrm_f * side * math.sin(dl)
-            q /= np.linalg.norm(q)
-            nrm2 = np.cross(q, T3); nrm2 /= np.linalg.norm(nrm2)          # Blattflaechen-Normalenvektor
-            l = L * 0.22 * (math.sin(math.pi * (0.08 + 0.84 * u)) ** 0.7)
-            w = 0.26 * l
-            P0p = to3(B)
+        for k2 in range(Np):
+            u = (k2 + (0.08 if side > 0 else 0.55)) / Np
+            idx_f = u * n_arc
+            idx = min(int(idx_f), n_arc - 1)
+            frac = idx_f - idx
+            P2 = np.array(arc2d[idx]) * (1 - frac) + np.array(arc2d[idx + 1]) * frac
+            T2 = np.array(arc2d[min(idx + 1, n_arc)]) - np.array(arc2d[max(idx - 1, 0)])
+            T2 /= (np.linalg.norm(T2) + 1e-9)
+            T3 = d * T2[0] + upv * T2[1]
+
+            q = np.cross(T3, nrm_f) * side
+            q /= (np.linalg.norm(q) + 1e-9)
+            droop = math.radians(10 + 20 * u)
+            q = q * math.cos(droop) - upv * math.sin(droop)
+            q /= (np.linalg.norm(q) + 1e-9)
+
+            nrm2 = np.cross(q, T3); nrm2 /= (np.linalg.norm(nrm2) + 1e-9)
+            l = l_mid * (math.sin(math.pi * (0.05 + 0.90 * u)) ** 0.7)
+            w = 0.28 * l
+            P0p = top + d * P2[0] + upv * P2[1]
+
             m = 3
-            verts, uvs, faces = [], [], []
+            verts, uvs2, faces = [], [], []
             for i in range(m + 1):
                 f = i / m
-                half = max(w * 0.5 * math.cos(f * math.pi / 2) ** 0.7, 1e-4)   # Spitze spitz
-                c = P0p + q * (l * f)
+                half = max(w * 0.5 * math.cos(f * math.pi / 2) ** 0.7, 1e-4)
+                concave = 0.03 * f * f
+                c = P0p + q * (l * f) - upv * concave
                 verts += [tuple(c - nrm2 * half), tuple(c + nrm2 * half)]
-                uvs += [(0.0, f), (1.0, f)]
+                uvs2 += [(0.0, f), (1.0, f)]
             for i in range(m):
                 a = 2 * i
-                faces.append((a, a + 2, a + 3, a + 1))
-            add(verts, faces, uvs, 0)
+                faces.append((a, a+2, a+3, a+1))
+            add(verts, faces, uvs2, 0)
 
+# ---------------- Mesh + Material ----------------
 me = bpy.data.meshes.new("Baumfarn")
 me.from_pydata(V, [], F); me.update()
 uvl = me.uv_layers.new(name="UVMap")
@@ -121,7 +160,8 @@ def mat_leaf():
     a = N.new("ShaderNodeTexImage"); a.image = img("Baumfarn_Leaf_Albedo.png")
     nm = N.new("ShaderNodeTexImage"); nm.image = img("Baumfarn_Leaf_Normal.png", False)
     mk = N.new("ShaderNodeTexImage"); mk.image = img("Baumfarn_Leaf_Mask.png", False)
-    nmap = N.new("ShaderNodeNormalMap"); inv = N.new("ShaderNodeMath"); inv.operation = "SUBTRACT"; inv.inputs[0].default_value = 1
+    nmap = N.new("ShaderNodeNormalMap")
+    inv = N.new("ShaderNodeMath"); inv.operation = "SUBTRACT"; inv.inputs[0].default_value = 1
     nt.links.new(a.outputs[0], bsdf.inputs["Base Color"])
     nt.links.new(a.outputs["Alpha"], bsdf.inputs["Alpha"])
     nt.links.new(nm.outputs[0], nmap.inputs["Color"]); nt.links.new(nmap.outputs[0], bsdf.inputs["Normal"])
@@ -135,43 +175,72 @@ def mat_leaf():
 def mat_stem():
     m = bpy.data.materials.new("M_Baumfarn_Stem"); nt = m.node_tree
     a = nt.nodes.new("ShaderNodeTexImage"); a.image = img("Baumfarn_Stem_Albedo.png")
-    b = nt.nodes["Principled BSDF"]; b.inputs["Roughness"].default_value = 0.8
+    b = nt.nodes["Principled BSDF"]; b.inputs["Roughness"].default_value = 0.85
     nt.links.new(a.outputs[0], b.inputs["Base Color"])
     return m
 
 me.materials.append(mat_leaf()); me.materials.append(mat_stem())
 
+# ---------------- FBX-Export ----------------
 os.makedirs(out, exist_ok=True)
 bpy.ops.object.select_all(action="DESELECT"); ob.select_set(True); bpy.context.view_layer.objects.active = ob
 bpy.ops.export_scene.fbx(filepath=os.path.join(out, f"Baumfarn_{seed}.fbx"), use_selection=True,
     apply_scale_options="FBX_SCALE_ALL", axis_forward="-Z", axis_up="Y", bake_space_transform=True,
     mesh_smooth_type="FACE", path_mode="STRIP", use_mesh_modifiers=True)
-print("Polys", len(me.polygons), "Verts", len(me.vertices))
+print(f"Polys={len(me.polygons)} Verts={len(me.vertices)}")
 
+# ---------------- Vorschau-Rendering ----------------
 if do_render:
     sc = bpy.context.scene
     # Boden
-    bpy.ops.mesh.primitive_plane_add(size=16)
+    bpy.ops.mesh.primitive_plane_add(size=20)
     g = bpy.context.object; gm = bpy.data.materials.new("Ground"); nt = gm.node_tree
     nz = nt.nodes.new("ShaderNodeTexNoise"); nz.inputs["Scale"].default_value = 9; nz.inputs["Detail"].default_value = 8
-    cr = nt.nodes.new("ShaderNodeValToRGB"); cr.color_ramp.elements[0].color = (0.035, 0.022, 0.012, 1); cr.color_ramp.elements[1].color = (0.11, 0.075, 0.035, 1)
-    nt.links.new(nz.outputs[0], cr.inputs[0]); nt.links.new(cr.outputs[0], nt.nodes["Principled BSDF"].inputs["Base Color"])
+    cr = nt.nodes.new("ShaderNodeValToRGB")
+    cr.color_ramp.elements[0].color = (0.035, 0.022, 0.012, 1)
+    cr.color_ramp.elements[1].color = (0.11, 0.075, 0.035, 1)
+    nt.links.new(nz.outputs[0], cr.inputs[0])
+    nt.links.new(cr.outputs[0], nt.nodes["Principled BSDF"].inputs["Base Color"])
     nt.nodes["Principled BSDF"].inputs["Roughness"].default_value = 0.85
     g.data.materials.append(gm)
     # Licht
     w = bpy.data.worlds.new("W"); sc.world = w; wn = w.node_tree
     sky = wn.nodes.new("ShaderNodeTexSky"); sky.sky_type = "MULTIPLE_SCATTERING"
     sky.sun_elevation = math.radians(35); sky.sun_rotation = math.radians(140)
-    wn.links.new(sky.outputs[0], wn.nodes["Background"].inputs[0]); wn.nodes["Background"].inputs[1].default_value = 0.35
-    bpy.ops.object.light_add(type="SUN"); sun = bpy.context.object; sun.data.energy = 3.0; sun.data.angle = math.radians(2)
-    sun.rotation_euler = (math.radians(55), 0, math.radians(140 + 180 - 90))
-    sc.render.engine = "CYCLES"; sc.cycles.device = "CPU"; sc.cycles.samples = 48; sc.cycles.use_denoising = True
+    wn.links.new(sky.outputs[0], wn.nodes["Background"].inputs[0])
+    wn.nodes["Background"].inputs[1].default_value = 0.35
+    bpy.ops.object.light_add(type="SUN")
+    sun = bpy.context.object; sun.data.energy = 3.0; sun.data.angle = math.radians(2)
+    sun.rotation_euler = (math.radians(55), 0, math.radians(140 + 90))
+    sc.render.engine = "CYCLES"; sc.cycles.device = "CPU"
+    sc.cycles.samples = 48; sc.cycles.use_denoising = True
     sc.render.resolution_x, sc.render.resolution_y = 960, 540
     sc.view_settings.look = "AgX - Medium High Contrast"
-    cam = bpy.data.cameras.new("C"); co = bpy.data.objects.new("Cam", cam); sc.collection.objects.link(co); sc.camera = co
-    loc = (5.2, -2.2, 1.2)   # ca. 6 m Abstand, 1.2 m hoch
-    tgt = (0.0, 0.0, H * 0.5)
-    co.location = loc; cam.lens = 35
-    co.rotation_euler = (Vector(tgt) - Vector(loc)).to_track_quat("-Z", "Y").to_euler()
-    sc.render.filepath = os.path.join(out, "Baumfarn_Vorschau.png"); bpy.ops.render.render(write_still=True)
+
+    # --- Aufnahme 1: Gesamtansicht (9m Abstand, 1.5m hoch, Ziel 2.6m, 35mm) ---
+    cam1 = bpy.data.cameras.new("Cam1"); co1 = bpy.data.objects.new("Cam1", cam1)
+    sc.collection.objects.link(co1); sc.camera = co1
+    cam1.lens = 35
+    az1 = math.radians(-30)
+    loc1 = np.array([9.0 * math.cos(az1), 9.0 * math.sin(az1), 1.5])
+    tgt1 = np.array([0.0, 0.0, 2.6])
+    co1.location = tuple(loc1)
+    co1.rotation_euler = (Vector(tgt1) - Vector(loc1)).to_track_quat("-Z", "Y").to_euler()
+    sc.render.filepath = os.path.join(out, "Baumfarn_Vorschau.png")
+    bpy.ops.render.render(write_still=True)
+    print("Vorschau gesamt: Baumfarn_Vorschau.png")
+
+    # --- Aufnahme 2: Spinnensicht (1.2m vom Stamm, 0.1m hoch, Blick nach oben, 18mm) ---
+    cam2 = bpy.data.cameras.new("Cam2"); co2 = bpy.data.objects.new("Cam2", cam2)
+    sc.collection.objects.link(co2); sc.camera = co2
+    cam2.lens = 18
+    az2 = math.radians(45)
+    loc2 = np.array([1.2 * math.cos(az2), 1.2 * math.sin(az2), 0.1])
+    tgt2 = np.array([0.0, 0.0, H * 0.85])
+    co2.location = tuple(loc2)
+    co2.rotation_euler = (Vector(tgt2) - Vector(loc2)).to_track_quat("-Z", "Y").to_euler()
+    sc.render.filepath = os.path.join(out, "Baumfarn_Vorschau_unten.png")
+    bpy.ops.render.render(write_still=True)
+    print("Vorschau unten: Baumfarn_Vorschau_unten.png")
+
 print("fertig")
