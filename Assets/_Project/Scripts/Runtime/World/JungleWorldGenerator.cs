@@ -198,15 +198,19 @@ namespace Spinnenspiel
                 GameObject bodendecker = new GameObject("Bodendecker");
                 int groundN = 0;
                 const int groundMax = 12000;
-                const float groundStep = 0.45f; // Bei Performance-Problemen auf 0.6f erhöhen.
-                int groundCells = Mathf.FloorToInt(size / groundStep);
+                const float groundRadius = 28f;
+                const float groundStep = 0.5f; // Bei Performance-Problemen auf 0.6f erhöhen.
+                int n = Mathf.CeilToInt(groundRadius / groundStep);
 
-                for (int i = 0; i < groundCells && groundN < groundMax; i++)
+                for (int i = -n; i <= n && groundN < groundMax; i++)
                 {
-                    for (int j = 0; j < groundCells && groundN < groundMax; j++)
+                    for (int j = -n; j <= n && groundN < groundMax; j++)
                     {
-                        float x = groundStep / 2f + i * groundStep + (World.Hash01(i, j, 71) - 0.5f) * 0.4f;
-                        float z = groundStep / 2f + j * groundStep + (World.Hash01(i, j, 72) - 0.5f) * 0.4f;
+                        int hi = i + 10000, hj = j + 10000; // positive Indizes für Hash01
+                        float x = _spawnXZ.x + i * groundStep + (World.Hash01(hi, hj, 71) - 0.5f) * 0.4f;
+                        float z = _spawnXZ.z + j * groundStep + (World.Hash01(hi, hj, 72) - 0.5f) * 0.4f;
+                        float ddx = x - _spawnXZ.x, ddz = z - _spawnXZ.z;
+                        if (ddx * ddx + ddz * ddz > groundRadius * groundRadius) continue;
                         if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
                         if (!IsDryFlat(World, x, z)) continue;
                         if (World.Height(x, z) < JungleWorld.WaterLevel + 0.1f) continue;
