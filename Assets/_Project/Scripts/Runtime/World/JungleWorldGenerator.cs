@@ -190,7 +190,7 @@ namespace Spinnenspiel
             }
             StaticBatchingUtility.Combine(unterholz);
 
-            // 5b) Lianen: dünne senkrechte Überkopf-Halte für Netz-Anker.
+            // 5b) Lianen: hängen aus dem Kronendach, dünne senkrechte Halte für Netz-Anker.
             // Eigener Eltern-Node (nicht in das statische Batching der Unterhölzer),
             // 5 Mesh-Varianten, Variante und Skalierung pro Zelle per Hash.
             GameObject lianen = new GameObject("Lianen");
@@ -211,9 +211,22 @@ namespace Spinnenspiel
                     if (World.IsClearing(x, z)) continue;
                     int variant = Mathf.FloorToInt(World.Hash01(i, j, 53) * 5f);
                     float rot = World.Hash01(i, j, 54) * 360f;
-                    float scale = 0.8f + World.Hash01(i, j, 55) * 0.5f;
-                    AddPlant(lianen.transform, lianaMeshes[variant], library.logMat,
-                        new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale);
+                    float sxz = 0.8f + World.Hash01(i, j, 55) * 0.5f;
+                    float lianaL = 6f + World.Hash01(i, j, 56) * 3f; // Lianen-Länge 6..9 m
+                    float gap = 0.2f + World.Hash01(i, j, 57) * 0.6f; // unteres Ende 0.2..0.8 m über Boden
+                    GameObject g = AddPlant(lianen.transform, lianaMeshes[variant], library.logMat,
+                        new Vector3(x, World.Height(x, z) - 0.05f, z), rot, sxz);
+                    // Hängen lassen: 180° um X (Liane hängt nach unten), Y-Skalierung L/3.
+                    // Unteres Ende endet in "gap" über dem Boden, oberes Ende im Kronendach.
+                    Bounds lb = lianaMeshes[variant].bounds;
+                    float sy = lianaL / 3f;
+                    g.transform.rotation = Quaternion.Euler(180f, rot, 0f);
+                    g.transform.localScale = new Vector3(sxz, sy, sxz);
+                    g.transform.position = new Vector3(x, World.Height(x, z) - 0.05f + gap + sy * lb.max.y, z);
+                    // Kapsel-Kollider muss die neue gestreckte Höhe abdecken: Kapselhöhe im
+                    // Mesh-Lokalraum = lb.size.y, die Y-Skalierung sy dehnt sie auf die Weltlänge.
+                    var cc = g.transform.Find("PflanzenCollider").GetComponent<CapsuleCollider>();
+                    cc.height = lb.size.y;
                     lianaN++;
                 }
             }
