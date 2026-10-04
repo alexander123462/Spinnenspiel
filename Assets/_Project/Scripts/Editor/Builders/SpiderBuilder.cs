@@ -203,12 +203,7 @@ namespace Spinnenspiel.EditorTools
             return mat;
         }
 
-        /// <summary>
-        /// Lädt das erste Mesh aus einer FBX-Datei, setzt es auf die MeshFilter
-        /// des Teils und misst die Ausrichtung (vorne = +Z in Unity).
-        /// Bei Fehlausrichtung: 180° Y-Rotation.
-        /// Fehlt die Datei: Debug.LogWarning, Kugel bleibt.
-        /// </summary>
+        // Blender-Export (-Y vorne) landet in Unity mit +Z vorne, keine Drehung nötig (per Screenshot geprüft, S2c).
         private static void ApplyScanMesh(Transform part, string fbxPath, Material mat)
         {
             if (part == null)
@@ -229,53 +224,6 @@ namespace Spinnenspiel.EditorTools
             {
                 Debug.LogWarning("[Spider] Kein Mesh in: " + fbxPath + " – Kugel bleibt");
                 return;
-            }
-
-            // Messung 1: bounds.size
-            Debug.Log("[Spider] " + part.name + " bounds.size: " + mesh.bounds.size.ToString("F4"));
-
-            Vector3[] verts = mesh.vertices;
-            string partName = part.name;
-
-            if (partName == "Abdomen")
-            {
-                // Breite (x-Spanne) für z > 0.3 (vorne) und z < -0.3 (hinten)
-                var vFront = verts.Where(v => v.z > 0.3f).ToArray();
-                var vBack  = verts.Where(v => v.z < -0.3f).ToArray();
-
-                float xFront = vFront.Length > 0 ? vFront.Max(v => v.x) - vFront.Min(v => v.x) : -1f;
-                float xBack  = vBack.Length  > 0 ? vBack.Max(v => v.x)  - vBack.Min(v => v.x)  : -1f;
-
-                Debug.Log("[Spider] Abdomen Breite z>0.3 (vorne): " + xFront.ToString("F4") + "  (n=" + vFront.Length + ")");
-                Debug.Log("[Spider] Abdomen Breite z<-0.3 (hinten): " + xBack.ToString("F4") + "  (n=" + vBack.Length + ")");
-                // Kriterium: hinten schmaler -> xBack < xFront
-                bool correct = xBack < xFront && xBack > 0f && xFront > 0f;
-                if (!correct)
-                {
-                    Debug.Log("[Spider] Abdomen: Ausrichtung falsch -> 180° Y-Rotation");
-                    part.localRotation = Quaternion.Euler(0f, 180f, 0f);
-                    // Neu messen nach Rotation (Bounds sind unabhängig von Rotation, daher nur Hinweis)
-                    Debug.Log("[Spider] Abdomen: localRotation = " + part.localRotation.eulerAngles.ToString("F2"));
-                }
-            }
-            else if (partName == "Cephalothorax")
-            {
-                // 5% höchste Vertices (größtes y), dann z-Mittelwert
-                int count = Mathf.Max(1, verts.Length / 20);
-                var top = verts
-                    .OrderByDescending(v => v.y)
-                    .Take(count)
-                    .ToArray();
-                float zTop = top.Average(v => v.z);
-                Debug.Log("[Spider] Cephalothorax 5% höchste Vertices: n=" + count + "  z-Mittel=" + zTop.ToString("F4"));
-                // Kriterium: Augenhügel vorne -> z-Mittel > 0
-                bool correct = zTop > 0f;
-                if (!correct)
-                {
-                    Debug.Log("[Spider] Cephalothorax: Ausrichtung falsch -> 180° Y-Rotation");
-                    part.localRotation = Quaternion.Euler(0f, 180f, 0f);
-                    Debug.Log("[Spider] Cephalothorax: localRotation = " + part.localRotation.eulerAngles.ToString("F2"));
-                }
             }
 
             // Mesh und Material zuweisen
