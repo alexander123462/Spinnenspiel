@@ -43,13 +43,13 @@ namespace Spinnenspiel.EditorTools
             Material legMat = AssetUtil.CreateLitMaterial(folder + "/MAT_SpiderLeg.mat", Color.white, 0.35f, TextureFactory.SpiderLegBands());
             Material eyeMat = AssetUtil.CreateLitMaterial(folder + "/MAT_SpiderEye.mat", new Color(0.02f, 0.02f, 0.025f), 0.95f);
             Material abdomenScanMat = CreateScanMaterial("MAT_SpiderAbdomenScan",
-                "Assets/_Project/Art/Spider/Spinne_Abdomen_Albedo.png",
-                "Assets/_Project/Art/Spider/Spinne_Abdomen_Mask.png",
-                "Assets/_Project/Art/Spider/Spinne_Abdomen_Normal.png");
+                "Assets/_Project/Art/Spider/Textures/Spinne_Abdomen_Albedo.png",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Abdomen_Mask.png",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Abdomen_Normal.png");
             Material carapaceMat = CreateScanMaterial("MAT_SpiderCarapace",
-                "Assets/_Project/Art/Spider/Spinne_Cephalothorax_Albedo.png",
-                "Assets/_Project/Art/Spider/Spinne_Cephalothorax_Mask.png",
-                "Assets/_Project/Art/Spider/Spinne_Cephalothorax_Normal.png");
+                "Assets/_Project/Art/Spider/Textures/Spinne_Cephalothorax_Albedo.png",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Cephalothorax_Mask.png",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Cephalothorax_Normal.png");
 
             AddPart(body.transform, "Abdomen", new Vector3(0f, 0.008f, -0.052f), new Vector3(0.085f, 0.068f, 0.11f), abdomenMat);
             ApplyScanMesh(body.transform.Find("Abdomen"), "Assets/_Project/Art/Spider/Spinne_Abdomen.fbx", abdomenScanMat);
@@ -174,9 +174,18 @@ namespace Spinnenspiel.EditorTools
                 throw new System.InvalidOperationException("[Spider] Shader nicht gefunden: HDRP/Lit");
 
             Material mat = existing ?? new Material(hdrpLit) { name = name };
-            mat.SetTexture("_BaseColorMap", AssetDatabase.LoadAssetAtPath<Texture2D>(albedo));
-            mat.SetTexture("_MaskMap", AssetDatabase.LoadAssetAtPath<Texture2D>(mask));
-            mat.SetTexture("_NormalMap", AssetDatabase.LoadAssetAtPath<Texture2D>(normal));
+            Texture2D albedoTex = AssetDatabase.LoadAssetAtPath<Texture2D>(albedo);
+            if (albedoTex == null)
+                Debug.LogError("[Spider] Textur fehlt: " + albedo);
+            mat.SetTexture("_BaseColorMap", albedoTex);
+            Texture2D maskTex = AssetDatabase.LoadAssetAtPath<Texture2D>(mask);
+            if (maskTex == null)
+                Debug.LogError("[Spider] Textur fehlt: " + mask);
+            mat.SetTexture("_MaskMap", maskTex);
+            Texture2D normalTex = AssetDatabase.LoadAssetAtPath<Texture2D>(normal);
+            if (normalTex == null)
+                Debug.LogError("[Spider] Textur fehlt: " + normal);
+            mat.SetTexture("_NormalMap", normalTex);
             mat.SetFloat("_SurfaceType", 0f);          // Opak
             mat.SetFloat("_AlphaCutoffEnable", 0f);    // Kein Cutout
             mat.SetFloat("_DoubleSidedEnable", 0f);    // Einseitig
