@@ -61,6 +61,9 @@ namespace Spinnenspiel.EditorTools
             lib.giantLeaves = LoadRiesenblattMeshes();
             lib.giantLeafMats = CreateRiesenblattMats();
 
+            // Bodendecker (Scan-Gras/Kraut): nur Optik, keine Collider; um die Spinne herum.
+            LoadGroundCover(lib);
+
             // Boden: Scan-TerrainLayer (TileSize 2 m, ca. 1 Kachel pro 2 m); Fallback: prozedurale Layer.
             // Reihenfolge: Earth, Grass, Mud, Rock.
             lib.terrainLayers = ScanLayers(new[]
@@ -277,6 +280,53 @@ namespace Spinnenspiel.EditorTools
             return result;
         }
 
+        /// <summary>Lädt Scan-Bodendecker (Gras/Kraut) als Mesh-/Material-Paare in die Asset-Bibliothek.</summary>
+        private static void LoadGroundCover(JungleAssetLibrary lib)
+        {
+            string[] ids = { "grass_medium_01", "grass_medium_02", "weed_plant_02" };
+            var meshes = new System.Collections.Generic.List<Mesh>();
+            var mats = new System.Collections.Generic.List<Material>();
+
+            foreach (string id in ids)
+            {
+                if (!ScanModels.IsAvailable(id))
+                {
+                    Debug.LogWarning("[Urwald] Bodendecker nicht verfügbar, übersprungen: " + id);
+                    continue;
+                }
+
+                try
+                {
+                    ScanModels.EnsureImported(id);
+                    Mesh[] loaded = ScanModels.LoadMeshes(id);
+                    if (loaded.Length == 0)
+                    {
+                        Debug.LogWarning("[Urwald] Bodendecker ohne Mesh, übersprungen: " + id);
+                        continue;
+                    }
+
+                    Material mat = ScanModels.CreateFoliageMaterial(id);
+                    if (mat == null)
+                    {
+                        Debug.LogWarning("[Urwald] Bodendecker-Material fehlt, übersprungen: " + id);
+                        continue;
+                    }
+                    mat.enableInstancing = true;
+                    EditorUtility.SetDirty(mat);
+
+                    meshes.Add(loaded[0]);
+                    mats.Add(mat);
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogWarning("[Urwald] Bodendecker fehlgeschlagen, übersprungen: " + id + " – " + e.Message);
+                }
+            }
+
+            lib.groundCover = meshes.ToArray();
+            lib.groundCoverMats = mats.ToArray();
+        }
+
         private static Material TropischMaterial(Material src, string name)
         {
             if (src == null)
@@ -285,10 +335,20 @@ namespace Spinnenspiel.EditorTools
             }
             string path = "Assets/_Project/Art/Generated/Materials/" + name + ".mat";
             AssetUtil.EnsureFolder("Assets/_Project/Art/Generated/Materials");
-            Material copy = AssetDatabase.LoadAssetAtPath<Material>(path) ?? new Material(src);
-            // Tropisch-grüne Tönung als _BaseColor (Multiplikator der Scan-Textur).
-            copy.color = new Color(0.55f, 0.95f, 0.40f, 1f);
-            return AssetUtil.ReplaceAsset(copy, path);
+            Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+            Color tint = new Color(0.55f, 0.95f, 0.40f, 1f);
+            if (existing != null)
+            {
+                existing.CopyPropertiesFromMaterial(src);
+                existing.color = tint;
+                EditorUtility.SetDirty(existing);
+                AssetDatabase.SaveAssets();
+                return existing;
+            }
+            Material copy = new Material(src) { name = name };
+            copy.color = tint;
+            AssetDatabase.CreateAsset(copy, path);
+            return copy;
         }
 
         private static Material ScanMaterial(string path, Material fallback)

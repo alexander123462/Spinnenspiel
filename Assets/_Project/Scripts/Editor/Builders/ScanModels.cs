@@ -17,7 +17,7 @@ namespace Spinnenspiel.EditorTools
     {
         private static readonly string[] AllIds =
         {
-            "fern_02", "weed_plant_02", "shrub_02", "shrub_03", "shrub_04",
+            "fern_02", "weed_plant_02", "grass_medium_01", "grass_medium_02", "shrub_02", "shrub_03", "shrub_04",
             "nettle_plant", "dandelion_01", "periwinkle_plant", "dry_branches_medium_01",
             "dead_tree_trunk", "dead_tree_trunk_02", "tree_stump_01", "tree_stump_02",
             "rock_07", "rock_09", "stone_01", "rock_moss_set_01", "rock_moss_set_02",

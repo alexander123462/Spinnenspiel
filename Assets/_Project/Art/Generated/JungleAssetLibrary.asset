@@ -30,7 +30,7 @@ MonoBehaviour:
   fern: {fileID: -1101056946369687347, guid: f46ac9d82e0940946b3ea00c2fd89a4d, type: 3}
   reed: {fileID: 4300000, guid: d5f4178a636866445847a11af0d805fc, type: 2}
   bushMat: {fileID: 2100000, guid: a3704bb223b7af24b9c1bf8ed6d08a84, type: 2}
-  fernMat: {fileID: 2100000, guid: cfbee492ef092bb47b00c93c85225dfe, type: 2}
+  fernMat: {fileID: 2100000, guid: 6ece19c60c3fd2247ba6752efe65f1cc, type: 2}
   reedMat: {fileID: 2100000, guid: a1391c9790a7e514d924d89d8373348d, type: 2}
   giantLeaves:
   - {fileID: 1593906062978676987, guid: e39360f3f430b2a429bb44da7c4cfe75, type: 3}
@@ -40,6 +40,14 @@ MonoBehaviour:
   - {fileID: 2100000, guid: fade971132bf9d442a324e5a2f57b8e7, type: 2}
   - {fileID: 2100000, guid: 7f1d5c3edf1020a4cb8134ae4d17abba, type: 2}
   - {fileID: 2100000, guid: 7edf52fe44230c24794fbbc8d81d29c3, type: 2}
+  groundCover:
+  - {fileID: -8799722270921484849, guid: b94e5972b11c77d4a9392cae2d8bd377, type: 3}
+  - {fileID: -8976219707546791707, guid: e4484f2e03a451446b0709e3332793d5, type: 3}
+  - {fileID: -3017959995843890192, guid: e96789b65e4384140b1da3d2c8ab306d, type: 3}
+  groundCoverMats:
+  - {fileID: 2100000, guid: 790302d2a6f2ef848af9384f23938297, type: 2}
+  - {fileID: 2100000, guid: 002e9d1e93bcaf942aa7114f825e664b, type: 2}
+  - {fileID: 2100000, guid: 6604d49ba0883b84b93a2c25f0762d96, type: 2}
   logs:
   - {fileID: 4300000, guid: cc578cc4491c562498645ea4e928559b, type: 2}
   - {fileID: 4300000, guid: 50a11b4b795adf44cbf08fd3195849b4, type: 2}

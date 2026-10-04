@@ -26,6 +26,10 @@ namespace Spinnenspiel
         public Mesh[] giantLeaves;
         public Material[] giantLeafMats;
 
+        /// <summary>Scan-Bodendecker (Gras/Kraut), gleiche Länge und Reihenfolge wie die Materialien.</summary>
+        public Mesh[] groundCover;
+        public Material[] groundCoverMats;
+
         public Mesh[] logs;
         public Mesh[] rocks;
         public Material logMat;

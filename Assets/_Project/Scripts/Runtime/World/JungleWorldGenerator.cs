@@ -31,6 +31,7 @@ namespace Spinnenspiel
         public int FernCount { get; private set; }
         public int ReedCount { get; private set; }
         public int GiantLeafCount { get; private set; }
+        public int GroundCoverCount { get; private set; }
         public int PlantColliderCount { get; private set; }
         public int LianaCount { get; private set; }
         public int LogCount { get; private set; }
@@ -191,6 +192,53 @@ namespace Spinnenspiel
             }
             StaticBatchingUtility.Combine(unterholz);
 
+            // 6b) Bodendecker: Scan-Gras/Kraut als reine Optik (keine Collider), dicht über dem Boden.
+            if (library.groundCover != null && library.groundCoverMats != null && library.groundCover.Length > 0)
+            {
+                GameObject bodendecker = new GameObject("Bodendecker");
+                int groundN = 0;
+                const int groundMax = 12000;
+                const float groundStep = 0.45f; // Bei Performance-Problemen auf 0.6f erhöhen.
+                int groundCells = Mathf.FloorToInt(size / groundStep);
+
+                for (int i = 0; i < groundCells && groundN < groundMax; i++)
+                {
+                    for (int j = 0; j < groundCells && groundN < groundMax; j++)
+                    {
+                        float x = groundStep / 2f + i * groundStep + (World.Hash01(i, j, 71) - 0.5f) * 0.4f;
+                        float z = groundStep / 2f + j * groundStep + (World.Hash01(i, j, 72) - 0.5f) * 0.4f;
+                        if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
+                        if (!IsDryFlat(World, x, z)) continue;
+                        if (World.Height(x, z) < JungleWorld.WaterLevel + 0.1f) continue;
+
+                        int variant = Mathf.FloorToInt(World.Hash01(i, j, 73) * (float)library.groundCover.Length);
+                        if (variant < 0 || variant >= library.groundCover.Length || variant >= library.groundCoverMats.Length) continue;
+                        Mesh mesh = library.groundCover[variant];
+                        Material mat = library.groundCoverMats[variant];
+                        if (mesh == null || mat == null) continue;
+
+                        float rot = World.Hash01(i, j, 74) * 360f;
+                        float scale = 0.5f + World.Hash01(i, j, 75) * 0.6f;
+                        float h = World.Height(x, z);
+
+                        GameObject g = new GameObject();
+                        g.transform.SetParent(bodendecker.transform, false);
+                        g.layer = 0; // Default
+                        g.transform.position = new Vector3(x, h - 0.02f, z);
+                        g.transform.rotation = Quaternion.Euler(0f, rot, 0f);
+                        g.transform.localScale = Vector3.one * scale;
+                        g.AddComponent<MeshFilter>().sharedMesh = mesh;
+                        var r = g.AddComponent<MeshRenderer>();
+                        r.sharedMaterial = mat;
+                        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                        groundN++;
+                    }
+                }
+
+                StaticBatchingUtility.Combine(bodendecker);
+                GroundCoverCount = groundN;
+            }
+
             // 5b) Lianen: hängen aus dem Kronendach, dünne senkrechte Halte für Netz-Anker.
             // Eigener Eltern-Node (nicht in das statische Batching der Unterhölzer),
             // 5 Mesh-Varianten, Variante und Skalierung pro Zelle per Hash.
@@ -304,6 +352,7 @@ namespace Spinnenspiel
             IsReady = true;
             UnityEngine.Debug.Log("[Urwald] Seed " + Seed + ": " + TreeCount + " Bäume, "
                 + BushCount + " Büsche, " + FernCount + " Farne, " + ReedCount + " Schilf, " + GiantLeafCount + " Riesenbläter, "
+                + GroundCoverCount + " Bodendecker, "
                 + LianaCount + " Lianen, "
                 + LogCount + " Stämme, " + RockCount + " Steine, "
                 + PlantColliderCount + " Pflanzen-Collider, "
