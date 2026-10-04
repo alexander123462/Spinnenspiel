@@ -22,6 +22,10 @@ namespace Spinnenspiel
         public Material fernMat;
         public Material reedMat;
 
+        /// <summary>Blender-Riesenbläter, 3 Varianten (index 0..2), mit passendem Material auf demselben Index.</summary>
+        public Mesh[] giantLeaves;
+        public Material[] giantLeafMats;
+
         public Mesh[] logs;
         public Mesh[] rocks;
         public Material logMat;

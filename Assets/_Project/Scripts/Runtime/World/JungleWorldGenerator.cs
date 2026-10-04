@@ -30,6 +30,7 @@ namespace Spinnenspiel
         public int BushCount { get; private set; }
         public int FernCount { get; private set; }
         public int ReedCount { get; private set; }
+        public int GiantLeafCount { get; private set; }
         public int PlantColliderCount { get; private set; }
         public int LianaCount { get; private set; }
         public int LogCount { get; private set; }
@@ -158,6 +159,35 @@ namespace Spinnenspiel
                     && World.Height(x, z) <= JungleWorld.WaterLevel + 0.2f
                     && World.Hash01(i, j, 33) < 0.9f,
                 (i, j) => 0.8f + World.Hash01(i, j, 34) * 0.7f, 1500);
+
+            // Riesenbläter (Blender, 3 Varianten): groß tropische Blattschnitte mit
+            // Cutout-Maske und Normal. Im selben statischen Batching wie das restliche Unterholz.
+            if (library.giantLeaves != null && library.giantLeafMats != null)
+            {
+                int giantN = 0;
+                int gcells = Mathf.FloorToInt(size / 2.0f);
+                for (int i = 0; i < gcells && giantN < 400; i++)
+                {
+                    for (int j = 0; j < gcells && giantN < 400; j++)
+                    {
+                        float x = 1.0f + i * 2.0f + (World.Hash01(i, j, 41) - 0.5f);
+                        float z = 1.0f + j * 2.0f + (World.Hash01(i, j, 42) - 0.5f);
+                        if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
+                        if (NearSpawn(x, z, 1.0f)) continue;
+                        if (!IsDryFlat(World, x, z)) continue;
+                        if (World.Hash01(i, j, 61) >= World.Density(x, z) * 0.25f) continue;
+                        int variant = Mathf.FloorToInt(World.Hash01(i, j, 62) * (float)library.giantLeaves.Length);
+                        if (library.giantLeaves[variant] == null || library.giantLeafMats[variant] == null) continue;
+                        float rot = World.Hash01(i, j, 63) * 360f;
+                        float scale = 0.7f + World.Hash01(i, j, 64) * 0.7f;
+                        AddPlant(unterholz.transform, library.giantLeaves[variant], library.giantLeafMats[variant],
+                            new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale);
+                        PlantColliderCount++;
+                        giantN++;
+                    }
+                }
+                GiantLeafCount = giantN;
+            }
             StaticBatchingUtility.Combine(unterholz);
 
             // 5b) Lianen: dünne senkrechte Überkopf-Halte für Netz-Anker.
@@ -259,7 +289,7 @@ namespace Spinnenspiel
             GenerationSeconds = (float)sw.Elapsed.TotalSeconds;
             IsReady = true;
             UnityEngine.Debug.Log("[Urwald] Seed " + Seed + ": " + TreeCount + " Bäume, "
-                + BushCount + " Büsche, " + FernCount + " Farne, " + ReedCount + " Schilf, "
+                + BushCount + " Büsche, " + FernCount + " Farne, " + ReedCount + " Schilf, " + GiantLeafCount + " Riesenbläter, "
                 + LianaCount + " Lianen, "
                 + LogCount + " Stämme, " + RockCount + " Steine, "
                 + PlantColliderCount + " Pflanzen-Collider, "

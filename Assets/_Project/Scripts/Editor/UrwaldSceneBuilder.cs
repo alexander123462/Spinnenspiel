@@ -56,6 +56,10 @@ namespace Spinnenspiel.EditorTools
             lib.bush = ScanMesh("Assets/_Project/Art/Scans/Models/shrub_02/shrub_02_2k.fbx", LoadMesh("VM_Bush"));
             lib.bushMat = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_shrub_02.mat", LoadMaterial("MAT_Grass"));
 
+            // Riesenbläter (Blender, 3 Varianten): tropische Pflanze mit Blattschnitt-Mask und Normal.
+            lib.giantLeaves = LoadRiesenblattMeshes();
+            lib.giantLeafMats = CreateRiesenblattMats();
+
             // Boden: Scan-TerrainLayer (TileSize 2 m, ca. 1 Kachel pro 2 m); Fallback: prozedurale Layer.
             // Reihenfolge: Earth, Grass, Mud, Rock.
             lib.terrainLayers = ScanLayers(new[]
@@ -206,6 +210,70 @@ namespace Spinnenspiel.EditorTools
             EditorUtility.SetDirty(copy);
             AssetDatabase.SaveAssets();
             return copy;
+        }
+
+        private static Mesh[] LoadRiesenblattMeshes()
+        {
+            const string folder = "Assets/_Project/Art/Plants/Riesenblatt/";
+            var result = new Mesh[3];
+            for (int i = 0; i < 3; i++)
+            {
+                string path = folder + "Riesenblatt_" + (i + 1) + ".fbx";
+                if (!System.IO.File.Exists(path))
+                {
+                    Debug.LogWarning("[Urwald] Riesenblatt-FBX fehlt: " + path);
+                    continue;
+                }
+                foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(path))
+                {
+                    if (obj is Mesh mesh)
+                    {
+                        result[i] = mesh;
+                        break;
+                    }
+                }
+                if (result[i] == null)
+                    Debug.LogWarning("[Urwald] Kein Mesh im Riesenblatt: " + path);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// HDRP-Lit-Materialien fü die Riesenbläter: Albedo, Blattschnitt-Maske und Normal aus dem
+        /// Blender-Export, Opaque mit Cutout. Werden nur angelegt, falls noch nicht vorhanden.
+        /// </summary>
+        private static Material[] CreateRiesenblattMats()
+        {
+            const string tex = "Assets/_Project/Art/Plants/Riesenblatt/Textures/";
+            var result = new Material[3];
+            for (int i = 0; i < 3; i++)
+            {
+                string path = MatFolder + "MAT_Riesenblatt_" + (i + 1) + ".mat";
+                Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+                if (mat == null)
+                {
+                    Shader hdrpLit = Shader.Find("HDRP/Lit");
+                    if (hdrpLit == null)
+                    {
+                        throw new System.InvalidOperationException("[Urwald] Shader nicht gefunden: HDRP/Lit");
+                    }
+                    mat = new Material(hdrpLit);
+                    mat.name = "MAT_Riesenblatt_" + (i + 1);
+                    AssetDatabase.CreateAsset(mat, path);
+                }
+                mat.SetTexture("_BaseColorMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + "Riesenblatt_Leaf_Albedo.png"));
+                mat.SetTexture("_MaskMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + "Riesenblatt_Leaf_Mask.png"));
+                mat.SetTexture("_NormalMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + "Riesenblatt_Leaf_Normal.png"));
+                mat.SetFloat("_SurfaceType", 1f); // Cutout (Blattschnitt)
+                mat.SetFloat("_AlphaCutoffEnable", 1f);
+                mat.SetFloat("_AlphaCutoff", 0.5f);
+                mat.SetFloat("_Smoothness", 0.35f);
+                mat.color = Color.white;
+                EditorUtility.SetDirty(mat);
+                result[i] = mat;
+            }
+            AssetDatabase.SaveAssets();
+            return result;
         }
 
         private static Material ScanMaterial(string path, Material fallback)
