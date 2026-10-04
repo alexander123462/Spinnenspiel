@@ -73,19 +73,31 @@ Image.fromarray((mm[::-1] * 255).astype(np.uint8), "RGBA").save(f"{out}/Baumfarn
 # --- Stamm: dunkelbraune Faserrinde (Basis sRGB ~0.16/0.10/0.06), helle Narben von abgefallenen Wedeln
 SW, SH = 256, 1024
 rv = (np.arange(SH) + 0.5) / SH
-fibers = noise((1.5, 55), 3, (SH, SW))          # feine vertikale Fasern
-streaks = noise((8, 30), 33, (SH, SW))          # breite dunkle Streifen
+fibers = noise((1.2, 65), 3, (SH, SW))          # feine vertikale Fasern mit stärkerer Ausrichtung
+fib_coarse = noise((2.5, 3), 7, (SH, SW))       # grobe vertikale Fasern
+fibers = (fibers * 0.4 + fib_coarse * 0.6)      # Mischung
+fibers = fibers - fibers.mean()
+fibers /= (fibers.std() + 1e-6)
+streaks = noise((12, 20), 33, (SH, SW))          # rautenförmige dunkle Längsfasern
+streaks = streaks - streaks.mean()
+streaks /= (streaks.std() + 1e-6)
+# Muster zur Rautenform (45° gedreht)
+raute = (np.sin(np.pi * rv[:, None] / 2 + np.pi/4) ** 2 + np.cos(np.pi * rv[:, None] / 2 - np.pi/4) ** 2) ** 0.5
+raute = (raute[:, None] - 0.5) / 0.5
+raute = np.clip(raute + 0.15 * noise(8, 29, (SH, SW)), -0.8, 0.8)
+raute *= streaks
 base = np.array([0.16, 0.10, 0.06])             # Ziel-Basisfarbe (sRGB)
 dark = np.array([0.07, 0.045, 0.028])
 scar_c = np.array([0.34, 0.25, 0.15])           # helle Narben (tann)
-col = base[None, None] * (1 + 0.35 * fibers[..., None])
-col = col * (1 + 0.20 * streaks[..., None])
-col = col * (1 - 0.35 * np.clip(-streaks, 0, 1)[..., None])   # dunkle Streifen
-# helle Narben: horizontal, unregelmaeßig verteilt (abgefallene Wedel)
-row = np.sin(rv * 38.0 + 2.0 * noise(25, 41, (SH, 1)))
-narrows = np.exp(-((rv[:, None] - (0.08 + 0.84 * (noise(40, 43, (SH, 1)) * 0.5 + 0.5))) ** 2) / 0.0006)
-narrows = np.clip(narrows * (0.5 + 0.5 * noise(3, 47, (SH, 1))), 0, 1)
-col = col * (1 - 0.6 * narrows[..., None]) + scar_c[None, None] * (0.6 * narrows)[..., None]
+col = base[None, None] * (1 + 0.30 * fibers[..., None])
+col = col * (1 + 0.18 * streaks[..., None])
+col = col * (1 - 0.40 * np.clip(-streaks, 0, 1)[..., None])   # dunkle Streifen
+# helle Narben: horizontal, unregelmaeßig verteilt (abgefallene Wedeln)
+# Rautenförmig versetzt: waagerecht gestreifter Grund + rautenartige Versätze
+row = np.sin(rv * 42.0 + 2.0 * noise(20, 35, (SH, 1)))
+narrows = np.exp(-((rv[:, None] - (0.10 + 0.82 * (noise(35, 37, (SH, 1)) * 0.5 + 0.5))) ** 2) / 0.0005)
+narrows = np.clip(narrows * (0.4 + 0.6 * noise(4, 52, (SH, 1))), 0, 1)
+col = col * (1 - 0.55 * narrows[..., None]) + scar_c[None, None] * (0.55 * narrows)[..., None]
 # unten (alt) etwas dunkler, oben leicht gruenlich
 bg = np.clip((0.15 - rv[:, None]) / 0.15, 0, 1)
 col = col * (1 - 0.25 * bg[..., None])

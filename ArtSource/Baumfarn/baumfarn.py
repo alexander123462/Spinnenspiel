@@ -52,19 +52,21 @@ def _tube_pts(pts, r0, r1, seg):
 
 # ---------------- Stamm ----------------
 H = float(rng.uniform(2.5, 4.5))
-r_bot = 0.16
+r_bot = 0.24
 r_top = 0.11
 bend = np.array([float(rng.uniform(-0.3, 0.3)), float(rng.uniform(-0.3, 0.3)), 0.0])
 P0t = np.array([0.0, 0.0, 0.0])
 P1t = np.array([0.0, 0.0, H]) + bend
 Ct = (P0t + P1t) / 2 + bend * 0.5
+r_noise = rng.uniform(-0.08, 0.08)
+r_bot = r_bot * (1.0 + r_noise)
 sv, sf, su = tube_bezier(P0t, Ct, P1t, r_bot, r_top, rings=14, seg=7)
 add(sv, sf, su, 1)
-print(f"Stamm: H={H:.2f}m r_bot={r_bot} r_top={r_top} bend={bend.round(2)}")
+print(f"Stamm: H={H:.2f}m r_bot={r_bot:.2f} r_top={r_top} bend={bend.round(2)} r_noise={r_noise:+.3f}")
 
 # ---------------- Wedel (Krone) ----------------
 top = P1t
-n = int(rng.integers(9, 15))
+n = int(rng.integers(12, 17))
 upv = np.array([0.0, 0.0, 1.0])
 print(f"Wedel: {n} Stueck")
 
@@ -99,7 +101,7 @@ for k in range(n):
 
     # Fiederblaettchen
     nrm_f = np.cross(d, upv); nrm_f /= (np.linalg.norm(nrm_f) + 1e-9)
-    Np = int(rng.integers(18, 24))
+    Np = int(rng.integers(30, 39))
     l_mid = float(rng.uniform(0.25, 0.35))
 
     for side in (-1, 1):
@@ -121,7 +123,7 @@ for k in range(n):
 
             nrm2 = np.cross(q, T3); nrm2 /= (np.linalg.norm(nrm2) + 1e-9)
             l = l_mid * (math.sin(math.pi * (0.05 + 0.90 * u)) ** 0.7)
-            w = 0.28 * l
+            w = 0.335 * l
             P0p = top + d * P2[0] + upv * P2[1]
 
             m = 3
