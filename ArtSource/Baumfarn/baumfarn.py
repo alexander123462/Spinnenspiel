@@ -23,23 +23,25 @@ def _frame(p, tan):
     up = np.cross(side, tan)
     return side, up
 
-def tube_bezier(P0, C, P1, r0, r1, rings=16, seg=7):
+def tube_bezier(P0, C, P1, r0, r1, rings=16, seg=7, radii=None):
     P0, C, P1 = map(np.array, (P0, C, P1))
     pts = [(1-k)**2*P0 + 2*(1-k)*k*C + k**2*P1 for k in np.linspace(0, 1, rings)]
-    return _tube_pts(pts, r0, r1, seg)
+    return _tube_pts(pts, r0, r1, seg, radii)
 
-def tube_points(pts, r0, r1, seg=7):
+def tube_points(pts, r0, r1, seg=7, radii=None):
     pts = [np.array(p, dtype=float) for p in pts]
-    return _tube_pts(pts, r0, r1, seg)
+    return _tube_pts(pts, r0, r1, seg, radii)
 
-def _tube_pts(pts, r0, r1, seg):
+def _tube_pts(pts, r0, r1, seg, radii=None):
     verts, uvs, faces = [], [], []
     n = len(pts)
+    if radii is not None:
+        radii = np.asarray(radii, dtype=float)
     for i, p in enumerate(pts):
         tan = pts[min(i+1, n-1)] - pts[max(i-1, 0)]
         tan /= (np.linalg.norm(tan) + 1e-9)
         side, up = _frame(p, tan)
-        r = r0 + (r1 - r0) * i / (n - 1)
+        r = radii[i] if radii is not None else (r0 + (r1 - r0) * i / (n - 1))
         for j in range(seg + 1):
             a = j / seg * 6.283
             verts.append(tuple(p + r * (math.cos(a)*side + math.sin(a)*up)))
@@ -58,11 +60,17 @@ bend = np.array([float(rng.uniform(-0.3, 0.3)), float(rng.uniform(-0.3, 0.3)), 0
 P0t = np.array([0.0, 0.0, 0.0])
 P1t = np.array([0.0, 0.0, H]) + bend
 Ct = (P0t + P1t) / 2 + bend * 0.5
-r_noise = rng.uniform(-0.08, 0.08)
-r_bot = r_bot * (1.0 + r_noise)
-sv, sf, su = tube_bezier(P0t, Ct, P1t, r_bot, r_top, rings=14, seg=7)
+rings = 14
+z = np.linspace(0.0, H, rings)                          # Hoehe entlang der Ringe (Bogen klein)
+r_mid = r_bot * 0.90
+r = np.where(z < 0.4,
+             r_bot * (1.0 - 0.10 * (z / 0.4)),          # Wurzelballen: untere 0.4 m dick halten
+             r_mid + (r_top - r_mid) * ((z - 0.4) / max(H - 0.4, 1e-6)))   # dann Taper zur Spitze
+r = r * (1.0 + rng.uniform(-0.08, 0.08, size=rings))    # Radius-Rauschen ±8 %
+r_max = float(r.max())
+sv, sf, su = tube_bezier(P0t, Ct, P1t, r_bot, r_top, rings=rings, seg=7, radii=r)
 add(sv, sf, su, 1)
-print(f"Stamm: H={H:.2f}m r_bot={r_bot:.2f} r_top={r_top} bend={bend.round(2)} r_noise={r_noise:+.3f}")
+print(f"Stamm: H={H:.2f}m Wurzelballen={r_max:.2f} (untere 0.4 m, ±8%) r_top={r_top} bend={bend.round(2)}")
 
 # ---------------- Wedel (Krone) ----------------
 top = P1t
@@ -72,9 +80,9 @@ print(f"Wedel: {n} Stueck")
 
 for k in range(n):
     yaw = k / n * 6.283 + float(rng.uniform(-0.2, 0.2))
-    L = float(rng.uniform(1.8, 2.6))
-    th0 = math.radians(float(rng.uniform(20, 35)))
-    th1 = math.radians(-float(rng.uniform(50, 80)))
+    L = float(rng.uniform(1.9, 2.7))
+    th0 = math.radians(float(rng.uniform(22, 38)))
+    th1 = math.radians(-float(rng.uniform(55, 82)))
     d = np.array([math.cos(yaw), math.sin(yaw), 0.0])
 
     # Kreisbogen: Starttangente th0, Endtangente th1, Bogenlaenge L
@@ -102,7 +110,8 @@ for k in range(n):
     # Fiederblaettchen
     nrm_f = np.cross(d, upv); nrm_f /= (np.linalg.norm(nrm_f) + 1e-9)
     Np = int(rng.integers(30, 39))
-    l_mid = float(rng.uniform(0.25, 0.35))
+    l_mid = float(rng.uniform(0.50, 0.65))
+    print(f"  Fiederblaettchen: {Np} pro Seite ({2 * Np} am Wedel)")
 
     for side in (-1, 1):
         for k2 in range(Np):
@@ -115,15 +124,16 @@ for k in range(n):
             T2 /= (np.linalg.norm(T2) + 1e-9)
             T3 = d * T2[0] + upv * T2[1]
 
-            q = np.cross(T3, nrm_f) * side
-            q /= (np.linalg.norm(q) + 1e-9)
-            droop = math.radians(10 + 20 * u)
+            # Fiederblaettchen: waagerecht (Flaeche zeigt nach unten, nicht hochkant),
+            # Laenge radial vom Wedel, dichte Ueberlappung entlang der Mittelrippe
+            q = nrm_f * side
+            droop = math.radians(10 + 12 * u)
             q = q * math.cos(droop) - upv * math.sin(droop)
             q /= (np.linalg.norm(q) + 1e-9)
 
-            nrm2 = np.cross(q, T3); nrm2 /= (np.linalg.norm(nrm2) + 1e-9)
+            nrm2 = np.cross(q, upv); nrm2 /= (np.linalg.norm(nrm2) + 1e-9)
             l = l_mid * (math.sin(math.pi * (0.05 + 0.90 * u)) ** 0.7)
-            w = 0.335 * l
+            w = 0.34 * l
             P0p = top + d * P2[0] + upv * P2[1]
 
             m = 3
