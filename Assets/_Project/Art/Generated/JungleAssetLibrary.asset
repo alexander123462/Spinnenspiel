@@ -40,6 +40,12 @@ MonoBehaviour:
   - {fileID: 2100000, guid: fade971132bf9d442a324e5a2f57b8e7, type: 2}
   - {fileID: 2100000, guid: 7f1d5c3edf1020a4cb8134ae4d17abba, type: 2}
   - {fileID: 2100000, guid: 7edf52fe44230c24794fbbc8d81d29c3, type: 2}
+  treeFerns:
+  - {fileID: 3385503233844402379, guid: 9c53a3b6413382847ae568167c5827c1, type: 3}
+  - {fileID: -4262416572816261180, guid: 7c5743ff81947364e8b82f6f201e2b38, type: 3}
+  - {fileID: 6685440814674906772, guid: 08c07e8c31c600a43b66b28cd91497ea, type: 3}
+  treeFernLeafMat: {fileID: 2100000, guid: bb3ba566a0c082545a588f49fc8a0a07, type: 2}
+  treeFernStemMat: {fileID: 2100000, guid: 4fb9f269db86c804193d0f547f667ce9, type: 2}
   groundCover:
   - {fileID: -8799722270921484849, guid: b94e5972b11c77d4a9392cae2d8bd377, type: 3}
   - {fileID: -8976219707546791707, guid: e4484f2e03a451446b0709e3332793d5, type: 3}

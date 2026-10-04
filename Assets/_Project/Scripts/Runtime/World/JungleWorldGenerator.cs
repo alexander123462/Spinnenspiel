@@ -31,6 +31,7 @@ namespace Spinnenspiel
         public int FernCount { get; private set; }
         public int ReedCount { get; private set; }
         public int GiantLeafCount { get; private set; }
+        public int TreeFernCount { get; private set; }
         public int GroundCoverCount { get; private set; }
         public int PlantColliderCount { get; private set; }
         public int LianaCount { get; private set; }
@@ -191,6 +192,57 @@ namespace Spinnenspiel
                 GiantLeafCount = giantN;
             }
             StaticBatchingUtility.Combine(unterholz);
+
+            // Baumfarne (Blender, 3 Varianten): kletterbarer Stamm (Capsule-Collider) + Blattschnitt-Cutout.
+            // Kein statisches Batching: jeder Farn trägt einen eigenen Kletter-Collider.
+            // Plus 3 garantierte Exemplare 6–10 m vor dem Spawn, in Blickrichtung der Startkamera.
+            if (library.treeFerns != null && library.treeFernLeafMat != null && library.treeFernStemMat != null)
+            {
+                GameObject baumfarne = new GameObject("Baumfarne");
+                int fernN = 0;
+                const int fernMax = 120;
+                int fcells = Mathf.FloorToInt(size / 7f);
+                for (int i = 0; i < fcells && fernN < fernMax; i++)
+                {
+                    for (int j = 0; j < fcells && fernN < fernMax; j++)
+                    {
+                        float x = 3.5f + i * 7f + (World.Hash01(i, j, 81) - 0.5f) * 3f;
+                        float z = 3.5f + j * 7f + (World.Hash01(i, j, 82) - 0.5f) * 3f;
+                        if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
+                        if (NearSpawn(x, z, 4f)) continue;
+                        if (!IsDryFlat(World, x, z)) continue;
+                        if (World.Hash01(i, j, 83) >= World.Density(x, z) * 0.5f) continue;
+                        int variant = Mathf.FloorToInt(World.Hash01(i, j, 84) * (float)library.treeFerns.Length);
+                        if (variant < 0 || variant >= library.treeFerns.Length) continue;
+                        if (library.treeFerns[variant] == null) continue;
+                        float rot = World.Hash01(i, j, 85) * 360f;
+                        float scale = 0.8f + World.Hash01(i, j, 86) * 0.4f;
+                        AddTreeFern(baumfarne.transform, library.treeFerns[variant],
+                            new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale);
+                        fernN++;
+                    }
+                }
+                // 3 garantierte Exemplare 6/8/10 m vor dem Spawn: Kamera schaut vom Spawn aus in +Z,
+                // also stehen die Farne in Blickrichtung des Start-Screenshots.
+                Vector3 vor = new Vector3(0f, 0f, 1f);
+                for (int k = 0; k < 3; k++)
+                {
+                    float dist = 6f + k * 2f;
+                    float fx = _spawnXZ.x + vor.x * dist + (World.Hash01(0, k, 91) - 0.5f) * 1.5f;
+                    float fz = _spawnXZ.z + vor.z * dist + (World.Hash01(0, k, 92) - 0.5f) * 1.5f;
+                    if (fx < 0.5f || fx > size - 0.5f || fz < 0.5f || fz > size - 0.5f) continue;
+                    if (!IsDryFlat(World, fx, fz)) continue;
+                    int variant = Mathf.FloorToInt(World.Hash01(0, k, 93) * (float)library.treeFerns.Length) % library.treeFerns.Length;
+                    if (library.treeFerns[(int)variant] == null) continue;
+                    float rot = World.Hash01(0, k, 94) * 360f;
+                    float scale = 0.8f + World.Hash01(0, k, 95) * 0.4f;
+                    AddTreeFern(baumfarne.transform, library.treeFerns[(int)variant],
+                        new Vector3(fx, World.Height(fx, fz) - 0.05f, fz), rot, scale);
+                    fernN++;
+                }
+                TreeFernCount = fernN;
+                UnityEngine.Debug.Log("[Jungle] Baumfarne: " + fernN + " (inkl. 3 garantiert vor dem Spawn)");
+            }
 
             // 6b) Bodendecker: Scan-Gras/Kraut als reine Optik (keine Collider), dicht über dem Boden.
             if (library.groundCover != null && library.groundCoverMats != null && library.groundCover.Length > 0)
@@ -358,7 +410,7 @@ namespace Spinnenspiel
             GenerationSeconds = (float)sw.Elapsed.TotalSeconds;
             IsReady = true;
             UnityEngine.Debug.Log("[Urwald] Seed " + Seed + ": " + TreeCount + " Bäume, "
-                + BushCount + " Büsche, " + FernCount + " Farne, " + ReedCount + " Schilf, " + GiantLeafCount + " Riesenbläter, "
+                + BushCount + " Büsche, " + FernCount + " Farne, " + ReedCount + " Schilf, " + GiantLeafCount + " Riesenbläter, " + TreeFernCount + " Baumfarne, "
                 + GroundCoverCount + " Bodendecker, "
                 + LianaCount + " Lianen, "
                 + LogCount + " Stämme, " + RockCount + " Steine, "
@@ -450,6 +502,35 @@ namespace Spinnenspiel
             foreach (Vector3 q in pos)
                 if ((q - p).sqrMagnitude < d2) return true;
             return false;
+        }
+
+        /// <summary>
+        /// Baumfarn erzeugen: ein MeshRenderer mit 2 sharedMaterials (0 = Blatt, 1 = Stamm,
+        /// Submesh-Reihenfolge) + dünner Capsule-Kollider am Stamm (Spinne kann klettern).
+        /// Die Wedel selbst bekommen keinen Collider.
+        /// </summary>
+        private void AddTreeFern(Transform parent, Mesh mesh, Vector3 pos, float rotY, float scale)
+        {
+            GameObject g = new GameObject();
+            g.transform.SetParent(parent, false);
+            g.transform.position = pos;
+            g.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
+            g.transform.localScale = Vector3.one * scale;
+            g.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var r = g.AddComponent<MeshRenderer>();
+            r.sharedMaterials = new[] { library.treeFernLeafMat, library.treeFernStemMat };
+
+            // Kletter-Stamm: dünne Kapsel an der Basis (Radius 0.16, Höhe = bounds.y * 0.75 * scale).
+            // Die Wedel (oberes Viertel) bleiben kollisionsfrei.
+            Bounds b = mesh.bounds;
+            GameObject c = new GameObject("StammCollider");
+            c.transform.SetParent(g.transform, false);
+            c.layer = GameLayers.Plants;
+            var cc = c.AddComponent<CapsuleCollider>();
+            cc.direction = 1; // Y-Achse
+            cc.radius = 0.16f;
+            cc.height = b.size.y * 0.75f * scale;
+            c.transform.localPosition = new Vector3(0f, 0.375f * b.size.y, 0f);
         }
 
         /// <summary>Stamm/Stein mit Convex-Collider und SurfaceTag erzeugen.</summary>

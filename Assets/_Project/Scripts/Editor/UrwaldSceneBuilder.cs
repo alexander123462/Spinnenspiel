@@ -61,6 +61,12 @@ namespace Spinnenspiel.EditorTools
             lib.giantLeaves = LoadRiesenblattMeshes();
             lib.giantLeafMats = CreateRiesenblattMats();
 
+            // Baumfarne (Blender, 3 Varianten): 2 Submeshes pro FBX (0 = Blatt, 1 = Stamm).
+            lib.treeFerns = LoadBaumfarnMeshes();
+            var baumfarnMats = CreateBaumfarnMats();
+            lib.treeFernLeafMat = baumfarnMats[0];
+            lib.treeFernStemMat = baumfarnMats[1];
+
             // Bodendecker (Scan-Gras/Kraut): nur Optik, keine Collider; um die Spinne herum.
             LoadGroundCover(lib);
 
@@ -280,6 +286,79 @@ namespace Spinnenspiel.EditorTools
             }
             AssetDatabase.SaveAssets();
             return result;
+        }
+
+        private static Mesh[] LoadBaumfarnMeshes()
+        {
+            const string folder = "Assets/_Project/Art/Plants/Baumfarn/";
+            var result = new Mesh[3];
+            for (int i = 0; i < 3; i++)
+            {
+                string path = folder + "Baumfarn_" + (i + 1) + ".fbx";
+                if (!System.IO.File.Exists(path))
+                {
+                    Debug.LogWarning("[Urwald] Baumfarn-FBX fehlt: " + path);
+                    continue;
+                }
+                foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(path))
+                {
+                    if (obj is Mesh mesh)
+                    {
+                        result[i] = mesh;
+                        Debug.Log("[Urwald] Baumfarn subMeshCount " + (i + 1) + ": " + mesh.subMeshCount
+                            + " (erwartet 2: 0 = Blatt, 1 = Stamm)");
+                        break;
+                    }
+                }
+                if (result[i] == null)
+                    Debug.LogWarning("[Urwald] Kein Mesh im Baumfarn: " + path);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// HDRP-Lit-Materialien für die Baumfarne: Blatt (Albedo/Mask/Normal, Cutout 0.5, doppelseitig)
+        /// und Stamm (Stamm-Albedo, Smoothness 0.2). Werden nur angelegt, falls noch nicht vorhanden.
+        /// </summary>
+        private static Material[] CreateBaumfarnMats()
+        {
+            const string tex = "Assets/_Project/Art/Plants/Baumfarn/Textures/";
+            Shader hdrpLit = Shader.Find("HDRP/Lit");
+            if (hdrpLit == null)
+                throw new System.InvalidOperationException("[Urwald] Shader nicht gefunden: HDRP/Lit");
+
+            Material leaf = CreateBaumfarnMat("MAT_Baumfarn_Leaf", hdrpLit,
+                tex + "Baumfarn_Leaf_Albedo.png", tex + "Baumfarn_Leaf_Mask.png", tex + "Baumfarn_Leaf_Normal.png");
+            leaf.SetFloat("_SurfaceType", 1f); // Cutout (Blattschnitt)
+            leaf.SetFloat("_AlphaCutoffEnable", 1f);
+            leaf.SetFloat("_AlphaCutoff", 0.5f);
+            leaf.SetFloat("_Smoothness", 0.35f);
+            leaf.SetFloat("_DoubleSidedEnable", 1f);
+
+            Material stem = CreateBaumfarnMat("MAT_Baumfarn_Stem", hdrpLit,
+                tex + "Baumfarn_Stem_Albedo.png", null, null);
+            stem.SetFloat("_Smoothness", 0.2f);
+
+            EditorUtility.SetDirty(leaf);
+            EditorUtility.SetDirty(stem);
+            AssetDatabase.SaveAssets();
+            return new[] { leaf, stem };
+        }
+
+        private static Material CreateBaumfarnMat(string name, Shader shader, string albedo, string mask, string normal)
+        {
+            string path = MatFolder + name + ".mat";
+            Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                mat = new Material(shader) { name = name };
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            if (albedo != null) mat.SetTexture("_BaseColorMap", AssetDatabase.LoadAssetAtPath<Texture2D>(albedo));
+            if (mask != null) mat.SetTexture("_MaskMap", AssetDatabase.LoadAssetAtPath<Texture2D>(mask));
+            if (normal != null) mat.SetTexture("_NormalMap", AssetDatabase.LoadAssetAtPath<Texture2D>(normal));
+            mat.color = Color.white;
+            return mat;
         }
 
         /// <summary>Lädt Scan-Bodendecker (Gras/Kraut) als Mesh-/Material-Paare in die Asset-Bibliothek.</summary>
