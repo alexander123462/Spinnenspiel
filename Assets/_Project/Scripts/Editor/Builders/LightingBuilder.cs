@@ -1,13 +1,13 @@
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
+using UnityEngine.Rendering.HighDefinition;
 
 namespace Spinnenspiel.EditorTools
 {
     /// <summary>
-    /// Baut Sun, Ambient/Fog-Settings und ein URP Global Volume
-    /// (ACES-Tonemapping + Bloom) fuer die Milestone-1-Szene.
+    /// Baut Sun (HDRP: Lux, Farbtemperatur, Volumetrische Dimmung) und ein HDRP Global Volume
+    /// (PhysicallyBasedSky, Volumen-Nebel, Auto-Belichtung, ACES, Bloom) fuer die Milestone-1-Szene.
     /// </summary>
     public static class LightingBuilder
     {
@@ -27,6 +27,9 @@ namespace Spinnenspiel.EditorTools
             light.type = LightType.Directional;
             light.shadows = LightShadows.Soft;
             light.intensity = 1.2f;
+            // HDRP: physikalische Lichtstaerken (Lux) + Volumetrische Dimmung fuer Lichtstrahlen.
+            var hd = light.GetComponent<HDAdditionalLightData>(); if (hd == null) hd = light.gameObject.AddComponent<HDAdditionalLightData>();
+            light.lightUnit = LightUnit.Lux; light.intensity = 100000f; light.useColorTemperature = true; light.colorTemperature = 5600f; light.shadows = LightShadows.Soft; hd.volumetricDimmer = 1f;
             light.color = new Color(1f, 0.96f, 0.88f); // leicht warm
             go.transform.rotation = Quaternion.Euler(45f, -30f, 0f);
         }
@@ -49,12 +52,17 @@ namespace Spinnenspiel.EditorTools
         {
             VolumeProfile profile = ScriptableObject.CreateInstance<VolumeProfile>();
 
-            Tonemapping tonemapping = profile.Add<Tonemapping>(true);
-            tonemapping.mode.Override(TonemappingMode.ACES);
-
-            Bloom bloom = profile.Add<Bloom>(true);
-            bloom.intensity.Override(0.3f);
-            bloom.threshold.Override(1.1f);
+            var env = profile.Add<VisualEnvironment>(true); env.skyType.Override((int)SkyType.PhysicallyBased);
+            profile.Add<PhysicallyBasedSky>(true);
+            var fog = profile.Add<Fog>(true); fog.enabled.Override(true); fog.meanFreePath.Override(60f); fog.maximumHeight.Override(25f); fog.enableVolumetricFog.Override(true); fog.albedo.Override(new Color(0.75f, 0.82f, 0.75f));
+            var exp = profile.Add<Exposure>(true); exp.mode.Override(ExposureMode.AutomaticHistogram); exp.limitMin.Override(6f); exp.limitMax.Override(15f);
+            var tm = profile.Add<Tonemapping>(true); tm.mode.Override(TonemappingMode.ACES);
+            var bloom = profile.Add<Bloom>(true); bloom.intensity.Override(0.15f);
+            var ca = profile.Add<ColorAdjustments>(true); ca.saturation.Override(10f);
+            var vig = profile.Add<Vignette>(true); vig.intensity.Override(0.2f);
+            var sh = profile.Add<HDShadowSettings>(true); sh.maxShadowDistance.Override(80f);
+            var cs = profile.Add<ContactShadows>(true); cs.enable.Override(true);
+            var ao = profile.Add<ScreenSpaceAmbientOcclusion>(true); ao.intensity.Override(1f);
 
             if (AssetDatabase.LoadAssetAtPath<Object>(VolumeProfilePath) != null)
             {

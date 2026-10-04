@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
+using UnityEngine.Rendering.HighDefinition;
 
 namespace Spinnenspiel.EditorTools
 {
@@ -23,6 +23,9 @@ namespace Spinnenspiel.EditorTools
             sun.shadowNormalBias = 0.3f;
             sun.shadowBias = 0.02f;
             sun.intensity = 1.35f;
+            // HDRP: physikalische Lichtstaerken (Lux) + Volumetrische Dimmung fuer Lichtstrahlen.
+            var hd = sun.GetComponent<HDAdditionalLightData>(); if (hd == null) hd = sun.gameObject.AddComponent<HDAdditionalLightData>();
+            sun.lightUnit = LightUnit.Lux; sun.intensity = 100000f; sun.useColorTemperature = true; sun.colorTemperature = 5600f; sun.shadows = LightShadows.Soft; hd.volumetricDimmer = 1f;
             sun.color = new Color(1f, 0.93f, 0.82f);
             RenderSettings.sun = sun;
 
@@ -88,22 +91,17 @@ namespace Spinnenspiel.EditorTools
             VolumeProfile profile = ScriptableObject.CreateInstance<VolumeProfile>();
             AssetUtil.ReplaceAsset(profile, Folder + "/Testwelt_VolumeProfile.asset");
 
-            Tonemapping tonemapping = profile.Add<Tonemapping>(true);
-            tonemapping.mode.Override(TonemappingMode.ACES);
-
-            Bloom bloom = profile.Add<Bloom>(true);
-            bloom.intensity.Override(0.35f);
-            bloom.threshold.Override(1.05f);
-            bloom.scatter.Override(0.6f);
-
-            ColorAdjustments color = profile.Add<ColorAdjustments>(true);
-            color.postExposure.Override(0.15f);
-            color.contrast.Override(8f);
-            color.saturation.Override(6f);
-
-            Vignette vignette = profile.Add<Vignette>(true);
-            vignette.intensity.Override(0.18f);
-            vignette.smoothness.Override(0.5f);
+            var env = profile.Add<VisualEnvironment>(true); env.skyType.Override((int)SkyType.PhysicallyBased);
+            profile.Add<PhysicallyBasedSky>(true);
+            var fog = profile.Add<Fog>(true); fog.enabled.Override(true); fog.meanFreePath.Override(60f); fog.maximumHeight.Override(25f); fog.enableVolumetricFog.Override(true); fog.albedo.Override(new Color(0.75f, 0.82f, 0.75f));
+            var exp = profile.Add<Exposure>(true); exp.mode.Override(ExposureMode.AutomaticHistogram); exp.limitMin.Override(6f); exp.limitMax.Override(15f);
+            var tm = profile.Add<Tonemapping>(true); tm.mode.Override(TonemappingMode.ACES);
+            var bloom = profile.Add<Bloom>(true); bloom.intensity.Override(0.15f);
+            var ca = profile.Add<ColorAdjustments>(true); ca.saturation.Override(10f);
+            var vig = profile.Add<Vignette>(true); vig.intensity.Override(0.2f);
+            var sh = profile.Add<HDShadowSettings>(true); sh.maxShadowDistance.Override(80f);
+            var cs = profile.Add<ContactShadows>(true); cs.enable.Override(true);
+            var ao = profile.Add<ScreenSpaceAmbientOcclusion>(true); ao.intensity.Override(1f);
 
             foreach (VolumeComponent component in profile.components)
             {
@@ -121,17 +119,8 @@ namespace Spinnenspiel.EditorTools
 
         private static void ConfigurePipeline()
         {
-            UniversalRenderPipelineAsset pipeline = GraphicsSettings.defaultRenderPipeline as UniversalRenderPipelineAsset;
-            if (pipeline == null)
-            {
-                Debug.LogWarning("[Spinnenspiel] Keine URP-Pipeline aktiv – Schatten/MSAA nicht angepasst.");
-                return;
-            }
-
-            pipeline.shadowDistance = 45f;
-            pipeline.shadowCascadeCount = 3;
-            pipeline.msaaSampleCount = 4;
-            UnityEditor.EditorUtility.SetDirty(pipeline);
+            // URP-Konfig unter HDRP hinfällig – Schattendistanz/MSAA stehen im HDRP-Asset bzw. im Volume (HDShadowSettings).
+            return;
         }
     }
 }
