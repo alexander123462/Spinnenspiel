@@ -163,6 +163,30 @@ _abd_ok = check_bounds(abdomen) and check_polys(abdomen, 4000)
 _cep_ok = check_bounds(ceph) and check_polys(ceph, 4000)
 print(f"PRUEFUNG Abdomen+Kephalothorax: {'ALLE OK' if (_abd_ok and _cep_ok) else 'NOK - siehe oben'}")
 
+# ---------------- Normalen nach aussen (kein hohler/innenseitiger Look) ----------------
+# Wichtig: nach allen Transformationen + Bounds-Normierung, VOR dem FBX-Export.
+# Negativ-Skalen gibt es hier nicht (Skalierung = Division durch positive Bounds),
+# nur die Face-Normalen werden konsistent nach aussen gerechnet.
+def check_normals(ob):
+    """Normalen nach aussen rechnen; Anteil Faces mit dot(normal, center - mittelpunkt) > 0.
+    Kriterium: >= 0.95."""
+    import bmesh
+    bm = bmesh.new()
+    bm.from_mesh(ob.data)
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(ob.data)
+    bm.free()
+    ob.data.update()
+    me = ob.data
+    mittelpunkt = sum((p.center for p in me.polygons), Vector((0.0, 0.0, 0.0))) / len(me.polygons)
+    n_out = sum(1 for p in me.polygons if p.normal.dot(p.center - mittelpunkt) > 0.0)
+    frac = n_out / len(me.polygons)
+    ok = frac >= 0.95
+    print(f"{ob.name}: Normalen nach aussen: {n_out}/{len(me.polygons)} ({frac:.3f}) -> Kriterium >= 0.95 -> {'OK' if ok else 'NOK'}")
+    return ok
+_abd_ok = _abd_ok and check_normals(abdomen)
+_cep_ok = _cep_ok and check_normals(ceph)
+
 # ---------------- Material + Texturen ----------------
 tex = os.path.join(out, "Textures")
 def img(name, colour=True):
