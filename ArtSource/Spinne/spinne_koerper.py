@@ -118,15 +118,20 @@ def deform_ceph(x0, y0, z0, theta, phi):
     # leichte Rueckwaeulbung (Dome)
     if z > 0:
         z += 0.06 * f * (1.0 - abs(y0) * 0.6)
-    # Fovea: kleine Mittelgrube (Delle) auf der Ruecken-Mitte
-    fx, fy, fz = 0.0, -0.12, 1.0
-    d = math.sqrt((x0 - fx) ** 2 + (y0 - fy) ** 2 + (z0 - fz) ** 2)
+    # Fovea: runde, deutliche Mittelgrube, etwas hinter der Mitte (+Y = hinten)
     if z > 0:
-        z -= 0.045 * math.exp(-(d / 0.22) ** 2)
-    # Augenhuegel: kleiner Buegel vorne (-Y) oben
-    if y0 < -0.62 and z0 > 0.2:
-        t = (-y0 - 0.62) / 0.38
-        z += 0.05 * t * (z0 / 1.0)
+        fx, fy = 0.0, 0.12
+        d = math.sqrt((x0 - fx) ** 2 + (y0 - fy) ** 2)
+        z -= 0.10 * math.exp(-(d / 0.18) ** 2)      # Tiefe ~6 % der Hoehe
+    # 7 schwache radiale Furchen von der Fovea zum Rand
+    if z > 0:
+        dx, dy = x0 - 0.0, y0 - 0.12
+        r = math.sqrt(dx * dx + dy * dy)
+        z -= 0.008 * math.cos(7 * math.atan2(dy, dx)) * math.exp(-(r / 0.55) ** 2)
+    # Augenhuegel: erhohter runder Huegel vorne (-Y), ~15 % vom Vorderrand
+    if z > 0:
+        dh = math.sqrt((x0 - 0.0) ** 2 + (y0 - (-0.835)) ** 2)
+        z += 0.11 * math.exp(-(dh / 0.18) ** 2)      # Hoehe ~8 % der Hoehe
     return (x, y, z)
 
 # ---------------- Objekte bauen ----------------
