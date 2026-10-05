@@ -127,6 +127,33 @@ namespace Spinnenspiel.Tests
         }
 
         [UnityTest]
+        public IEnumerator Silk_ShootIntoGroundNearby_Rejected()
+        {
+            yield return Setup();
+
+            // Spinne auf dem Boden, Blick +X: Schuss nach vorn-unten trifft den Boden direkt vor ihr.
+            movement.Teleport(new Vector3(0f, 0f, -2f), Quaternion.LookRotation(Vector3.right, Vector3.up));
+            yield return new WaitForSeconds(0.3f);
+
+            Vector3 dir = spider.transform.forward + Vector3.down * 0.6f;
+            SilkThread thread = silk.ShootThread(dir);
+            Assert.IsNull(thread, "Schuss in den Boden vor der Spinne hat unerwartet einen Faden erzeugt");
+
+            // Nach 1 s: keine Fadenverbindung, Spinne steht noch aufrecht und haftet.
+            yield return new WaitForSeconds(1.0f);
+
+            float dotUp = Vector3.Dot(spider.transform.up, Vector3.up);
+            string stats = string.Format(CultureInfo.InvariantCulture,
+                "thread={0} upDot={1:F3} attached={2} pos=({3:F2},{4:F2},{5:F2})",
+                movement.CurrentThread != null, dotUp, movement.IsAttached,
+                spider.transform.position.x, spider.transform.position.y, spider.transform.position.z);
+
+            Assert.IsNull(movement.CurrentThread, "Spinne ist unerwartet am Faden: " + stats);
+            Assert.IsTrue(dotUp > 0.9f, "Spinne liegt nach dem Schuss in den Boden nicht aufrecht: " + stats);
+            Assert.IsTrue(movement.IsAttached, "Spinne haftet nach dem Schuss in den Boden nicht: " + stats);
+        }
+
+        [UnityTest]
         public IEnumerator Silk_CrossThread_ToTrunk()
         {
             yield return Setup();
@@ -338,7 +365,7 @@ namespace Spinnenspiel.Tests
             Assert.IsTrue(dragline.AnchorCount >= 3, "Weniger als 3 Anker nach 4 s Vorwärts: " + stats);
             float dist = (spider.transform.position - dragline.LastAnchor).magnitude;
             Assert.IsTrue(dist <= dragline.AnchorSpacing + 0.1f, "Abstand LastAnchor↔Spinne > anchorSpacing + 0.1: " + stats);
-            Assert.IsTrue(dragline.Line != null && dragline.Line.enabled, "Dragline-LineRenderer ist nicht aktiv: " + stats);
+            Assert.IsFalse(dragline.Line.enabled, "Dragline beim Laufen sichtbar: " + stats);
         }
 
         [UnityTest]

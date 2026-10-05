@@ -100,6 +100,15 @@ namespace Spinnenspiel
                 return;
             }
 
+            // Treffer muss auch als Faden-Anker gültig sein (keine zu nahe / eigene Ebene).
+            Vector3 dir = hit.point - silk.spinnerets.position;
+            if (!Physics.Raycast(silk.spinnerets.position, dir.normalized, out RaycastHit thatHit,
+                    silk.maxRange, Physics.DefaultRaycastLayers & ~(1 << 2), QueryTriggerInteraction.Ignore)
+                || !silk.CanAnchor(silk.spinnerets.position, dir, thatHit, movement.SurfaceNormal))
+            {
+                return;
+            }
+
             TargetPoint = hit.point;
             HasValidTarget = true;
         }
