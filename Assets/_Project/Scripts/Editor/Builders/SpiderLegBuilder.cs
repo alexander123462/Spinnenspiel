@@ -23,7 +23,8 @@ namespace Spinnenspiel.EditorTools
         private const float UpperLength = 0.085f;
         private const float LowerLength = 0.095f;
         private const float TarsusLength = 0.028f;
-        private const float Thickness = 0.011f;
+        // L2: Vogelspinnen-Beine kräftiger
+        private const float Thickness = 0.015f;
 
         public static void Build(GameObject spider, Transform body, Material legMaterial)
         {

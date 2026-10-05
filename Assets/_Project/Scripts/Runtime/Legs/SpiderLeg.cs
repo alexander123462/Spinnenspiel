@@ -23,7 +23,7 @@ namespace Spinnenspiel
         [SerializeField] private float upperLength = 0.085f;
         [SerializeField] private float lowerLength = 0.095f;
         [SerializeField] private float tarsusLength = 0.028f;
-        [SerializeField] private float segmentThickness = 0.011f;
+        [SerializeField] private float segmentThickness = 0.015f;
 
         [Header("Darstellung")]
         [SerializeField] private Transform femurVisual;

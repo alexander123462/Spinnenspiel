@@ -150,9 +150,9 @@ sig = 0.022
 ringL = np.exp(-((VL - 0.0) / sig) ** 2) + np.exp(-((VL - 1.0) / sig) ** 2)
 ringL = np.clip(ringL, 0, 1)
 
-# --- Grundfarbe (sRGB 0.08, 0.06, 0.045) ---
-baseL = np.array([0.08, 0.06, 0.045])
-hairL_c = np.array([0.25, 0.16, 0.10])   # heller roetlichbraun
+# --- Grundfarbe (sRGB 0.13, 0.095, 0.07) — L2: heller und lesbarer ---
+baseL = np.array([0.13, 0.095, 0.07])
+hairL_c = np.array([0.36, 0.24, 0.15])   # heller roetlichbraun (L2)
 ringL_c = np.array([0.30, 0.22, 0.15])   # gedaeumpter hellerer Ring (nicht orange)
 colL = baseL[None, None] * (1 + 0.35 * noise(12, 131, (H_L, W_L))[..., None])
 colL = colL * (1 - 0.45 * hairL[..., None]) + hairL_c[None, None] * (0.45 * hairL)[..., None]
