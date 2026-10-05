@@ -40,7 +40,10 @@ namespace Spinnenspiel.EditorTools
             string folder = AssetUtil.GeneratedRoot + "/Materials";
             Material abdomenMat = AssetUtil.CreateLitMaterial(folder + "/MAT_SpiderAbdomen.mat", Color.white, 0.42f, TextureFactory.SpiderAbdomen());
             Material thoraxMat = AssetUtil.CreateLitMaterial(folder + "/MAT_SpiderThorax.mat", new Color(0.16f, 0.11f, 0.075f), 0.5f);
-            Material legMat = AssetUtil.CreateLitMaterial(folder + "/MAT_SpiderLeg.mat", Color.white, 0.35f, TextureFactory.SpiderLegBands());
+            Material legMat = CreateScanMaterial("MAT_SpiderLegScan",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Leg_Albedo.png",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Leg_Mask.png",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Leg_Normal.png");
             Material eyeMat = AssetUtil.CreateLitMaterial(folder + "/MAT_SpiderEye.mat", new Color(0.02f, 0.02f, 0.025f), 0.95f);
             Material abdomenScanMat = CreateScanMaterial("MAT_SpiderAbdomenScan",
                 "Assets/_Project/Art/Spider/Textures/Spinne_Abdomen_Albedo.png",

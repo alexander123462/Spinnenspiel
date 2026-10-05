@@ -124,4 +124,57 @@ smooth_c = np.clip(0.35 + 0.04 * noise(20, 83, (H, W)), 0, 1)
 mmc = np.stack([np.zeros_like(ao_c), ao_c, detail_c, smooth_c], -1)
 Image.fromarray((mmc[::-1] * 255).astype(np.uint8), "RGBA").save(f"{out}/Spinne_Cephalothorax_Mask.png")
 print("Cephalothorax-Texturen ok")
+
+# ========================================================================
+# BEIN (Kapsel-UV): dichte feine Haarstraeuhnen entlang der Laenge (V) +
+# je ein schmaler, gedaeumpter hellerer Ring an den Gelenkenden (V nahe 0 und 1).
+# Kapsel-UV: u = umlaufend (Quer), v = entlang der Beinae (Länge).
+# Abmessungen: 512 x 1024.
+# ========================================================================
+W_L = 512
+H_L = 1024
+uL = (np.arange(W_L) + 0.5) / W_L
+vL = (np.arange(H_L) + 0.5) / H_L
+UL, VL = np.meshgrid(uL, vL)
+
+# --- dichte feine Haarstraeuhnen entlang der Laenge (v-Richtung) ---
+# Viele feine Streifen entlang u (senkrecht zu v) = Fasern, die entlang v laufen
+fibersL = np.sin((UL * 140 + 0.6 * np.sin(VL * 3 + UL * 2)) * np.pi)
+fibersL = np.clip(fibersL * 0.5 + 0.5, 0, 1)
+fibersL_coarse = np.sin((UL * 16 + 0.3 * np.sin(VL * 5)) * np.pi)
+fibersL_coarse = np.clip(fibersL_coarse * 0.5 + 0.5, 0, 1)
+hairL = (0.7 * fibersL + 0.3 * fibersL_coarse)
+
+# --- gedämpfter Gelenkring an beiden Gelenkenden (v nahe 0 und 1) ---
+sig = 0.022
+ringL = np.exp(-((VL - 0.0) / sig) ** 2) + np.exp(-((VL - 1.0) / sig) ** 2)
+ringL = np.clip(ringL, 0, 1)
+
+# --- Grundfarbe (sRGB 0.08, 0.06, 0.045) ---
+baseL = np.array([0.08, 0.06, 0.045])
+hairL_c = np.array([0.25, 0.16, 0.10])   # heller roetlichbraun
+ringL_c = np.array([0.30, 0.22, 0.15])   # gedaeumpter hellerer Ring (nicht orange)
+colL = baseL[None, None] * (1 + 0.35 * noise(12, 131, (H_L, W_L))[..., None])
+colL = colL * (1 - 0.45 * hairL[..., None]) + hairL_c[None, None] * (0.45 * hairL)[..., None]
+colL = colL * (1 - 0.55 * ringL[..., None]) + ringL_c[None, None] * (0.55 * ringL)[..., None]
+colL = np.clip(colL, 0, 1)
+save_rgb(colL[::-1], f"{out}/Spinne_Leg_Albedo.png")
+
+# --- Hoehe -> Normal (OpenGL): feine Laengsfasern ---
+hL = 0.55 * hairL + 0.35 * ringL + 0.05 * noise(4, 141, (H_L, W_L))
+hL = gaussian_filter(hL, 1.2)
+kL = 3.5
+dyL, dxL = np.gradient(hL)
+nxL, nyL, nzL = -dxL * kL, -dyL * kL, np.ones_like(hL)
+LL = np.sqrt(nxL ** 2 + nyL ** 2 + nzL ** 2)
+nrmL = np.stack([nxL / LL, nyL / LL, nzL / LL], -1)
+Image.fromarray(((nrmL[::-1] * 0.5 + 0.5) * 255).astype(np.uint8)).save(f"{out}/Spinne_Leg_Normal.png")
+
+# --- HDRP MaskMap: R=Metallic 0, G=AO, B=Detail, A=Smoothness (0.2) ---
+aoL = np.clip(0.88 - 0.16 * hairL + 0.05 * noise(12, 151, (H_L, W_L)), 0, 1)
+detailL = np.clip(0.45 + 0.35 * np.clip(noise(6, 155, (H_L, W_L)), 0, 1), 0, 1)
+smoothL = np.clip(0.20 + 0.03 * noise(20, 153, (H_L, W_L)), 0, 1)
+mmL = np.stack([np.zeros_like(aoL), aoL, detailL, smoothL], -1)
+Image.fromarray((mmL[::-1] * 255).astype(np.uint8), "RGBA").save(f"{out}/Spinne_Leg_Mask.png")
+print(f"Leg-Texturen ok ({W_L}x{H_L})")
 print("Texturen fertig")
