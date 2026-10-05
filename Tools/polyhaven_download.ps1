@@ -32,7 +32,7 @@ $wc.Headers.Add('User-Agent', $UA)
 
 $manifest   = [System.Collections.Generic.List[object]]::new()
 $failures   = [System.Collections.Generic.List[string]]::new()
-$manifestPath = Join-Path $base 'manifest.csv'
+$manifestPath = if (Test-Path (Join-Path $PSScriptRoot 'polyhaven_manifest.csv')) { Join-Path $PSScriptRoot 'polyhaven_manifest.csv' } else { Join-Path $base 'manifest.csv' }
 New-Item -ItemType Directory -Force -Path $base | Out-Null
 
 function Get-Ph([string]$path) {
