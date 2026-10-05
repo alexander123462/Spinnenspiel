@@ -168,6 +168,71 @@ for k in range(n):
 print(f"Baumfarn: steile_Wedel={int(sum(young_mask))} haengend={len(droop_tips)} "
       f"mittlere_Spitze_unter_Ansatz_haengend={np.mean(droop_tips):.2f}m")
 
+# ---------------- Trokene Wedel (vertrocknet, steil nach unten am Stamm entlang) ----------------
+# Sitzen am unteren Kronenansatz (nahe TOP), hängen steil nach unten.
+# Spitze 1.0-1.6 m unter dem Ansatz, etwas kürzer und schmaler als normale Wedel.
+# Eigenes Material "Dry" (braun 0.30/0.20/0.10) als 3. Blender-Slot;
+# beim FBX-Export dem Stamm zugeordnet (damit Unity nur 2 Submeshes sieht).
+n_dry = int(rng.integers(2, 4))   # 2 bis 3
+dry_droop = []
+print(f"Trockene Wedel: {n_dry} Stueck")
+for kd in range(n_dry):
+    yaw_d = float(rng.uniform(0, 2 * math.pi))
+    d_d = np.array([math.cos(yaw_d), math.sin(yaw_d), 0.0])
+    drop_d = float(rng.uniform(1.0, 1.6))   # Spitze 1.0-1.6 m unter dem Ansatz
+    n_arc_d = 12
+    # Steil nach unten, am Stamm entlang (kleine Außen-Auslenkung, leicht gewölbt).
+    arc2d_d = []
+    for i in range(n_arc_d + 1):
+        t = i / n_arc_d
+        z = -drop_d * t                              # z: von 0 (Ansatz) bis -drop_d (Spitze)
+        out_d = 0.10 * math.sin(math.pi * t) + 0.04  # max ~0.14 m in der Mitte
+        arc2d_d.append((out_d, z))
+    arc3d_d = [top + d_d * p[0] + upv * p[1] for p in arc2d_d]
+    tip_d = arc3d_d[-1]
+    droop_d = top[2] - tip_d[2]
+    dry_droop.append(droop_d)
+    print(f"  Trocken {kd+1}: Spitze_Z={tip_d[2]:.2f}m Ansatz_Z={top[2]:.2f}m Droop={droop_d:.2f}m")
+
+    # Mittelrippe (schmaler als normale Wedel)
+    rv_d, rf_d, ru_d = tube_points(arc3d_d, 0.018, 0.006, seg=4)
+    add(rv_d, rf_d, ru_d, 1)                          # 1 = Stamm (damit Unity nur 2 Submeshes sieht)
+
+    # Fiederblättchen (schmaler: l_mid ~0.35 statt 0.55)
+    nrm_f_d = np.cross(d_d, upv); nrm_f_d /= (np.linalg.norm(nrm_f_d) + 1e-9)
+    Np_d = int(rng.integers(22, 28))
+    l_mid_d = float(rng.uniform(0.30, 0.40))
+    for side in (-1, 1):
+        for k2 in range(Np_d):
+            u = (k2 + (0.08 if side > 0 else 0.55)) / Np_d
+            idx_f = u * n_arc_d
+            idx = min(int(idx_f), n_arc_d - 1)
+            frac = idx_f - idx
+            P2_d = np.array(arc2d_d[idx]) * (1 - frac) + np.array(arc2d_d[idx + 1]) * frac
+            q_d = nrm_f_d * side
+            droop_a = math.radians(10 + 12 * u)
+            q_d = q_d * math.cos(droop_a) - upv * math.sin(droop_a)
+            q_d /= (np.linalg.norm(q_d) + 1e-9)
+            nrm2_d = np.cross(q_d, upv); nrm2_d /= (np.linalg.norm(nrm2_d) + 1e-9)
+            l_d = l_mid_d * (math.sin(math.pi * (0.05 + 0.90 * u)) ** 0.7)
+            w_d = 0.34 * l_d
+            P0p_d = top + d_d * P2_d[0] + upv * P2_d[1]
+            m_d = 3
+            verts_d, uvs2_d, faces_d = [], [], []
+            for i in range(m_d + 1):
+                f = i / m_d
+                half_d = max(w_d * 0.5 * math.cos(f * math.pi / 2) ** 0.7, 1e-4)
+                concave_d = 0.03 * f * f
+                c_d = P0p_d + q_d * (l_d * f) - upv * concave_d
+                verts_d += [tuple(c_d - nrm2_d * half_d), tuple(c_d + nrm2_d * half_d)]
+                uvs2_d += [(0.0, f), (1.0, f)]
+            for i in range(m_d):
+                a_d = 2 * i
+                faces_d.append((a_d, a_d+2, a_d+3, a_d+1))
+            add(verts_d, faces_d, uvs2_d, 1)        # 1 = Stamm (damit Unity nur 2 Submeshes sieht)
+
+print(f"Trockene: {n_dry} Stueck, mittlere_Spitze_unter_Ansatz={np.mean(dry_droop):.2f}m")
+
 # ---------------- Mesh + Material ----------------
 me = bpy.data.meshes.new("Baumfarn")
 me.from_pydata(V, [], F); me.update()
@@ -209,7 +274,14 @@ def mat_stem():
     nt.links.new(a.outputs[0], b.inputs["Base Color"])
     return m
 
-me.materials.append(mat_leaf()); me.materials.append(mat_stem())
+def mat_dry():
+    m = bpy.data.materials.new("M_Baumfarn_Dry"); nt = m.node_tree
+    b = nt.nodes["Principled BSDF"]
+    b.inputs["Base Color"].default_value = (0.30, 0.20, 0.10, 1.0)
+    b.inputs["Roughness"].default_value = 0.9
+    return m
+
+me.materials.append(mat_leaf()); me.materials.append(mat_stem()); me.materials.append(mat_dry())
 
 # ---------------- FBX-Export ----------------
 os.makedirs(out, exist_ok=True)
