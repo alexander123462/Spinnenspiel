@@ -88,8 +88,9 @@ def normalize(ob):
 # ---------------- Abdomen (Vogelspinnen-Hinterleib, eifoermig) ----------------
 def deform_abdomen(x0, y0, z0, theta, phi):
     s, c = math.sin(theta), math.cos(theta)
-    # hinten (c=+1) spitzer als vorne (c=-1): Exponent rueckwaerts groesser
-    p = 0.80 + 0.55 * max(c, 0.0)
+    # gleichmaeßig abgerundeter Pol vorne und hinten (Keil-/Knubbel-Freiheit);
+    # die hintere Laenge kommt weiterhin aus L (hinten laenger)
+    p = 0.85
     f = s ** p                      # Querschnitts-Radius (0 an beiden Polen)
     L = 1.12 + 0.18 * max(c, 0.0)   # Rueckhaelfte etwas laenger
     W, H = 1.00, 0.84              # hoeher als breit
@@ -146,6 +147,21 @@ normalize(ceph)
 for ob in (abdomen, ceph):
     b = bounds(ob)
     print(f"{ob.name}: Bounds X={b[0]:.3f} Y={b[1]:.3f} Z={b[2]:.3f} | Faces={len(ob.data.polygons)}")
+
+# ---------------- Bounds / Poly-Pruefung (Kriterien) ----------------
+def check_bounds(ob):
+    b = bounds(ob)
+    ok = all(0.95 <= v <= 1.05 for v in b)
+    print(f"{ob.name}: Bounds X={b[0]:.3f} Y={b[1]:.3f} Z={b[2]:.3f} -> Kriterium 0.95..1.05 -> {'OK' if ok else 'NOK'}")
+    return ok
+def check_polys(ob, limit=4000):
+    n = len(ob.data.polygons)
+    ok = n < limit
+    print(f"{ob.name}: Polys={n} -> Kriterium < {limit} -> {'OK' if ok else 'NOK'}")
+    return ok
+_abd_ok = check_bounds(abdomen) and check_polys(abdomen, 4000)
+_cep_ok = check_bounds(ceph) and check_polys(ceph, 4000)
+print(f"PRUEFUNG Abdomen+Kephalothorax: {'ALLE OK' if (_abd_ok and _cep_ok) else 'NOK - siehe oben'}")
 
 # ---------------- Material + Texturen ----------------
 tex = os.path.join(out, "Textures")
@@ -230,4 +246,13 @@ if do_render:
     sc.render.filepath = os.path.join(out, "Spinne_Vorschau.png")
     bpy.ops.render.render(write_still=True)
     print("Vorschau: Spinne_Vorschau.png")
+
+    # Zweite Vorschau: von HINTEN (Kamera auf +Y-Seite, leicht erhoht, Blick nach vorne)
+    back_loc = (0.12, 0.22, 0.14)
+    back_tgt = (0.0, 0.02, 0.008)
+    co.location = back_loc
+    co.rotation_euler = (Vector(back_tgt) - Vector(back_loc)).to_track_quat("-Z", "Y").to_euler()
+    sc.render.filepath = os.path.join(out, "Spinne_Vorschau_hinten.png")
+    bpy.ops.render.render(write_still=True)
+    print("Vorschau: Spinne_Vorschau_hinten.png")
 print("fertig")
