@@ -78,11 +78,24 @@ n = int(rng.integers(12, 17))
 upv = np.array([0.0, 0.0, 1.0])
 print(f"Wedel: {n} Stueck")
 
+# Typen: ~1/4 junge steile Wedel (im Zentrum nach oben), Rest hängende alte Wedel.
+# Pro Wedel zusätzlich ±10° Azimut (seitliche Verdrehung) und ±15% Längenstreuung.
+n_young = max(1, int(round(n * 0.25)))
+young_mask = rng.permutation(n) < n_young
+droop_tips = []
+
 for k in range(n):
-    yaw = k / n * 6.283 + float(rng.uniform(-0.2, 0.2))
-    L = float(rng.uniform(1.9, 2.7))
-    th0 = math.radians(float(rng.uniform(22, 38)))
-    th1 = math.radians(-float(rng.uniform(55, 82)))
+    if young_mask[k]:
+        # Jung/steil: Startwinkel 45-60 Grad, Spitze bleibt nahe/über dem Ansatz
+        th0 = math.radians(float(rng.uniform(45, 60)))
+        th1 = math.radians(-float(rng.uniform(20, 45)))
+        L = 2.0 * float(rng.uniform(0.85, 1.15))      # Längenstreuung ±15%
+    else:
+        # Alt/hängend: starkes Durchhängen, Spitze im Mittel >= 0.6 m unter dem Ansatz
+        th0 = math.radians(float(rng.uniform(20, 35)))
+        th1 = math.radians(-float(rng.uniform(70, 95)))
+        L = 2.4 * float(rng.uniform(0.85, 1.15))      # Längenstreuung ±15%
+    yaw = k / n * 6.283 + float(rng.uniform(-math.radians(10), math.radians(10)))  # ±10° Verdrehung
     d = np.array([math.cos(yaw), math.sin(yaw), 0.0])
 
     # Kreisbogen: Starttangente th0, Endtangente th1, Bogenlaenge L
@@ -101,6 +114,8 @@ for k in range(n):
 
     arc3d = [top + d * p[0] + upv * p[1] for p in arc2d]
     tip = arc3d[-1]
+    if not young_mask[k]:
+        droop_tips.append(top[2] - tip[2])      # positiv = Spitze unter dem Ansatz
     print(f"  Wedel {k+1}: L={L:.2f}m anfang={math.degrees(th0):.0f}° ende={math.degrees(th1):.0f}° Spitze_Z={tip[2]:.2f}m Ansatz_Z={top[2]:.2f}m")
 
     # Mittelrippe
@@ -149,6 +164,9 @@ for k in range(n):
                 a = 2 * i
                 faces.append((a, a+2, a+3, a+1))
             add(verts, faces, uvs2, 0)
+
+print(f"Baumfarn: steile_Wedel={int(sum(young_mask))} haengend={len(droop_tips)} "
+      f"mittlere_Spitze_unter_Ansatz_haengend={np.mean(droop_tips):.2f}m")
 
 # ---------------- Mesh + Material ----------------
 me = bpy.data.meshes.new("Baumfarn")
