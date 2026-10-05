@@ -7,7 +7,8 @@ namespace Spinnenspiel
     /// Die Spinne baut das Radnetz selbst und sichtbar: zuerst Überweg zum
     /// Startpunkt, dann Rahmen, Radien, Hilfsspirale und Fangspirale in der
     /// echten Reihenfolge. Am Ende sitzt sie kopfunter in der Nabe;
-    /// Bewegungseingabe oder Release lässt sie sich am Sicherheitsfaden fallen.
+    /// Bewegungseingabe lässt sie im Netz laufen, Release lässt sie sich
+    /// am Sicherheitsfaden fallen.
     /// </summary>
     public class SpiderWebBuilder : MonoBehaviour
     {
@@ -99,8 +100,8 @@ namespace Spinnenspiel
 
         private void Update()
         {
-            // Spinne sitzt nach dem Bau in der Nabe: bei Bewegungseingabe oder
-            // Release lässt sie sich wie echt am Sicherheitsfaden fallen.
+            // Spinne sitzt nach dem Bau in der Nabe:
+            // Bewegungseingabe = im Netz laufen, Release = am Sicherheitsfaden fallen lassen.
             if (!_sittingInWeb || _input == null)
             {
                 return;
@@ -119,9 +120,23 @@ namespace Spinnenspiel
             }
 
             _sittingInWeb = false;
-            if (_movement != null)
+            if (_movement == null)
             {
-                _movement.SetScripted(false);
+                return;
+            }
+
+            _movement.SetScripted(false);
+            if (release)
+            {
+                _movement.LetGo();
+            }
+            else if (Web != null)
+            {
+                _movement.AttachToWeb(Web);
+            }
+            else
+            {
+                // Kein Netz vorhanden (sollte nicht passieren): fallen lassen.
                 _movement.LetGo();
             }
         }

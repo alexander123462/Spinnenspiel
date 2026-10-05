@@ -58,8 +58,9 @@ namespace Spinnenspiel
                 silk.ShootThread(dir);
             }
 
-            // Loslassen: Taste + Spinne aktuell am Faden.
-            if (input != null && input.ReleasePressed && movement != null && movement.CurrentThread != null)
+            // Loslassen: Taste + Spinne aktuell am Faden oder im Netz.
+            if (input != null && input.ReleasePressed && movement != null
+                && (movement.CurrentThread != null || movement.CurrentWeb != null))
             {
                 movement.LetGo();
             }

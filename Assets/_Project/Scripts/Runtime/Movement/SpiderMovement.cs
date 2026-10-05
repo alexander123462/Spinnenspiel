@@ -38,6 +38,11 @@ namespace Spinnenspiel
         [SerializeField] private float detachDelay = 0.2f; // Toleranz nach Letztem Oberflächen-Treffer (s)
         [SerializeField] private float bodyRadius = 0.05f; // Körperkugel für Kollisionsschutz (m)
 
+        [Header("Radnetz")]
+        [SerializeField] private float webSpeedFactor = 0.6f; // Tempo-Faktor im Netz (Relativ zu Lauf-/Sprinttempo)
+        [SerializeField] private float webGrip = 0.12f; // max. Abstand (m) zu einem Faden, damit die Spinne sich weiterbewegt
+        [SerializeField] private float webBodyOffset = 0.03f; // Abstand des Körpers zur Netzebene (m)
+
         [Header("Weltgrenzen")]
         [SerializeField] private bool useWorldBounds; // XZ-Abgrenzung nur, wenn an
         [SerializeField] private Vector3 worldBoundsMin;
@@ -79,14 +84,17 @@ namespace Spinnenspiel
         /// <summary>Normale der zuletzt erkannten Oberfläche (Weltkoordinaten).</summary>
         public Vector3 SurfaceNormal => _surfaceNormal;
 
-        /// <summary>True, wenn die Spinne an einer Unterlage haftet (Boden, Wand, ...).</summary>
-        public bool IsGrounded => IsAttached || CurrentThread != null;
+        /// <summary>True, wenn die Spinne an einer Unterlage haftet (Boden, Wand, ...), am Faden hängt oder im Netz läuft.</summary>
+        public bool IsGrounded => IsAttached || CurrentThread != null || CurrentWeb != null;
 
         /// <summary>True, solange die Spinne am Seil (Dragline) hängt.</summary>
         public bool IsOnRope { get; private set; }
 
         /// <summary>An welchen Seidenfaden die Spinne aktuell hängt/klettert (null = kein Faden).</summary>
         public SilkThread CurrentThread { get; private set; }
+
+        /// <summary>In welchem Radnetz die Spinne aktuell läuft (null = kein Netz).</summary>
+        public OrbWeb CurrentWeb { get; private set; }
 
         public float WalkSpeed => walkSpeed;
 
@@ -191,12 +199,33 @@ namespace Spinnenspiel
         }
 
         /// <summary>
+        /// Hängt die Spinne in ein Radnetz ein: läuft auf den Fäden, Beine greifen selbst
+        /// über OrbWeb.TryClosestPoint. Davor laufende Bewegung wird verworfen.
+        /// </summary>
+        public void AttachToWeb(OrbWeb web)
+        {
+            CurrentWeb = web;
+            CurrentThread = null;
+            IsOnRope = false;
+            _attached = false;
+            _vel = Vector3.zero;
+            _lastVelocity = Vector3.zero;
+        }
+
+        /// <summary>Entfernt den Netzbezug (z. B. am Netzrand).</summary>
+        public void DetachFromWeb()
+        {
+            CurrentWeb = null;
+        }
+
+        /// <summary>
         /// Faden aktiv loslassen: Fadenbezug entfernen und Haftung aufheben, damit die Spinne fällt,
         /// bis sie wieder auf einer Oberfläche landet.
         /// </summary>
         public void LetGo()
         {
             DetachFromThread();
+            CurrentWeb = null;
             _boardCooldownUntil = Time.time + 1f;
             _attached = false;
             CatchOnDragline();
@@ -397,6 +426,14 @@ namespace Spinnenspiel
             if (CurrentThread != null)
             {
                 UpdateThread(dt, dir);
+                _lastVelocity = (transform.position - oldPos) / dt;
+                return;
+            }
+
+            // Netz-Modus: im Radnetz laufen, Beine greifen die Fäden selbst.
+            if (CurrentWeb != null)
+            {
+                UpdateWeb(dt, dir);
                 _lastVelocity = (transform.position - oldPos) / dt;
                 return;
             }
@@ -625,6 +662,52 @@ namespace Spinnenspiel
                 _attached = true;
                 _lastSurfaceTime = Time.time;
             }
+        }
+
+        /// <summary>
+        /// Netz-Modus: Die Spinne läuft in der Netzebene auf den Fäden; die Beine
+        /// greifen die Fäden selbst (OrbWeb.TryClosestPoint in SpiderLeg). Am Netzrand
+        /// (kein Faden mehr in Reichweite) bleibt sie stehen. Weltgrenzen gelten hier
+        /// bewusst nicht (das Netz darf über/unter der XZ-Grenze hängen).
+        /// </summary>
+        private void UpdateWeb(float dt, Vector3 dir)
+        {
+            OrbWeb web = CurrentWeb;
+            if (web == null || web.Layout == null)
+            {
+                // Netz verschwunden (z. B. zerstört): loslassen und fallen.
+                LetGo();
+                return;
+            }
+
+            // Netzebene von der Seite der Spinne aus orientieren.
+            Vector3 n = web.PlaneNormal;
+            if (Vector3.Dot(n, transform.up) < 0f)
+            {
+                n = -n;
+            }
+
+            dir = Vector3.ProjectOnPlane(dir, n);
+            float tempo = (IsSprintHeld() ? sprintSpeed : walkSpeed) * webSpeedFactor;
+
+            Vector3 hub = web.Layout.Hub;
+            Vector3 candidate = transform.position + dir * tempo * dt;
+            // Auf die Netzebene projizieren und den Körperabstand (webBodyOffset) setzen.
+            candidate = candidate - n * Vector3.Dot(candidate - hub, n) + n * webBodyOffset;
+
+            // Nur weiterbewegen, wenn in der Ebene noch ein Faden in Reichweite ist
+            // (sonst Netzrand: stehen bleiben).
+            if (web.TryClosestPoint(candidate - n * webBodyOffset, webGrip, out _))
+            {
+                transform.position = candidate;
+            }
+
+            // Drehung: Blick in Laufrichtung in der Netzebene; ohne Eingabe nur
+            // die up-Achse an die Netzebene ausrichten.
+            Quaternion target = dir.sqrMagnitude > 1e-4f
+                ? Quaternion.LookRotation(dir.normalized, n)
+                : Quaternion.FromToRotation(transform.up, n) * transform.rotation;
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, target, turnSpeed * dt);
         }
 
         /// <summary>
