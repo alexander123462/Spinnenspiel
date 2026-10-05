@@ -1,7 +1,8 @@
 # Auftrag 3.0: Poly-Haven-Katalog abfragen (nur Listen, nichts herunterladen)
 $ErrorActionPreference = 'Stop'
 $UA   = 'Spinnenspiel/1.0 (Alex, lokal)'
-$out  = 'C:\Users\vorau\dev\Spinnenspiel\Logs\assets'
+$Root = Split-Path -Parent $PSScriptRoot
+$out  = Join-Path $Root 'Logs\assets'
 New-Item -ItemType Directory -Force -Path $out | Out-Null
 
 function Get-Ph([string]$url) {

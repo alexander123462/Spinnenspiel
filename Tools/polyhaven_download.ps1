@@ -3,7 +3,8 @@
 # Einzelne Fehler werden gemeldet, das Skript bricht nicht ab.
 $ErrorActionPreference = 'Stop'
 $UA   = 'Spinnenspiel/1.0 (Alex, lokal)'
-$base = 'C:\Users\vorau\dev\Spinnenspiel\AssetSource\polyhaven'
+$Root = Split-Path -Parent $PSScriptRoot
+$base = Join-Path $Root 'AssetSource\polyhaven'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
 # ---------- Listen ----------

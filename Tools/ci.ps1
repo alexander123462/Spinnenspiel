@@ -1,5 +1,5 @@
 # Spinnenspiel CI: optional Editor-Methode ausfuehren, kompilieren, PlayMode-Tests laufen lassen.
-# Aufruf: powershell -ExecutionPolicy Bypass -File C:\Users\vorau\dev\Spinnenspiel\Tools\ci.ps1 -Name m2 -Method Spinnenspiel.EditorTools.Milestone1SceneBuilder.Build -Tests
+# Aufruf: powershell -ExecutionPolicy Bypass -File <Projekt>\Tools\ci.ps1 -Name m2 -Method Spinnenspiel.EditorTools.Milestone1SceneBuilder.Build -Tests
 # Optional: -Filter "Spinnenspiel.Tests.Climb*" nur Teilmenge der Tests (schnelle Einzellaeufe; vor Commits immer ohne Filter).
 param(
     [string]$Name = "ci",
@@ -11,15 +11,16 @@ param(
 $ErrorActionPreference = 'Continue'
 # Bei Aufruf ueber -File kommen Listen als ein String "a,b" an -> aufteilen.
 $Method = @($Method | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-$project = 'C:\Users\vorau\dev\Spinnenspiel'
-$unity = 'C:\Program Files\Unity\Hub\Editor\6000.3.24f1\Editor\Unity.exe'
+$Root = Split-Path -Parent $PSScriptRoot
+$project = $Root
+$UnityExe = if ($env:UNITY_EXE) { $env:UNITY_EXE } else { 'C:\Program Files\Unity\Hub\Editor\6000.3.24f1\Editor\Unity.exe' }
 $logDir = "$project\Logs\ci"
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 
 function Invoke-Unity([string[]]$UnityArgs, [string]$Log) {
     $all = @('-batchmode', '-projectPath', "`"$project`"", '-logFile', "`"$Log`"") + $UnityArgs
     # Nur auf Unity selbst warten (Start-Process -Wait wartet auch auf Hintergrund-Kindprozesse wie den Lizenz-Client).
-    $p = Start-Process -FilePath $unity -ArgumentList $all -PassThru -WindowStyle Hidden
+    $p = Start-Process -FilePath $UnityExe -ArgumentList $all -PassThru -WindowStyle Hidden
     $p.WaitForExit()
     return $p.ExitCode
 }
