@@ -1,0 +1,10 @@
+=== jacaranda_tree
+01:16.344  render           | Saved: 'C:\Users\vorau\dev\Spinnenspiel\Assets\_Project\Art\Plants\PH_Baeume\jacaranda_tree\jacaranda_tree_LODs.png'
+Holz-Objekte ['jacaranda_tree_LOD0.001', 'jacaranda_tree_LOD0.002'] Blatt-Objekte ['jacaranda_tree_LOD0']
+DEBUG W_h 19.414204701781273 L_h 17.219542503356934 H0 19.468875035643578
+jacaranda_tree: LOD0 74690, LOD1 24999, Hoehe 17.33, Breite 24.56, Blaetter 60377 (Karten 60377)
+74690 -> LOD0 <= 90000 -> OK
+24999 -> LOD1 <= 25000 -> OK
+17.33/19.47 -> Hoehe +-5% -> NOK
+fertig
+=== ENDE

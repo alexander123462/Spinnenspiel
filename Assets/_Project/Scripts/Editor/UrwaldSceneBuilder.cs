@@ -71,6 +71,9 @@ namespace Spinnenspiel.EditorTools
             // Bodendecker (Scan-Gras/Kraut): nur Optik, keine Collider; um die Spinne herum.
             LoadGroundCover(lib);
 
+            // Poly-Haven-Baume (B3): FBX-Meshes (LOD0/1) + HDRP-Materials + Scales in die Library.
+            LoadPHTrees(lib);
+
             // Boden: Scan-TerrainLayer (TileSize 2 m, ca. 1 Kachel pro 2 m); Fallback: prozedurale Layer.
             // Reihenfolge: Earth, Grass, Mud, Rock.
             lib.terrainLayers = ScanLayers(new[]
@@ -366,6 +369,155 @@ namespace Spinnenspiel.EditorTools
             if (normal != null) mat.SetTexture("_NormalMap", AssetDatabase.LoadAssetAtPath<Texture2D>(normal));
             mat.color = Color.white;
             return mat;
+        }
+
+        /// <summary>
+        /// B3: loading the 5 Poly Haven trees (LOD0/LOD1 per FBX) plus their HDRP materials
+        /// (wood opaque; leaves Alpha-Cutout 0.5, double-sided) into the asset library.
+        /// Submesh order measured via GetSubMesh(i).bounds (leaf = wider crown), scale from
+        /// mesh height (Jacaranda approx. 30 m, island trees 3-5x).
+        /// </summary>
+        private static void LoadPHTrees(JungleAssetLibrary lib)
+        {
+            const string root = "Assets/_Project/Art/Plants/PH_Baeume/";
+            string[] ids = { "jacaranda_tree", "island_tree_01", "island_tree_02", "island_tree_03", "tree_small_02" };
+
+            lib.phTreeLod0 = new Mesh[ids.Length];
+            lib.phTreeLod1 = new Mesh[ids.Length];
+            lib.phTreeWoodMats = new Material[ids.Length];
+            lib.phTreeLeafMats = new Material[ids.Length];
+            lib.phTreeScales = new float[ids.Length];
+
+            for (int i = 0; i < ids.Length; i++)
+            {
+                string fbx = root + ids[i] + "/" + ids[i] + ".fbx";
+                var lodMeshes = new Mesh[2];
+                foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(fbx))
+                {
+                    if (obj is Mesh mesh && mesh.name.Contains("_LOD0")) lodMeshes[0] = mesh;
+                    if (obj is Mesh m1 && m1.name.Contains("_LOD1")) lodMeshes[1] = m1;
+                }
+
+                if (lodMeshes[0] == null || lodMeshes[1] == null)
+                {
+                    foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(fbx))
+                    {
+                        if (obj is Mesh badMesh)
+                        {
+                            Debug.Log("[Urwald] PH-Tree Mesh found: " + badMesh.name + " verts=" + badMesh.vertexCount);
+                        }
+                    }
+
+                    Debug.LogWarning("[Urwald] PH-Tree FBX without LOD0/LOD1: " + fbx);
+                    continue;
+                }
+
+                lib.phTreeLod0[i] = lodMeshes[0];
+                lib.phTreeLod1[i] = lodMeshes[1];
+                var mats = CreatePHTreeMats(ids[i]);
+                lib.phTreeWoodMats[i] = mats[0];
+                lib.phTreeLeafMats[i] = mats[1];
+
+                float height = lodMeshes[0].bounds.size.y;
+                float target = ids[i] == "jacaranda_tree" ? 30f : 12f;
+                float scale = target / Mathf.Max(0.01f, height);
+                if (ids[i] != "jacaranda_tree")
+                {
+                    scale = Mathf.Clamp(scale, 3f, 5f);
+                }
+
+                lib.phTreeScales[i] = scale;
+                Debug.Log(string.Format("[Urwald] PH-Tree {0}: Hoehe {1:0.00} m -> Scale {2:0.00} -> Hoehe {3:0.0} m (Kriterium Jacaranda 25-35, else 9-20)",
+                    ids[i], height, scale, height * scale));
+            }
+        }
+
+        /// <summary>
+        /// HDRP-Lit-Materials per PH-Tree: [0]=Holz opak (trunk/branch-Textures),
+        /// [1]=Blätter Alpha-Cutout 0.5, doppelseitig (leaves_*-Textures). Existing get reused,
+        /// afterwards HDMaterial.ValidateMaterial. Texture-Import: Normal non-sRGB, Mask non-sRGB.
+        /// </summary>
+        private static Material[] CreatePHTreeMats(string id)
+        {
+            string tex = "Assets/_Project/Art/Plants/PH_Baeume/" + id + "/Textures/";
+            // Wood-Base: Jacaranda "trunk", else "<id>_Albedo".
+            string woodBase = tex + id + "_" + (id == "jacaranda_tree" ? "trunk_" : "");
+
+            Material wood = GetOrLoadPHTreeMat("MAT_PHTree_" + id + "_Wood");
+            SetPHTexture(wood, woodBase + "Albedo.png", true);
+            SetPHTexture(wood, woodBase + "Normal.png", false);
+            SetPHTexture(wood, woodBase + "Mask.png", false);
+            wood.SetFloat("_SurfaceType", 0f); // opaque
+            wood.SetFloat("_AlphaCutoffEnable", 0f);
+            wood.SetFloat("_Smoothness", 0.15f);
+
+            Material leaf = GetOrLoadPHTreeMat("MAT_PHTree_" + id + "_Leaf");
+            SetPHTexture(leaf, tex + id + "_leaves_Albedo.png", true);
+            SetPHTexture(leaf, tex + id + "_leaves_Normal.png", false);
+            SetPHTexture(leaf, tex + id + "_leaves_Mask.png", false);
+            leaf.SetFloat("_SurfaceType", 1f); // Cutout
+            leaf.SetFloat("_AlphaCutoffEnable", 1f);
+            leaf.SetFloat("_AlphaCutoff", 0.5f);
+            leaf.SetFloat("_DoubleSidedEnable", 1f);
+            leaf.SetFloat("_CullMode", 0f);
+            leaf.SetFloat("_DoubleSidedNormalMode", 2f); // Reversed (Flip-Normals)
+            leaf.enableInstancing = true;
+
+            HDMaterial.ValidateMaterial(wood);
+            HDMaterial.ValidateMaterial(leaf);
+            EditorUtility.SetDirty(wood);
+            EditorUtility.SetDirty(leaf);
+            return new[] { wood, leaf };
+        }
+
+        private static Material GetOrLoadPHTreeMat(string name)
+        {
+            string path = MatFolder + name + ".mat";
+            Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                Shader hdrpLit = Shader.Find("HDRP/Lit");
+                if (hdrpLit == null)
+                {
+                    throw new System.InvalidOperationException("[Urwald] Shader nicht gefunden: HDRP/Lit");
+                }
+
+                mat = new Material(hdrpLit) { name = name };
+                AssetDatabase.CreateAsset(mat, path);
+            }
+
+            mat.color = Color.white;
+            return mat;
+        }
+
+        /// <summary>Texture-Assignment with Import-Settings: sRGB Albedo (alphaTransparency), Normal non-sRGB.</summary>
+        private static void SetPHTexture(Material mat, string texPath, bool isAlbedo)
+        {
+            if (!System.IO.File.Exists(texPath))
+            {
+                Debug.LogWarning("[Urwald] PH-Tree-Texture fehlt: " + texPath);
+                return;
+            }
+
+            TextureImporter importer = AssetImporter.GetAtPath(texPath) as TextureImporter;
+            if (importer != null)
+            {
+                bool isNormal = texPath.EndsWith("Normal.png");
+                importer.sRGBTexture = isAlbedo;
+                importer.textureType = isNormal ? TextureImporterType.NormalMap : TextureImporterType.Default;
+                importer.alphaIsTransparency = isAlbedo;
+                importer.SaveAndReimport();
+            }
+
+            Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
+            if (tex == null)
+            {
+                Debug.LogWarning("[Urwald] PH-Texture not loadable: " + texPath);
+                return;
+            }
+
+            string prop = texPath.EndsWith("Normal.png") ? "_NormalMap" : texPath.EndsWith("Mask.png") ? "_MaskMap" : "_BaseColorMap";
+            mat.SetTexture(prop, tex);
         }
 
         /// <summary>Lädt Scan-Bodendecker (Gras/Kraut) als Mesh-/Material-Paare in die Asset-Bibliothek.</summary>

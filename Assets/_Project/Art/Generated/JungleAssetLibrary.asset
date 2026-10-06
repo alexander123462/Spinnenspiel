@@ -54,6 +54,36 @@ MonoBehaviour:
   - {fileID: 2100000, guid: 790302d2a6f2ef848af9384f23938297, type: 2}
   - {fileID: 2100000, guid: 002e9d1e93bcaf942aa7114f825e664b, type: 2}
   - {fileID: 2100000, guid: 6604d49ba0883b84b93a2c25f0762d96, type: 2}
+  phTreeLod0:
+  - {fileID: -3041392576114301669, guid: 6e4229031562afe4dbe2777d5f4e2918, type: 3}
+  - {fileID: -4573377648036762696, guid: 6289a73ef9ca18a4cb364b7e44df25c1, type: 3}
+  - {fileID: 7269387617276295180, guid: b1a47132eb34a6e46bdc64ca07ee178e, type: 3}
+  - {fileID: 8817124431214624275, guid: 68b917a39ac570c41ab2a1c270e2cfe7, type: 3}
+  - {fileID: 1384434759578104745, guid: 606ab53172926954fb9f536c7a451712, type: 3}
+  phTreeLod1:
+  - {fileID: 3208158450535171237, guid: 6e4229031562afe4dbe2777d5f4e2918, type: 3}
+  - {fileID: -7690267842432765104, guid: 6289a73ef9ca18a4cb364b7e44df25c1, type: 3}
+  - {fileID: -7419082993899318194, guid: b1a47132eb34a6e46bdc64ca07ee178e, type: 3}
+  - {fileID: 2291372102503624755, guid: 68b917a39ac570c41ab2a1c270e2cfe7, type: 3}
+  - {fileID: -6723503324878603599, guid: 606ab53172926954fb9f536c7a451712, type: 3}
+  phTreeWoodMats:
+  - {fileID: 2100000, guid: 67c7855bf2f66924ab721d1bfad7868d, type: 2}
+  - {fileID: 2100000, guid: 142bc6400d5d7ea4c837964884d1a6ee, type: 2}
+  - {fileID: 2100000, guid: dab2424b2acd2e543893388713fc581b, type: 2}
+  - {fileID: 2100000, guid: 0ded83e724634b1429a0ac5779042816, type: 2}
+  - {fileID: 2100000, guid: 0d0a914adb7871e4a93e6d706d305157, type: 2}
+  phTreeLeafMats:
+  - {fileID: 2100000, guid: c3305d48a9e79ea4da891cbb3d052783, type: 2}
+  - {fileID: 2100000, guid: 989f261b1adb4b3489e375e8e872ad08, type: 2}
+  - {fileID: 2100000, guid: f363da3824995c44c9d98e2488d083ae, type: 2}
+  - {fileID: 2100000, guid: 427bf6924f0357140b9a16201cdf4444, type: 2}
+  - {fileID: 2100000, guid: 2b879d8b1d62d3d4b9f0c785140cb224, type: 2}
+  phTreeScales:
+  - 1.731101
+  - 3
+  - 3.5264537
+  - 4.5635643
+  - 3
   logs:
   - {fileID: 4300000, guid: cc578cc4491c562498645ea4e928559b, type: 2}
   - {fileID: 4300000, guid: 50a11b4b795adf44cbf08fd3195849b4, type: 2}
