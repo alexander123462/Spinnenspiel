@@ -130,12 +130,16 @@ namespace Spinnenspiel
                     Vector3 flat = new Vector3(x, 0f, z);
                     if (HasNearbyTree(placed, cell, flat)) continue;
 
-                    int variant = (int)(World.Hash01(gx, gz, 4) * 3f) % System.Math.Max(1, library.trunks.Length);
+                    int treeVariants = library.phTreeLod0 != null ? library.phTreeLod0.Length : 0;
+                    if (treeVariants == 0) continue; // ohne PH-Trees im Library: skip (geloggt frueh unten)
+                    int variant = (int)(World.Hash01(gx, gz, 4) * treeVariants) % treeVariants;
                     float rot = World.Hash01(gx, gz, 5) * 360f;
-                    float scale = 0.8f + World.Hash01(gx, gz, 6) * 0.5f;
+                    // Zufalls-Skalierung mal Library-Scale (Jacaranda ca. 30 m, Inselbäume 12-15 m).
+                    float scale = (0.8f + World.Hash01(gx, gz, 6) * 0.5f) * library.phTreeScales[variant];
                     float y = h - 0.15f;
 
                     Transform tree = CreateTree(new Vector3(x, y, z), rot, scale, variant, treesRoot);
+                    if (tree == null) continue;
                     Trees.Add(tree);
 
                     if (!placed.TryGetValue(cell, out List<Vector3> list))
@@ -564,55 +568,87 @@ namespace Spinnenspiel
         }
 
         /// <summary>
-        /// Baum aus generierten Meshes aufbauen (Vorlage VegetationBuilder.CreateTree),
-        /// zur Laufzeit ohne AssetUtil-Aufruf.
+        /// PH-Tree (Poly Haven) aufbauen: LOD0/LOD1-Mesh from Library, one MeshRenderer per LOD
+        /// with 2 materials in SUBMESH order. Submesh order NOT guaranteed by FBX import ->
+        /// wood/leaf assigned per GetSubMesh(i).bounds (taller+narrower = Wood, broader = Leaf).
+        /// MeshCollider on the LOD1-Mesh (concave), SurfaceTag Wood on root and collider node.
         /// </summary>
         private Transform CreateTree(Vector3 pos, float rotY, float scale, int variant, Transform parent)
         {
-            Mesh trunkMesh = library.trunks[variant];
-            Mesh crownNear = library.crownsNear[variant];
-            Mesh crownFar = library.crownsFar[variant];
+            Mesh lod0 = library.phTreeLod0[variant];
+            Mesh lod1 = library.phTreeLod1 != null && variant < library.phTreeLod1.Length ? library.phTreeLod1[variant] : lod0;
+            if (lod0 == null) return null;
+            Material woodMat = library.phTreeWoodMats[variant];
+            Material leafMat = library.phTreeLeafMats[variant];
 
-            GameObject tree = new GameObject("Tree");
+            GameObject tree = new GameObject("PH-Tree");
             tree.transform.SetParent(parent, false);
             tree.transform.position = pos;
             tree.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
             tree.transform.localScale = Vector3.one * scale;
             tree.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Wood;
 
-            GameObject trunk = new GameObject("Trunk");
-            trunk.transform.SetParent(tree.transform, false);
-            trunk.transform.localPosition = Vector3.zero;
-            trunk.AddComponent<MeshFilter>().sharedMesh = trunkMesh;
-            Renderer trunkR = trunk.AddComponent<MeshRenderer>();
-            trunkR.sharedMaterial = library.bark;
-            var mc = trunk.AddComponent<MeshCollider>();
-            mc.sharedMesh = trunkMesh;
+            // Material per Submesh: Wood/Leaf in der ACTUALN submesh-order (Blender-Order not guaranteed).
+            MeshRenderer r0 = null, r1 = null;
+            GameObject lod0Node = new GameObject("TreeLOD0");
+            lod0Node.transform.SetParent(tree.transform, false);
+            lod0Node.transform.localPosition = Vector3.zero;
+            lod0Node.AddComponent<MeshFilter>().sharedMesh = lod0;
+            r0 = lod0Node.AddComponent<MeshRenderer>();
+            r0.sharedMaterials = PickMaterialsPerSubmesh(lod0, woodMat, leafMat, variant);
+
+            if (lod1 != lod0)
+            {
+                GameObject lod1Node = new GameObject("TreeLOD1");
+                lod1Node.transform.SetParent(tree.transform, false);
+                lod1Node.transform.localPosition = Vector3.zero;
+                lod1Node.AddComponent<MeshFilter>().sharedMesh = lod1;
+                r1 = lod1Node.AddComponent<MeshRenderer>();
+                r1.sharedMaterials = PickMaterialsPerSubmesh(lod1, woodMat, leafMat, variant);
+            }
+
+            // Collider on the LOD1-Mesh: concave MeshCollider so the Spider gets stopped.
+            GameObject colNode = new GameObject("TreeCollider");
+            colNode.transform.SetParent(tree.transform, false);
+            var mc = colNode.AddComponent<MeshCollider>();
+            mc.sharedMesh = lod1;
             mc.convex = false;
-            trunk.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Wood;
-
-            GameObject crown0 = new GameObject("CrownLOD0");
-            crown0.transform.SetParent(tree.transform, false);
-            crown0.AddComponent<MeshFilter>().sharedMesh = crownNear;
-            Renderer crown0R = crown0.AddComponent<MeshRenderer>();
-            crown0R.sharedMaterial = library.leaves;
-
-            GameObject crown1 = new GameObject("CrownLOD1");
-            crown1.transform.SetParent(tree.transform, false);
-            crown1.AddComponent<MeshFilter>().sharedMesh = crownFar;
-            Renderer crown1R = crown1.AddComponent<MeshRenderer>();
-            crown1R.sharedMaterial = library.leaves;
 
             var lod = tree.AddComponent<LODGroup>();
             lod.SetLODs(new[]
             {
-                new LOD(0.18f, new Renderer[] { trunkR, crown0R }),
-                new LOD(0.04f, new Renderer[] { trunkR, crown1R }),
+                new LOD(0.18f, new MeshRenderer[] { r0 }),
+                new LOD(0.04f, new MeshRenderer[] { r1 != null ? r1 : r0 }),
             });
             lod.fadeMode = LODFadeMode.CrossFade;
             lod.RecalculateBounds();
 
             return tree.transform;
+        }
+
+        /// <summary>
+        /// Wood/Leaf per Submesh via bounds: der Submesh mit der grueateren Bounds.Y und der
+        /// schmalerer x/z-Footprint = Wood (Stem), die broader = Leaf (Crown). One Submesh: Wood.
+        /// Logs the measured values once per variant ("Value -> Kriterium -> Result").
+        /// </summary>
+        private static Material[] PickMaterialsPerSubmesh(Mesh mesh, Material woodMat, Material leafMat, int variant)
+        {
+            int subs = Math.Max(1, mesh.subMeshCount);
+            var matPerSub = new Material[subs];
+            if (subs == 1)
+            {
+                matPerSub[0] = woodMat;
+                return matPerSub;
+            }
+            Bounds m0 = mesh.GetSubMesh(0).bounds;
+            Bounds m1 = mesh.GetSubMesh(1).bounds;
+            float f0 = m0.size.x * m0.size.z, f1 = m1.size.x * m1.size.z;
+            bool sub0IsWood = m0.size.y >= m1.size.y && f0 <= f1;
+            UnityEngine.Debug.Log(string.Format("[Tree] variant {0}: s0 h={1:0.00} f={2:0.000} | s1 h={3:0.00} f={4:0.000} -> Wood=Sub{5}",
+                variant, m0.size.y, f0, m1.size.y, f1, sub0IsWood ? 0 : 1));
+            matPerSub[0] = sub0IsWood ? woodMat : leafMat;
+            matPerSub[1] = sub0IsWood ? leafMat : woodMat;
+            return matPerSub;
         }
 
         private void Update()
