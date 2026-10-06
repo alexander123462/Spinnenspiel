@@ -35,6 +35,13 @@ namespace Spinnenspiel
         public Mesh[] groundCover;
         public Material[] groundCoverMats;
 
+        /// <summary>Poly-Haven-Baeume. Index 0..4 = Baumart (Jacaranda, island_tree_01..03, tree_small_02).
+        /// phTreeMeshes[i][0]=LOD0, [i][1]=LOD1. phTreeMats[i][0]=Holz, [i][1]=Blätter.
+        /// phTreeScales[i] = Worldscale so das Jacaranda ca. 25-35 m high.</summary>
+        public Mesh[][] phTreeMeshes;
+        public Material[][] phTreeMats;
+        public float[] phTreeScales;
+
         public Mesh[] logs;
         public Mesh[] rocks;
         public Material logMat;
