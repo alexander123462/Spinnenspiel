@@ -1,4 +1,6 @@
 using UnityEngine;
+using System.Linq;
+using UnityEditor;
 
 namespace Spinnenspiel.EditorTools
 {
@@ -25,6 +27,8 @@ namespace Spinnenspiel.EditorTools
         private const float TarsusLength = 0.028f;
         // L2: Vogelspinnen-Beine kräftiger
         private const float Thickness = 0.015f;
+
+        private const string LegFbx = "Assets/_Project/Art/Spider/Spinne_Beine.fbx";
 
         public static void Build(GameObject spider, Transform body, Material legMaterial)
         {
@@ -53,9 +57,9 @@ namespace Spinnenspiel.EditorTools
                     rest.SetParent(targets, false);
                     rest.localPosition = new Vector3(side * Mathf.Sin(angle) * radius, 0f, Mathf.Cos(angle) * radius);
 
-                    Transform femur = CreateSegment(visuals, legName + "_Femur", legMaterial);
-                    Transform tibia = CreateSegment(visuals, legName + "_Tibia", legMaterial);
-                    Transform tarsus = CreateSegment(visuals, legName + "_Tarsus", legMaterial);
+                    Transform femur = CreateSegment(visuals, legName + "_Femur", legMaterial, "Femur");
+                    Transform tibia = CreateSegment(visuals, legName + "_Tibia", legMaterial, "Tibia");
+                    Transform tarsus = CreateSegment(visuals, legName + "_Tarsus", legMaterial, "Tarsus");
 
                     SpiderLeg leg = hip.gameObject.AddComponent<SpiderLeg>();
                     leg.Configure(rest, body, group, UpperLength * scale, LowerLength * scale, TarsusLength * scale,
@@ -68,16 +72,28 @@ namespace Spinnenspiel.EditorTools
             bodyController.Configure(body, body.localPosition.y);
         }
 
-        private static Transform CreateSegment(Transform parent, string name, Material material)
+        private static Transform CreateSegment(Transform parent, string name, Material material, string meshKey)
         {
-            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            go.name = name;
-            go.transform.SetParent(parent, false);
-            Object.DestroyImmediate(go.GetComponent<Collider>());
-            MeshRenderer renderer = go.GetComponent<MeshRenderer>();
-            renderer.sharedMaterial = material;
-            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
-            return go.transform;
+            Mesh mesh = AssetDatabase.LoadAllAssetsAtPath(LegFbx).OfType<Mesh>().FirstOrDefault(m => m.name.Contains(meshKey));
+            if (mesh != null)
+            {
+                GameObject go = new GameObject(name);
+                go.transform.SetParent(parent, false);
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                MeshRenderer renderer = go.AddComponent<MeshRenderer>();
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+                return go.transform;
+            }
+            Debug.LogWarning("[Spider] Bein-Mesh fehlt: " + meshKey + " in " + LegFbx + " – Kapsel bleibt");
+            GameObject capsule = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            capsule.name = name;
+            capsule.transform.SetParent(parent, false);
+            Object.DestroyImmediate(capsule.GetComponent<Collider>());
+            MeshRenderer capsuleRenderer = capsule.GetComponent<MeshRenderer>();
+            capsuleRenderer.sharedMaterial = material;
+            capsuleRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
+            return capsule.transform;
         }
     }
 }

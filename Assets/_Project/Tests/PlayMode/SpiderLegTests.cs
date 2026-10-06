@@ -243,5 +243,58 @@ namespace Spinnenspiel.Tests
 
             Assert.IsEmpty(fehler, string.Join("\n", fehler));
         }
+
+        [UnityTest]
+        public IEnumerator Legs_UseBlenderMeshes()
+        {
+            SceneManager.LoadScene(SceneName);
+            yield return null;
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+
+            string[] suffixes = { "_Femur", "_Tibia", "_Tarsus" };
+            List<MeshFilter> segmentFilters = new List<MeshFilter>();
+            foreach (MeshFilter mf in spider.GetComponentsInChildren<MeshFilter>())
+            {
+                foreach (string suffix in suffixes)
+                {
+                    if (mf.gameObject.name.EndsWith(suffix))
+                    {
+                        segmentFilters.Add(mf);
+                        break;
+                    }
+                }
+            }
+
+            Assert.AreEqual(24, segmentFilters.Count,
+                "Bein-Segment-MeshFilters unter der Spinne: " + segmentFilters.Count + " (es braucht 24)");
+
+            List<string> report = new List<string>();
+            List<string> fehler = new List<string>();
+            foreach (MeshFilter mf in segmentFilters)
+            {
+                Mesh mesh = mf.sharedMesh;
+                Assert.IsNotNull(mesh, "sharedMesh null auf " + mf.gameObject.name);
+                Vector3 size = mesh.bounds.size;
+                report.Add(mf.gameObject.name + " | " + mesh.name + " | size.y " + size.y.ToString("F4", CultureInfo.InvariantCulture));
+
+                if (mesh.name.Contains("Capsule"))
+                {
+                    fehler.Add(mf.gameObject.name + ": sharedMesh.name '" + mesh.name + "' contains Capsule");
+                }
+
+                if (size.y < 1.9f || size.y > 2.1f)
+                {
+                    fehler.Add(mf.gameObject.name + " (" + mesh.name + "): size.y " + size.y.ToString("F4", CultureInfo.InvariantCulture) + " outside 1.9..2.1");
+                }
+            }
+
+            string logDir = Path.Combine(Application.dataPath, "../Logs/ci");
+            Directory.CreateDirectory(logDir);
+            File.WriteAllLines(Path.Combine(logDir, "leg_mesh_report.txt"), report);
+
+            Assert.IsEmpty(fehler, string.Join("\n", fehler));
+        }
     }
 }
