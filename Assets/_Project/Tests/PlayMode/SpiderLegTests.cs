@@ -296,5 +296,43 @@ namespace Spinnenspiel.Tests
 
             Assert.IsEmpty(fehler, string.Join("\n", fehler));
         }
+
+        [UnityTest]
+        public IEnumerator Body_UsesScanMeshesAndDoubleSided()
+        {
+            SceneManager.LoadScene(SceneName);
+            yield return null;
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+
+            string[] bodyNames = { "Abdomen", "Cephalothorax" };
+            List<string> fehler = new List<string>();
+            foreach (string name in bodyNames)
+            {
+                Transform part = spider.transform.Find("Body/" + name);
+                Assert.IsTrue(part != null, "Koerper-Part fehlt: Body/" + name);
+                MeshFilter mf = part.GetComponent<MeshFilter>();
+                Assert.IsNotNull(mf, "MeshFilter fehlt auf " + name);
+                Mesh mesh = mf.sharedMesh;
+                Assert.IsNotNull(mesh, "sharedMesh null auf " + name);
+                if (mesh.name.Contains("Sphere"))
+                {
+                    fehler.Add(name + ": Kugel-Fallback still in use (mesh.name " + mesh.name + ")");
+                }
+
+                MeshRenderer mr = part.GetComponent<MeshRenderer>();
+                Assert.IsNotNull(mr, "MeshRenderer fehlt auf " + name);
+                Material mat = mr.sharedMaterial;
+                Assert.IsNotNull(mat, "Material null auf " + name);
+                float doubleSided = mat.GetFloat("_DoubleSidedEnable");
+                if (Math.Abs(doubleSided - 1f) > 0.001f)
+                {
+                    fehler.Add(name + ": _DoubleSidedEnable = " + doubleSided.ToString("F1") + " (needs 1 for Haerchens)");
+                }
+            }
+
+            Assert.IsEmpty(fehler, string.Join("\n", fehler));
+        }
     }
 }

@@ -1,6 +1,6 @@
 # Spinnenkoerper (Abdomen + Cephalothorax) prozedural bauen, FBX exportieren, Vorschau rendern.
 # Aufruf: blender -b -P spinne_koerper.py -- <outdir> <seed> [render]
-import bpy, math, sys, os
+import bpy, bmesh, math, sys, os
 import numpy as np
 from mathutils import Vector
 
@@ -146,6 +146,35 @@ abdomen = make_obj("Spinne_Abdomen", aV, aF, aUV)
 cV, cF, cUV = deformed_sphere(32, 32, deform_ceph)
 ceph = make_obj("Spinne_Cephalothorax", cV, cF, cUV)
 
+# ---------------- Behaarung: kurze Kegel, liegen nach hinten (+Y) ----------------
+def add_hairs(ob, count, lmin, lmax, r0, tilt, seed):
+    """count Haare flaechengewichtet auf ob verteilen. tilt = Winkel von der Normalen Richtung +Y (Grad).
+    UV = UV der Grundflaeche, die Haarfarbe kommt also aus der Textur."""
+    r = np.random.default_rng(seed)
+    bm = bmesh.new(); bm.from_mesh(ob.data); bm.faces.ensure_lookup_table()
+    uv = bm.loops.layers.uv.active; ob["n_body"] = len(bm.faces)
+    faces = list(bm.faces); areas = np.array([f.calc_area() for f in faces])
+    picks = r.choice(len(faces), count, p=areas / areas.sum())
+    for fi in picks:
+        f = faces[fi]; n = f.normal.copy(); c = f.calc_center_median()
+        base = c.lerp(f.verts[int(r.integers(len(f.verts)))].co, float(r.random()) * 0.8)
+        u = f.loops[0][uv].uv.copy(); u.y = 0.995  # Haarfarbe: heller Streifen am vorderen Pol der Textur
+        tb = Vector((0, 1, 0)) - n * n.y
+        tb = tb.normalized() if tb.length > 1e-4 else n.orthogonal().normalized()
+        a = math.radians(tilt + r.normal(0, 12))
+        d = (n * math.cos(a) + tb * math.sin(a)).normalized()
+        e1 = d.orthogonal().normalized(); e2 = d.cross(e1)
+        ring = [bm.verts.new(base + (e1 * math.cos(k * 2.094) + e2 * math.sin(k * 2.094)) * r0) for k in range(3)]
+        tip = bm.verts.new(base + d * float(r.uniform(lmin, lmax)))
+        for k in range(3):
+            fc = bm.faces.new((ring[k], ring[(k + 1) % 3], tip)); fc.smooth = False
+            for lp in fc.loops: lp[uv].uv = u
+    bm.to_mesh(ob.data); bm.free(); ob.data.update()
+    print(f"{ob.name}: {count} Haare, Dreiecke jetzt {sum(len(p.vertices) - 2 for p in ob.data.polygons)}")
+
+add_hairs(abdomen, 7000, 0.12, 0.28, 0.012, 58, seed + 11)
+add_hairs(ceph, 2500, 0.06, 0.14, 0.008, 68, seed + 12)
+
 # ---------------- Normalisieren (Bounds -> 1.0) + ausgeben ----------------
 normalize(abdomen)
 normalize(ceph)
@@ -164,8 +193,8 @@ def check_polys(ob, limit=4000):
     ok = n < limit
     print(f"{ob.name}: Polys={n} -> Kriterium < {limit} -> {'OK' if ok else 'NOK'}")
     return ok
-_abd_ok = check_bounds(abdomen) and check_polys(abdomen, 4000)
-_cep_ok = check_bounds(ceph) and check_polys(ceph, 4000)
+_abd_ok = check_bounds(abdomen) and check_polys(abdomen, 30000)
+_cep_ok = check_bounds(ceph) and check_polys(ceph, 20000)
 print(f"PRUEFUNG Abdomen+Kephalothorax: {'ALLE OK' if (_abd_ok and _cep_ok) else 'NOK - siehe oben'}")
 
 # ---------------- Normalen nach aussen (kein hohler/innenseitiger Look) ----------------
@@ -178,16 +207,18 @@ def check_normals(ob):
     import bmesh
     bm = bmesh.new()
     bm.from_mesh(ob.data)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    nb = ob.get("n_body", len(bm.faces)); bm.faces.ensure_lookup_table()
+    bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces)[:nb])  # nur Koerper, Haare behalten ihre Richtung
     bm.to_mesh(ob.data)
     bm.free()
     ob.data.update()
     me = ob.data
     mittelpunkt = sum((p.center for p in me.polygons), Vector((0.0, 0.0, 0.0))) / len(me.polygons)
-    n_out = sum(1 for p in me.polygons if p.normal.dot(p.center - mittelpunkt) > 0.0)
-    frac = n_out / len(me.polygons)
+    body = list(me.polygons)[:nb]
+    n_out = sum(1 for p in body if p.normal.dot(p.center - mittelpunkt) > 0.0)
+    frac = n_out / len(body)
     ok = frac >= 0.95
-    print(f"{ob.name}: Normalen nach aussen: {n_out}/{len(me.polygons)} ({frac:.3f}) -> Kriterium >= 0.95 -> {'OK' if ok else 'NOK'}")
+    print(f"{ob.name}: Normalen nach aussen (Koerper): {n_out}/{len(body)} ({frac:.3f}) -> Kriterium >= 0.95 -> {'OK' if ok else 'NOK'}")
     return ok
 _abd_ok = _abd_ok and check_normals(abdomen)
 _cep_ok = _cep_ok and check_normals(ceph)

@@ -57,6 +57,7 @@ col = base[None, None] * (1 + 0.30 * noise(15, 11, (H, W))[..., None])
 col = col * (1 - 0.45 * hair[..., None]) + hair_c[None, None] * (0.45 * hair)[..., None]
 col = col * (1 - 0.50 * chevron[..., None]) + chev_c[None, None] * (0.50 * chevron)[..., None]
 col = np.clip(col, 0, 1)
+col[V > 0.985] = [0.50, 0.36, 0.22]  # Haarfarbe (Haar-UVs zeigen auf v=0.995)
 save_rgb(col[::-1], f"{out}/Spinne_Abdomen_Albedo.png")
 
 # --- Hoehe -> Normal (OpenGL) ---
@@ -105,6 +106,7 @@ colc = base_c[None, None] * (1 + 0.28 * noise(14, 21, (H, W))[..., None])
 colc = colc * (1 - 0.45 * radial[..., None]) + spoke_c[None, None] * (0.45 * radial)[..., None]
 colc = colc * (1 - 0.30 * fovea[..., None]) + foc_c[None, None] * (0.30 * fovea)[..., None]
 colc = np.clip(colc, 0, 1)
+colc[V > 0.985] = [0.42, 0.31, 0.20]  # Haarfarbe (Haar-UVs zeigen auf v=0.995)
 save_rgb(colc[::-1], f"{out}/Spinne_Cephalothorax_Albedo.png")
 
 # --- Hoehe -> Normal (OpenGL) ---

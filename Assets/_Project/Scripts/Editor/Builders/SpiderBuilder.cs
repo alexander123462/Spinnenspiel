@@ -43,16 +43,16 @@ namespace Spinnenspiel.EditorTools
             Material legMat = CreateScanMaterial("MAT_SpiderLegScan",
                 "Assets/_Project/Art/Spider/Textures/Spinne_Leg_Albedo.png",
                 "Assets/_Project/Art/Spider/Textures/Spinne_Leg_Mask.png",
-                "Assets/_Project/Art/Spider/Textures/Spinne_Leg_Normal.png");
+                "Assets/_Project/Art/Spider/Textures/Spinne_Leg_Normal.png", false);
             Material eyeMat = AssetUtil.CreateLitMaterial(folder + "/MAT_SpiderEye.mat", new Color(0.02f, 0.02f, 0.025f), 0.95f);
             Material abdomenScanMat = CreateScanMaterial("MAT_SpiderAbdomenScan",
                 "Assets/_Project/Art/Spider/Textures/Spinne_Abdomen_Albedo.png",
                 "Assets/_Project/Art/Spider/Textures/Spinne_Abdomen_Mask.png",
-                "Assets/_Project/Art/Spider/Textures/Spinne_Abdomen_Normal.png");
+                "Assets/_Project/Art/Spider/Textures/Spinne_Abdomen_Normal.png", true);
             Material carapaceMat = CreateScanMaterial("MAT_SpiderCarapace",
                 "Assets/_Project/Art/Spider/Textures/Spinne_Cephalothorax_Albedo.png",
                 "Assets/_Project/Art/Spider/Textures/Spinne_Cephalothorax_Mask.png",
-                "Assets/_Project/Art/Spider/Textures/Spinne_Cephalothorax_Normal.png");
+                "Assets/_Project/Art/Spider/Textures/Spinne_Cephalothorax_Normal.png", true);
 
             AddPart(body.transform, "Abdomen", new Vector3(0f, 0.008f, -0.052f), new Vector3(0.085f, 0.068f, 0.11f), abdomenMat);
             ApplyScanMesh(body.transform.Find("Abdomen"), "Assets/_Project/Art/Spider/Spinne_Abdomen.fbx", abdomenScanMat);
@@ -164,9 +164,9 @@ namespace Spinnenspiel.EditorTools
 
         /// <summary>
         /// Erzeugt ein HDRP/Lit-Material aus Albedo/Mask/Normal-Textur.
-        /// Opak, einseitig, Smoothness 0.42.
+        /// Opak, Smoothness 0.42. doubleSided=true for the body (Härchen need backfaces).
         /// </summary>
-        private static Material CreateScanMaterial(string name, string albedo, string mask, string normal)
+        private static Material CreateScanMaterial(string name, string albedo, string mask, string normal, bool doubleSided)
         {
             string path = AssetUtil.GeneratedRoot + "/Materials/" + name + ".mat";
             AssetUtil.EnsureFolder(AssetUtil.GeneratedRoot + "/Materials");
@@ -191,7 +191,7 @@ namespace Spinnenspiel.EditorTools
             mat.SetTexture("_NormalMap", normalTex);
             mat.SetFloat("_SurfaceType", 0f);          // Opak
             mat.SetFloat("_AlphaCutoffEnable", 0f);    // Kein Cutout
-            mat.SetFloat("_DoubleSidedEnable", 0f);    // Einseitig
+            mat.SetFloat("_DoubleSidedEnable", doubleSided ? 1f : 0f);
             mat.SetFloat("_Smoothness", 0.42f);
             mat.color = Color.white;
 
