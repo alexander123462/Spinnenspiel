@@ -16,7 +16,8 @@ $models1k = @(
 $models2k = @(
   'shrub_02','shrub_03','shrub_04','fir_tree_01','pine_tree_01','fir_sapling',
   'pine_sapling_small','pine_sapling_medium','dead_tree_trunk','dead_tree_trunk_02',
-  'tree_stump_01','tree_stump_02','rock_moss_set_01','rock_moss_set_02','rock_07','rock_09','boulder_01'
+  'tree_stump_01','tree_stump_02','rock_moss_set_01','rock_moss_set_02','rock_07','rock_09','boulder_01',
+  'island_tree_01','island_tree_02','island_tree_03','jacaranda_tree','tree_small_02'
 )
 $textures2k = @(
   'forest_ground_04','sparse_grass','brown_mud_leaves_01','mud_forest','rocky_trail',

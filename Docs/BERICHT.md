@@ -1,0 +1,31 @@
+
+2026-10-06 | B1 Beine | BLOCKED: Unity offen (Hub installing Editor 6000.3.24f1, unity.exe PID 37460 lauft) -> CI not run, nothing committed | no hash
+
+2026-10-06 | B1 Beine | GRUEN: CS0136 fixed, FBX imported, Legs_UseBlenderMeshes passed (size.y 2.0 all 24), full CI 81 passed / 0 failed | cb50b7a
+
+2026-10-06 | B2 Koerper | GRUEN: Body_UsesScanMeshesAndDoubleSided passed, full CI 82 passed / 0 failed | 424da30
+
+2026-10-06 21:00 | B3.2 JungleAssetLibrary PH-Tree-Fields | grün | 3cead3b
+2026-10-06 22:35 | B3.3 PH-Baumes in UrwaldSceneBuilder | gruuen (CI b3full 83/0) | 8584a5c
+
+2026-10-06 | B3.4 CreateTree PH-Trees (LOD0/1, MeshCollider LOD1, SurfaceTag Wood) | gruen (Build Exit 0) | f0d87d9
+
+2026-10-07 00:30 | B3.5 Trees_HaveCollidersAndBlockSpider | blockiert (Unity offen, Geschwark-Session b35f/b35h lauft; TreesTests.cs untracked) | -
+
+2026-10-07 01:25 | B3.5 Trees_HaveCollidersAndBlockSpider | blockiert (Geschwark-Session owns TreesTests.cs; CI b3test3 red Tree1 hits=0; baseDrop-Patch left uncommitted) | -
+
+2026-10-07 02:00 | B3.5/B3.6 | blockiert: Unity.exe (PID 11768) offen, Geschwark-Session owns TreesTests.cs; kein CI, kein Commit
+
+2026-10-07 03:07 | B3.6 Full CI + commit | blockiert (Unity.exe open, Geschwark-Session owns repo; ci b3full2 Exit 1 lock) | -
+
+2026-10-07 | B3.6 full CI + close-out | gruen (b36: Build Exit 0, Tests Exit 0, fehlgeschlagen 0) | d4ff92f
+
+2026-10-07 | B4 Lianen (per-Tree, capsule-chain, LianenTests) | gruen (b4full8 Build Exit 0, Tests Exit 0, fehlgeschlagen 0) | f482032
+
+2026-10-07 | B5 PlantBlockTests (rays vs colliders, Spider stops vs tree) | gruen (b5full6 Build Exit 0, Tests Exit 0, fehlgeschlagen 0) | 84e3e13
+
+2026-10-07 | B6 Hunger-Test + Spielschleife check | gruen (b6full1 Build Exit 0, Tests Exit 0, fehlgeschlagen 0) | 0f2d2ad
+
+2026-10-07 | B7 ControlsHelp auto-hide/Toggle-Test | gruen (b7full5 Build Exit 0, Tests Exit 0, fehlgeschlagen 0) | dc25b59
+
+2026-10-07 | B8 GameMenu + Test | gruen (b8full6 Build Exit 0, Tests Exit 0, fehlgeschlagen 0) | e5012fb

@@ -3,6 +3,7 @@
     "rootNamespace": "Spinnenspiel.EditorTools",
     "references": [
         "Spinnenspiel.Runtime",
+        "Unity.InputSystem",
         "Unity.RenderPipelines.Core.Runtime",
         "Unity.RenderPipelines.Universal.Runtime",
         "Unity.RenderPipelines.HighDefinition.Runtime",

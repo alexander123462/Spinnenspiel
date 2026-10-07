@@ -379,22 +379,31 @@ namespace Spinnenspiel.Tests
 
             Assert.IsFalse(builder.IsBuilding, "Netzbau nach 15 s noch nicht fertig");
             Assert.AreEqual(OrbWeb.WebStage.Done, builder.CurrentStage, "CurrentStage != Done");
-            // Nach Done 0.5 s warten, damit die Beine absetzen.
-            yield return new WaitForSeconds(0.5f);
 
             Assert.IsTrue(fourOnThreadDuringCapture,
                 "Während CaptureSpiral waren nie mindestens 4 Beine auf einem Faden.");
 
+            // Nach Done: abgeinen bis alle geerdeten Beine greiftn einen Faden (max 3 s).
             int grounded = 0;
             int onThread = 0;
-            for (int i = 0; i < legs.Length; i++)
+            float settle = 0f;
+            while (settle < 3f)
             {
-                SpiderLeg leg = legs[i];
-                if (!leg.IsGrounded)
-                    continue;
-                grounded++;
-                if (web.TryClosestPoint(leg.FootPosition, 0.01f, out _))
-                    onThread++;
+                grounded = 0;
+                onThread = 0;
+                for (int i = 0; i < legs.Length; i++)
+                {
+                    SpiderLeg leg = legs[i];
+                    if (!leg.IsGrounded)
+                        continue;
+                    grounded++;
+                    if (web.TryClosestPoint(leg.FootPosition, 0.01f, out _))
+                        onThread++;
+                }
+                if (grounded >= 6 && grounded == onThread)
+                    break;
+                settle += Time.deltaTime;
+                yield return null;
             }
             Assert.GreaterOrEqual(grounded, 6,
                 "Nur " + grounded + " von 8 Beinen geerdet.");

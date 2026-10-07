@@ -16,3 +16,7 @@
 - Geschwark/Claude-Sessions edit the same repo concurrently: if a test file changes between your reads (mtime check!) and kette-hdrp.log shows new "hermes" commits, that session owns the point -> mark [!], do NOT commit its files.
 - Physics.Raycast out-RaycastHit: use hit.collider.gameObject, hit.gameObject does not exist.
 - Autopilot lock race: if tasklist shows Unity.exe during CI, a sibling session owns the project; ci.ps1 exits 1 with 'keine Fehler' (project lock). Mark [!] and stop, never kill Unity.
+- Geschwark edits Docs/BACKLOG.md between your read and patch ("modified since last read" warning): re-read, its [!]/[x] marks are authoritative — reconcile, don't overwrite blindly.
+- Cron/background runs cannot use notify_on_complete; start CI in background and poll summary file with sleep+tail instead.
+
+- Geschwark/Claude-CI Exit 1 + 'keine Fehler' + tasklist Unity.exe = project lock by sibling session: do NOT retry, mark [!].

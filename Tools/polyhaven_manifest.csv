@@ -29,6 +29,11 @@ rock_moss_set_02;model;4;11007448;57647
 rock_07;model;4;10675875;27830
 rock_09;model;4;9980529;23280
 boulder_01;model;4;21374945;123976
+island_tree_01;model;11;127959683;3729692
+island_tree_02;model;11;111585792;1762064
+island_tree_03;model;11;141289267;4760490
+jacaranda_tree;model;11;252252209;312356
+tree_small_02;model;11;140734420;4652585
 forest_ground_04;texture;4;23786556;
 sparse_grass;texture;4;39074611;
 brown_mud_leaves_01;texture;4;39305387;

@@ -11,11 +11,14 @@
   - [x] B3.4 done — Commit f0d87d9 (CreateTree: PH LOD0/1 + MeshCollider on LOD1 + SurfaceTag Wood; Wood/Leaf per GetSubMesh(i).bounds; Build Exit 0, Jacaranda 30 m, Island 12-15 m)
   - [x] B3.5 done — Commits 89cd67d+f0863e8 (TreesTests.cs: collider+SurfaceTag Wood+footprint-downcast blocking; LOD0 collider, physics-based planting via RaycastAll foot-measure; full CI b37c 83/0 green)
   - [x] B3.6 done 2026-10-07 — full CI b36 green (Build Exit 0, Tests Exit 0, fehlgeschlagen 0, Trees_HaveCollidersAndBlockSpider Passed); ArtSource/Baeume already in 8584a5c; TreesTests.cs.meta committed
-- [ ] B4 Lianen: die 1500 geraden Stäbe ersetzen. Ca. 300 Lianen, die an Ästen der neuen Bäume hängen (Startpunkt in der Krone), leicht durchhängend/geschwungen, unteres Ende 0.2-0.8 m über Boden. Collider als Kette kurzer Kapseln, SurfaceTag Wood, bleiben als Netzanker nutzbar. Test: Spinne kann an einer Liane hochklettern.
-- [ ] B5 Kollisionstest für alle Pflanzenarten (Bäume, Lianen, Baumfarne, Riesenblätter): Spinne läuft dagegen und wird aufgehalten oder klettert.
-- [ ] B6 Spielschleife prüfen: Hunger sinkt, Fliegen fliegen ins Netz, Spinne fängt und frisst sie (SpiderHunger, SpiderPredation). Fehlt etwas: ergänzen, mit Test.
-- [ ] B7 HUD: Hungeranzeige und kurze Steuerungshilfe (ControlsHelp) sauber anzeigen.
-- [ ] B8 Menü: Startbildschirm, Pause mit Esc (Fortsetzen, Maus-Empfindlichkeit, Beenden). Einstellung in PlayerPrefs.
+- [x] B4 Lianen: done 2026-10-07 — Commit f482032 (per-Tree Lianen: branch-anchor via TreeCollider downcast, 300 Lianen, capsule-chain ~2.4 m + SurfaceTag Wood; LianenTests green; full CI b4full8 Build Exit 0 / Tests Exit 0 / fehlgeschlagen 0, 84/85 Passed +1 Skipped)
+  - [x] B4.1 done — Generator per-Tree Lianen (Commit f482032)
+  - [x] B4.2 done — LianenTests.cs (Clearance 0.05..0.9 m, chain>=2, body-height ray; Commit f482032)
+  - [x] B4.3 done — full CI b4full8 green + commit f482032
+- [x] B5 Kollisionstest: done 2026-10-07 — Commit 84e3e13 (PlantBlockTests.cs: TreeFerns-Stump-Rays, UnterholzCollider-Rays near spawn, Spider_StopsAgainstTree; full CI b5full6 Build Exit 0 / Tests Exit 0 / fehlgeschlagen 0)
+- [x] B6 Spielschleife prüfen: done 2026-10-07 — Commit 0f2d2ad (Hunger rise/Eat now asserted via Hunger_RisesOverTimeAndSinksWithPrey; Flies-ins-Web + Hunt/Wrap/Eat already covered by Predation_HuntsWrapsAndEats & Showcase_WebAndHunt; full CI b6full1 Build Exit 0 / Tests Exit 0 / fehlgeschlagen 0)
+- [x] B7 HUD: done 2026-10-07 — Commit dc25b59 (ControlsHelp_AutoHidesAndToggles: auto-hide 15 s + public Toggle(); Hunger-Balken already asserted in B6; full CI b7full5 Build Exit 0 / Tests Exit 0 / fehlgeschlagen 0)
+- [x] B8 Menü: done 2026-10-07 — Commit e5012fb (GameMenu.cs: Startscreen/Playing/Paused, TogglePause + Resumed event, Sensitivity 0.25–4 in PlayerPrefs; attached in SpiderBuilder; Testwelt+Urwald rebuilt via -Method both builders; GameMenu_StartPauseResumeAndSettings green; full CI b8full6 Build Exit 0 / Tests Exit 0 / fehlgeschlagen 0)
 - [ ] B9 Eingabe: SpiderInput auf ein .inputactions-Asset mit generierter Klasse umstellen, Gamepad-Deadzone, Dispose beim Deaktivieren.
 - [ ] B10 Leistung: PlayMode-Test, der im Urwald 10 s die mittlere Framezeit misst und loggt. Ziel unter 16.7 ms; sonst LOD-Abstände und Vegetationsdichte anpassen.
 - [ ] B11 Windows-Build: Editor-Methode Spinnenspiel.EditorTools.BuildWindows (Szene Urwald, Ausgabe Builds/Windows/Spinnenspiel.exe) plus CI-Aufruf. Prüfen, dass die exe entsteht.
