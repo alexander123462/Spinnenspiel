@@ -42,6 +42,40 @@ namespace Spinnenspiel.Tests
             Assert.IsTrue(help.Visible, "Toggle must show ControlsHelp again.");
         }
 
+        [UnityTest]
+        public IEnumerator GameMenu_StartPauseResumeAndSettings()
+        {
+            yield return LoadWorld();
+            GameObject spider = LoadedSpider();
+            GameMenu menu = spider.GetComponent<GameMenu>();
+            Assert.IsNotNull(menu, "GameMenu fehlt");
+
+            // Startscreen at start; StartGame -> Playing.
+            Assert.AreEqual(menu.State, 0, "Start at Startscreen.");
+            menu.StartGame();
+            Assert.AreEqual(menu.State, 1, "StartGame -> Playing.");
+
+            // Esc-Pause: TogglePause pauses, then resumes (Resumed fires).
+            bool resumed = false;
+            System.Action flag = () => { resumed = true; };
+            menu.Resumed += flag;
+            menu.TogglePause();
+            Assert.IsTrue(menu.IsPaused, "TogglePause must pause.");
+            menu.TogglePause();
+            Assert.IsFalse(menu.IsPaused, "Second TogglePause must resume.");
+            Assert.IsTrue(resumed, "Resuming must fire Resumed.");
+
+            // Settings: Sensivity saved in PlayerPrefs.
+            menu.SetSensitivity(2.5f);
+            yield return null;
+            Assert.AreEqual(PlayerPrefs.GetFloat("MouseSensitivity", 1f), 2.5f, delta: 0.001f,
+                "SetSensitivity must save MouseSensitivity.");
+            menu.SetSensitivity(99f);
+            Assert.AreEqual(menu.MouseSensitivity, 4f, delta: 0.001f, "Sensitivity clamps to 4.");
+
+            PlayerPrefs.DeleteKey("MouseSensitivity");
+        }
+
         private static IEnumerator LoadWorld()
         {
             SceneManager.LoadScene(SceneName);

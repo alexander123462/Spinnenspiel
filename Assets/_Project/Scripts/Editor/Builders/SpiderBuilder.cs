@@ -111,6 +111,9 @@ namespace Spinnenspiel.EditorTools
             // Steuerungshilfe (t82): Box oben rechts, F1 schaltet um.
             root.AddComponent<ControlsHelp>();
 
+            // Menu (B8): Startscreen, Esc-Pause, Sensitivity in PlayerPrefs.
+            root.AddComponent<GameMenu>();
+
             return root;
         }
 
