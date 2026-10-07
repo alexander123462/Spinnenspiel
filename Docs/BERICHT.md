@@ -31,3 +31,13 @@
 2026-10-07 | B8 GameMenu + Test | gruen (b8full6 Build Exit 0, Tests Exit 0, fehlgeschlagen 0) | e5012fb
 
 2026-10-07 | Z1 bald-star Abdomen (pole_skip 0.15) + FBX re-export | gruen (z1full Build Exit 0, Tests Exit 0, fehlgeschlagen 0, 91/92) | 8d48556
+
+2026-10-07 | Z2 own-code Warnings in CI log = 0 (grep) | gruen (no code change needed) | 21695df
+
+2026-10-07 | Z6 Netzbau-Komfort | blocked (Geschwark Z5 GameSaveData.cs "var out" breaks full compile, CI r4q rot; own Z6 code written uncommitted) | -
+
+2026-10-07 Z7 Beute (Motte): BLOCKED — CI r5d rot due to Geschwark uncommitted SaveLoadManager/GameSaveData; own code in Logs/z7/, no commit.
+
+2026-10-07 | Z5 Speichern | GREEN | Commit 352210c (SaveGame JSON in persistentDataPath, GameMenu Q-Quit/Starting hooks, SaveGameTests roundtrip; full CI r102 Build Exit 0 / Tests Exit 0 / fehlgeschlagen 0, 94/95 Passed)
+
+2026-10-07 | Z6 Netzbau-Komfort | GREEN | Commit 5ea1204 (SpiderWebBuilder.CancelBuild + cancel-flag in BuildRoutine/WalkTo; SpiderWebPlacer Esc->CancelBuild + red ShowBlockedPreview/PreviewBlocked; GameMenu EscIsBuildAbort skips Pause; NetbuildComfortTests CancelBuild_StopsRunningBuild + RedPreview_WhenSpotGoesBad green; full CI r103 Build Exit 0 / Tests Exit 0 / fehlgeschlagen 0, 96/97 Passed +1 Skipped)

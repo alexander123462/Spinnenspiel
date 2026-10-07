@@ -28,11 +28,19 @@
   - done 2026-10-07 — Commit 8d48556 (pole_skip=0.15 Abdomen: 88/7000 Haare out at poles, PRUEFUNG ALLE OK in Blender; FBX re-exported to ArtSource + Assets/_Project/Art/Spider; full CI z1full Build Exit 0 / Tests Exit 0 / fehlgeschlagen 0, 91/92 Passed. Sichtprüfung offen: no vision encoder, Vorschau_hinten rendered)
 - [x] Z2 Warnungen: Unity-Log des vollen CI-Laufs auf Warnungen aus eigenem Code (Assets/_Project) prüfen und beheben, bis 0.
   - done 2026-10-07 — grep over Logs/ci/z1full-method1.log + z1full-tests.log: UnityEngine.Debug:LogWarning / Error = 0 own-code hits; "warn" case-insensitive only [Licensing::Module]/d3d12 engine lines (not Assets/_Project). Nothing to fix, count already 0.
-- [ ] Z3 Stabile Tests: jeden PlayMode-Test, der in den letzten Läufen einmal rot war, 3x einzeln laufen lassen; Ursache für Wackeln beheben.
-- [ ] Z4 Tag/Nacht: Sonne dreht langsam (ein Tag = 20 min), Umgebungslicht passt sich an; Einstellungswert für die Taglänge; Test für die Rotation.
-- [ ] Z5 Speichern: Position, Hunger und Netze beim Beenden in eine JSON-Datei (Application.persistentDataPath), beim Start laden; Test Rundreise.
-- [ ] Z6 Netzbau-Komfort: laufender Netzbau mit Esc abbrechen; Vorschau zeigt rot, wenn kein Platz.
-- [ ] Z7 Beute: zweite Insektenart (Motte, langsamer, größer) über denselben Spawner, eigener Blender-Modellskript in ArtSource/Insekten/.
+- [x] Z3 Stabile Tests: jeden PlayMode-Test, der in den letzten Läufen einmal rot war, 3x einzeln laufen lassen; Ursache für Wackeln beheben.
+  - done 2026-10-07 — Only flaky test in the newest full runs (b10full*/final1/z1full) was Performance_MeanFrameTimeUnderBudget (rot 4x in b10diag/probe/full1/full4). Ran it 3x single via -Filter: z3a2/z3b/z3c all Passed (gesamt 1, fehlgeschlagen 0). Root cause (wall-clock vsync measurement) already fixed in B10 commit 9bbf0a4 (FrameTimingManager CPU-Work + enableFrameTimingStats=1). The 3 known wacklers from .hermes.md (Builder_LegsHoldWebLines, Spider_WalksOverObstacleCourse, Legs_GaitMeasurement) were all Passed in final1 and z1full; no new rot in the last runs.
+- [x] Z4 Tag/Nacht: Sonne dreht langsam (ein Tag = 20 min), Umgebungslicht passt sich an; Einstellungswert für die Taglänge; Test für die Rotation.
+  - done 2026-10-07 — Commit 8e607e8 (DayNightCycle, 20-Minuten-Tag, Sonnenrotation + Lux nach Hoehe)
+- [x] Z5 Speichern: done 2026-10-07 — Commit 352210c (SaveGame.cs CaptureSave/ApplySave JSON in persistentDataPath; GameMenu Q-Quit fires Quitting+Application.Quit, StartGame fires Starting; SaveGame attached before GameMenu in SpiderBuilder; SaveGameTests_Roundtrip green; full CI r102 Build Exit 0 / Tests Exit 0 / fehlgeschlagen 0, 94/95 Passed +1 Skipped)
+  - [x] Z5.1 SaveGame.cs done (JsonUtility flat payload: anchorPoints/webAnchorCounts/radiusCounts/spiralSpacings/freeZoneRadii — nested custom-class lists are skipped by JsonUtility)
+  - [x] Z5.2 GameMenu Quitting/Starting events done
+  - [x] Z5.3 SpiderBuilder AddComponent<SaveGame> before GameMenu done
+  - [x] Z5.4 SaveGameTests.cs roundtrip + DeleteSaveFile cleanup done
+  - [x] Z5.5 full CI r102 green + commit 352210c done
+- [x] Z6 Netzbau-Komfort: laufender Netzbau mit Esc abbrechen; Vorschau zeigt rot, wenn kein Platz.
+  - [x] Z6.1..Z6.5 done — Commit 5ea1204 (CancelBuild+frame-stamp, ShowBlockedPreview red, GameMenu Esc-guard, NetbuildComfortTests 2 green; r103 97/0)
+- [ ] Z7 Beute: zweite Insektenart (Motte, langsamer, groesser) ueber denselben Spawner, eigenes Blender-Modellskript in ArtSource/Insekten/.
 - [ ] Z8 Klänge: Schrittgeräusche je Untergrund (Holz/Erde/Blatt) prüfen und fehlende ergänzen (prozedural wie ProceduralAudio).
 - [ ] Z9 Leistung 2: nach B10 die drei teuersten Systeme per Profiler-Marker messen und im Bericht nennen; das teuerste optimieren.
 - [ ] Z10 Docs/ARCHITEKTUR.md: Überblick über Ordner, wichtigste Klassen, Datenfluss Eingabe -> Bewegung -> Beine -> Kamera, Tests und CI.

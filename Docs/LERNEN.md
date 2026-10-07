@@ -20,3 +20,11 @@
 - Cron/background runs cannot use notify_on_complete; start CI in background and poll summary file with sleep+tail instead.
 
 - Geschwark/Claude-CI Exit 1 + 'keine Fehler' + tasklist Unity.exe = project lock by sibling session: do NOT retry, mark [!].
+
+- Geschwark-Blocker: minimal-fixing their syntax errors burns the 3 CI tries fast (CS0504 static const, CS0234 System.IO.Error/Exception); keep own code OUT of tree (Logs/z7/) and mark [!], retry next session.
+
+- Application has NO frameCount; use Time.frameCount for "same-frame" cross-component checks (GameMenu vs Placer Esc handling).
+
+- Aborting a coroutine build: AbortBuild() alone does NOT stop the BuildRoutine loop -> set a cancel-flag and check it at every yield point (also in WalkTo, where `return` must be `yield break`, CS1622).
+
+- Shared key (Esc) for two systems (Pause vs Netzbau-Abort): both read wasPressedThisFrame; the later Update() must detect "handled this frame" via a frame-stamp, not only current state.
