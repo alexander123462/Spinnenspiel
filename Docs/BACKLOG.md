@@ -1,0 +1,22 @@
+# BACKLOG – Spinnenspiel (Autopilot)
+
+- [x] B1 Beine: neue Beinsegmente einbauen. SpiderLegBuilder.cs lädt schon Assets/_Project/Art/Spider/Spinne_Beine.fbx; Test Legs_UseBlenderMeshes in SpiderLegTests.cs ist geschrieben. Testen, Fehler beheben, committen (inkl. ArtSource/Spinne/spinne_beine.py, Spinne_Beine.fbx, Vorschau).
+  - [x] B1.1..B1.5 done — Commit cb50b7a (CS0136-Fix SpiderLegBuilder, FBX imported, M1 rebuilt, full CI green 81/0)
+- [x] B2 Körper: neue Abdomen/Cephalothorax-FBX (mit Härchen) und Texturen liegen in Assets/_Project/Art/Spider. Im SpiderBuilder die Körpermaterialien doppelseitig machen (Härchen), testen, committen (inkl. ArtSource/Spinne/spinne_koerper.py, tex_spinne.py, Texturen).
+  - done — Commit 424da30 (CreateScanMaterial doubleSided-Param, Abdomen/Cephalothorax=1, Leg=0; Test Body_UsesScanMeshesAndDoubleSided; full CI 82/0)
+- [ ] B3 Bäume: die 5 Poly-Haven-Bäume aus Assets/_Project/Art/Plants/PH_Baeume/<id>/<id>.fbx (LOD0/LOD1 im FBX) statt der prozeduralen VM_Trunk-Bäume im JungleWorldGenerator verwenden. Materialien HDRP Lit: Holz opak; Blätter Alpha-Cutout 0.5, doppelseitig, Albedo mit Alpha aus Textures/<mat>_Albedo.png, Normal, Mask. Nach Materialänderung HDMaterial.ValidateMaterial. Jacaranda als großer Kronenbaum (Skalierung so, dass ca. 25-35 m hoch), Inselbäume 3-5x skaliert. Jeder Baum: MeshCollider (LOD1-Mesh) + SurfaceTag Wood. Submesh-Reihenfolge per GetSubMesh(i).bounds messen. Test: jede Baumart hat Collider, Spinne läuft nicht hindurch. Committen inkl. ArtSource/Baeume/*.py/*.sh.
+  - [x] B3.1 übersprungen – Jacaranda akzeptiert
+  - [x] B3.2 done — Commit 3cead3b (phTreeMeshes/Mats/Scales; CI green, fehlgeschlagen 0)
+  - [x] B3.3 done — Commit 8584a5c (LoadPHTrees: LOD0/1 per FBX, MAT_PHTree_* Wood/Leaf, ValidateMaterial; Library-Fill gruen: Jacaranda 30 m, Island 12-15 m; CI b3full 83/0 fehlgeschlagen 0. NOTE: Mesh[][] nested NOT serialized -> flat phTreeLod0/1+WoodMats/LeafMats)
+  - [x] B3.4 done — Commit f0d87d9 (CreateTree: PH LOD0/1 + MeshCollider on LOD1 + SurfaceTag Wood; Wood/Leaf per GetSubMesh(i).bounds; Build Exit 0, Jacaranda 30 m, Island 12-15 m)
+  - [x] B3.5 done — Commits 89cd67d+f0863e8 (TreesTests.cs: collider+SurfaceTag Wood+footprint-downcast blocking; LOD0 collider, physics-based planting via RaycastAll foot-measure; full CI b37c 83/0 green)
+  - [ ] B3.6 Full CI + commit (incl. ArtSource/Baeume/*.py/*.sh)
+- [ ] B4 Lianen: die 1500 geraden Stäbe ersetzen. Ca. 300 Lianen, die an Ästen der neuen Bäume hängen (Startpunkt in der Krone), leicht durchhängend/geschwungen, unteres Ende 0.2-0.8 m über Boden. Collider als Kette kurzer Kapseln, SurfaceTag Wood, bleiben als Netzanker nutzbar. Test: Spinne kann an einer Liane hochklettern.
+- [ ] B5 Kollisionstest für alle Pflanzenarten (Bäume, Lianen, Baumfarne, Riesenblätter): Spinne läuft dagegen und wird aufgehalten oder klettert.
+- [ ] B6 Spielschleife prüfen: Hunger sinkt, Fliegen fliegen ins Netz, Spinne fängt und frisst sie (SpiderHunger, SpiderPredation). Fehlt etwas: ergänzen, mit Test.
+- [ ] B7 HUD: Hungeranzeige und kurze Steuerungshilfe (ControlsHelp) sauber anzeigen.
+- [ ] B8 Menü: Startbildschirm, Pause mit Esc (Fortsetzen, Maus-Empfindlichkeit, Beenden). Einstellung in PlayerPrefs.
+- [ ] B9 Eingabe: SpiderInput auf ein .inputactions-Asset mit generierter Klasse umstellen, Gamepad-Deadzone, Dispose beim Deaktivieren.
+- [ ] B10 Leistung: PlayMode-Test, der im Urwald 10 s die mittlere Framezeit misst und loggt. Ziel unter 16.7 ms; sonst LOD-Abstände und Vegetationsdichte anpassen.
+- [ ] B11 Windows-Build: Editor-Methode Spinnenspiel.EditorTools.BuildWindows (Szene Urwald, Ausgabe Builds/Windows/Spinnenspiel.exe) plus CI-Aufruf. Prüfen, dass die exe entsteht.
+- [ ] B12 README.md auf den neuen Stand bringen (Steuerung, Build, Assets-Download).
