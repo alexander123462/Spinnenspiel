@@ -302,43 +302,57 @@ namespace Spinnenspiel
                 UnityEngine.Debug.Log($"[Jungle] Bodendecker: {groundN} Objekte, mittlere Höhe 0.25–0.60 m (bounds-basiert)");
             }
 
-            // 5b) Lianen: hängen aus dem Kronendach, dünne senkrechte Halte für Netz-Anker.
-            // Eigener Eltern-Node (nicht in das statische Batching der Unterhölzer),
-            // 5 Mesh-Varianten, Variante und Skalierung pro Zelle per Hash.
+            // 5b) Lianen: an Ästen der PH-Bäume hängen (Startpunkt in der Kronen-Bounds),
+            // leicht geschwung, unteres Ende 0.2-0.8 m über Boden. Collider = Kette kurzer
+            // Kapseln (worldspace, SurfaceTag Wood) -> Spinne klettert + Netz-Anker nutzbar.
             GameObject lianen = new GameObject("Lianen");
             var lianaMeshes = new Mesh[5];
             for (int k = 0; k < 5; k++) lianaMeshes[k] = JunglePlantFactory.HangingLiana(Seed * 7 + k + 1);
-            float lianaStep = 1.3f;
-            int lianaCells = Mathf.FloorToInt(size / lianaStep);
             int lianaN = 0;
-            for (int i = 0; i < lianaCells && lianaN < 1500; i++)
+            const int lianaMax = 300;
+            for (int tIdx = 0; tIdx < Trees.Count && lianaN < lianaMax; tIdx++)
             {
-                for (int j = 0; j < lianaCells && lianaN < 1500; j++)
+                Transform tree = Trees[tIdx];
+                Mesh lod0 = null;
+                var mf = tree.transform.Find("TreeLOD0").GetComponent<MeshFilter>();
+                if (mf != null) lod0 = mf.sharedMesh;
+                if (lod0 == null) continue;
+                Vector3 gb = lod0.bounds.center, ge = lod0.bounds.extents;
+                float ts = Mathf.Max(0.01f, tree.transform.localScale.x);
+                Vector3 rootPos = tree.transform.position;
+                // Kronen in WORLD-space: obere Drittel der (schiertas) Bounds.
+                float crownTopY = rootPos.y + (gb.y + ge.y) * ts;
+                float crownBotY = crownTopY - 2f * ge.y * ts;
+                float radiusX = ge.x * ts, radiusZ = ge.z * ts;
+                int wantedThisTree = 3 + (int)(World.Hash01(tIdx, 0, 71) * 6f); // 3..8 per Tree
+                for (int a = 0; a < wantedThisTree && lianaN < lianaMax; a++)
                 {
-                    float x = lianaStep / 2f + i * lianaStep + (World.Hash01(i, j, 51) - 0.5f);
-                    float z = lianaStep / 2f + j * lianaStep + (World.Hash01(i, j, 52) - 0.5f);
-                    if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
-                    if (NearSpawn(x, z, 1.0f)) continue;
-                    if (!IsDryFlat(World, x, z)) continue; // enthält Height >= WaterLevel + 0.3 und Steigung < 20°
-                    if (World.IsClearing(x, z)) continue;
-                    int variant = Mathf.FloorToInt(World.Hash01(i, j, 53) * 5f);
-                    float rot = World.Hash01(i, j, 54) * 360f;
-                    float sxz = 0.8f + World.Hash01(i, j, 55) * 0.5f;
-                    float lianaL = 6f + World.Hash01(i, j, 56) * 3f; // Lianen-Länge 6..9 m
-                    float gap = 0.2f + World.Hash01(i, j, 57) * 0.6f; // unteres Ende 0.2..0.8 m über Boden
-                    GameObject g = AddPlant(lianen.transform, lianaMeshes[variant], library.logMat,
-                        new Vector3(x, World.Height(x, z) - 0.05f, z), rot, sxz);
-                    // Hängen lassen: 180° um X (Liane hängt nach unten), Y-Skalierung L/3.
-                    // Unteres Ende endet in "gap" über dem Boden, oberes Ende im Kronendach.
-                    Bounds lb = lianaMeshes[variant].bounds;
-                    float sy = lianaL / 3f;
-                    g.transform.rotation = Quaternion.Euler(180f, rot, 0f);
-                    g.transform.localScale = new Vector3(sxz, sy, sxz);
-                    g.transform.position = new Vector3(x, World.Height(x, z) - 0.05f + gap + sy * lb.max.y, z);
-                    // Kapsel-Kollider muss die neue gestreckte Höhe abdecken: Kapselhöhe im
-                    // Mesh-Lokalraum = lb.size.y, die Y-Skalierung sy dehnt sie auf die Weltlänge.
-                    var cc = g.transform.Find("PflanzenCollider").GetComponent<CapsuleCollider>();
-                    cc.height = lb.size.y;
+                    float ax = rootPos.x + (World.Hash01(tIdx, a, 72) * 2f - 1f) * radiusX * 0.85f;
+                    float az = rootPos.z + (World.Hash01(tIdx, a, 73) * 2f - 1f) * radiusZ * 0.85f;
+                    // Downcast: die FIRST hit on the TreeCollider (child of tree) = Branch-Surface.
+                    Vector3 origin = new Vector3(ax, crownTopY + 1f, az);
+                    float rayLen = (crownTopY - crownBotY) + 2f;
+                    RaycastHit[] hits = Physics.RaycastAll(origin, Vector3.down, rayLen);
+                    bool found = false;
+                    Vector3 anchor = Vector3.zero;
+                    foreach (var h in hits)
+                    {
+                        if (h.collider.gameObject.transform.parent != tree) continue; // not this Tree
+                        float wy = h.point.y;
+                        if (wy < crownBotY || wy > crownTopY) continue; // not in the Kronen
+                        if (!found || wy > anchor.y) anchor = h.point; // highest branch hit
+                        found = true;
+                    }
+                    if (!found) continue; // no Branch there -> skip
+                    float groundY = World.Height(anchor.x, anchor.z);
+                    float gap = 0.2f + World.Hash01(tIdx, a, 74) * 0.6f; // unteres Ende 0.2..0.8 m
+                    float len = (anchor.y - groundY) - gap;
+                    if (len < 1.5f || len > 30f) continue; // too short / Branch too high
+                    int variant = Mathf.FloorToInt(World.Hash01(tIdx, a, 75) * 5f) % 5;
+                    float rot = World.Hash01(tIdx, a, 76) * 360f;
+                    GameObject g = AddLiana(lianen.transform, lianaMeshes[variant], library.logMat,
+                        anchor, rot, len);
+                    if (g == null) continue;
                     lianaN++;
                 }
             }
@@ -491,6 +505,50 @@ namespace Spinnenspiel
             float dh = Mathf.Max(Mathf.Abs(world.Height(x + e, z) - h),
                                  Mathf.Abs(world.Height(x, z + e) - h));
             return Mathf.Atan2(dh, e) * Mathf.Rad2Deg < 20f;
+        }
+
+        /// <summary>
+        /// Hänging Liane at an branch anchor: the mesh hangs down (top at anchor), scaled so its
+        /// lower end sits 'len' below the anchor. Collider = Kette kurzer Kapseln (identity scale,
+        /// so no capsule distortion) with SurfaceTag Wood -> Spider can climb and WebSiteFinder
+        /// can use them as Netz-Anker.
+        /// </summary>
+        private GameObject AddLiana(Transform parent, Mesh mesh, Material mat, Vector3 anchor, float rotY, float len)
+        {
+            Bounds lb = mesh.bounds;
+            float sizeY = lb.size.y;
+            if (sizeY < 0.1f || len < 0.5f) return null;
+            float sy = len / sizeY;
+
+            GameObject g = new GameObject("Liana");
+            g.transform.SetParent(parent, false);
+            g.transform.position = anchor;
+            g.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
+            g.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Wood;
+
+            // Visual: non-uniform scale (thin in XZ, stretched in Y), top of mesh at the anchor.
+            GameObject vis = new GameObject("Visual");
+            vis.transform.SetParent(g.transform, false);
+            vis.transform.localPosition = new Vector3(0f, -sy * lb.max.y, 0f);
+            vis.transform.localScale = new Vector3(1f, sy, 1f);
+            vis.AddComponent<MeshFilter>().sharedMesh = mesh;
+            vis.AddComponent<MeshRenderer>().sharedMaterial = mat;
+
+            // Collider chain: Kapsels of ~2.4 m in root space (root scale = 1).
+            int segs = Mathf.Max(2, Mathf.CeilToInt(len / 2.4f));
+            float segLen = len / segs;
+            for (int s = 0; s < segs; s++)
+            {
+                GameObject c = new GameObject("Seg" + s);
+                c.transform.SetParent(g.transform, false);
+                c.transform.localPosition = new Vector3(0f, -(s + 0.5f) * segLen, 0f);
+                c.layer = GameLayers.Plants;
+                var cc = c.AddComponent<CapsuleCollider>();
+                cc.direction = 1; // Y-Axis
+                cc.radius = 0.05f;
+                cc.height = segLen + 0.06f; // small overlap so the chain has no gaps
+            }
+            return g;
         }
 
         /// <summary>Wagrechter Abstand zum Spawnplatz kleiner als dist?</summary>
