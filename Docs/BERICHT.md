@@ -29,3 +29,5 @@
 2026-10-07 | B7 ControlsHelp auto-hide/Toggle-Test | gruen (b7full5 Build Exit 0, Tests Exit 0, fehlgeschlagen 0) | dc25b59
 
 2026-10-07 | B8 GameMenu + Test | gruen (b8full6 Build Exit 0, Tests Exit 0, fehlgeschlagen 0) | e5012fb
+
+2026-10-07 | Z1 bald-star Abdomen (pole_skip 0.15) + FBX re-export | gruen (z1full Build Exit 0, Tests Exit 0, fehlgeschlagen 0, 91/92) | 8d48556

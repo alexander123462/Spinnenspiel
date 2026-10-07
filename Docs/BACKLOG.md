@@ -24,8 +24,10 @@
 - [x] B11 Windows-Build: done 2026-10-07 — Commit c63ec46 (BuildWindowsTool.BuildWindows via BuildPipeline.BuildPlayer StandaloneWindows64; CI b11gen6 Exit 0; Builds/Windows/Spinnenspiel.exe built, exe+Data verified on disk, Builds/ gitignored)
 - [x] B12 README.md auf den neuen Stand bringen (Steuerung, Build, Assets-Download): done 2026-10-07 — Commit c2a0712 (Steuerung from SpiderControls.inputactions bindings verified, Build-Section with CI-Aufruf, Input-Gen step in Setup)
 
-- [ ] Z1 Hinterleib: am hinteren Pol bilden die Härchen einen sichtbaren Stern. In ArtSource/Spinne/spinne_koerper.py (add_hairs) keine Haare in der Nähe der Pole setzen (Abstand der Fläche zum Pol < 0.15 auslassen), neu rendern, Test grün.
-- [ ] Z2 Warnungen: Unity-Log des vollen CI-Laufs auf Warnungen aus eigenem Code (Assets/_Project) prüfen und beheben, bis 0.
+- [x] Z1 Hinterleib: am hinteren Pol bilden die Härchen einen sichtbaren Stern. In ArtSource/Spinne/spinne_koerper.py (add_hairs) keine Haare in der Nähe der Pole setzen (Abstand der Fläche zum Pol < 0.15 auslassen), neu rendern, Test grün.
+  - done 2026-10-07 — Commit 8d48556 (pole_skip=0.15 Abdomen: 88/7000 Haare out at poles, PRUEFUNG ALLE OK in Blender; FBX re-exported to ArtSource + Assets/_Project/Art/Spider; full CI z1full Build Exit 0 / Tests Exit 0 / fehlgeschlagen 0, 91/92 Passed. Sichtprüfung offen: no vision encoder, Vorschau_hinten rendered)
+- [x] Z2 Warnungen: Unity-Log des vollen CI-Laufs auf Warnungen aus eigenem Code (Assets/_Project) prüfen und beheben, bis 0.
+  - done 2026-10-07 — grep over Logs/ci/z1full-method1.log + z1full-tests.log: UnityEngine.Debug:LogWarning / Error = 0 own-code hits; "warn" case-insensitive only [Licensing::Module]/d3d12 engine lines (not Assets/_Project). Nothing to fix, count already 0.
 - [ ] Z3 Stabile Tests: jeden PlayMode-Test, der in den letzten Läufen einmal rot war, 3x einzeln laufen lassen; Ursache für Wackeln beheben.
 - [ ] Z4 Tag/Nacht: Sonne dreht langsam (ein Tag = 20 min), Umgebungslicht passt sich an; Einstellungswert für die Taglänge; Test für die Rotation.
 - [ ] Z5 Speichern: Position, Hunger und Netze beim Beenden in eine JSON-Datei (Application.persistentDataPath), beim Start laden; Test Rundreise.
