@@ -85,6 +85,55 @@ namespace Spinnenspiel.Tests
         }
 
         [UnityTest]
+        public IEnumerator Performance_MeanFrameTimeUnderBudget()
+        {
+            JungleWorldGenerator.NextSeed = 4242;
+            SceneManager.LoadScene("Urwald");
+            yield return null;
+            yield return WaitReady();
+
+            // Wall-Clock in batchmode is vsync-locked (50 fps); measure the ECHT
+            // CPU/GPU frame times via FrameTimingManager instead.
+            Assert.IsTrue(FrameTimingManager.IsFeatureEnabled(), "Frame Timing Stats disabled.");
+
+            const int samples = 300;
+            float sumGpuMs = -1f, sumCpuMs = 0f;
+            int gpuValid = 0, measured = 0;
+            FrameTiming[] timing = new FrameTiming[8];
+            for (int i = 0; i < samples; i++)
+            {
+                FrameTimingManager.CaptureFrameTimings();
+                uint got = FrameTimingManager.GetLatestTimings((uint)timing.Length, timing);
+                for (int t = 0; t < (int)got; t++)
+                {
+                    float cpuWorkMs = (float)(timing[t].cpuFrameTime - timing[t].cpuMainThreadPresentWaitTime);
+                    if (cpuWorkMs > 0.0)
+                    {
+                        sumCpuMs += cpuWorkMs;
+                        measured++;
+                    }
+                    if ((float)timing[t].gpuFrameTime > 0.0)
+                    {
+                        sumGpuMs += (float)timing[t].gpuFrameTime;
+                        gpuValid++;
+                    }
+                }
+                yield return null;
+            }
+
+            Assert.Greater(measured, samples / 2, "Too few valid FrameTiming samples.");
+            float meanCpu = sumCpuMs / measured;
+            Debug.Log("[Perf] Urwald mittl. CPU-Work-Framezeit: " + meanCpu.ToString("0.00")
+                + " ms (" + measured + " Samples; GPU valid: " + gpuValid + "/" + samples + ")");
+            float meanGpu = gpuValid > 0 ? sumGpuMs / gpuValid : -1f;
+            if (meanGpu > 0f)
+            {
+                Debug.Log("[Perf] Urwald mittl. GPU-Framezeit: " + meanGpu.ToString("0.00") + " ms");
+            }
+            Assert.Less(meanCpu, 16.7f, "Mittl. CPU-Work-Framezeit ueber 16.7 ms Budget.");
+        }
+
+        [UnityTest]
         public IEnumerator Urwald_GeneratesWorldFromSeed()
         {
             JungleWorldGenerator.NextSeed = 4242;
