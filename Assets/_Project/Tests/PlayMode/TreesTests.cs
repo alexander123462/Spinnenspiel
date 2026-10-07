@@ -61,55 +61,6 @@ namespace Spinnenspiel.Tests
 
                 Mesh cmesh = mc.sharedMesh;
                 int subs = cmesh.subMeshCount < 1 ? 1 : cmesh.subMeshCount;
-
-                if (i == 1)
-                {
-                    int tsub = 0;
-                    float bestA = 1e9f;
-                    for (int s = 0; s < subs; s++)
-                    {
-                        Bounds sbx = cmesh.GetSubMesh(s).bounds;
-                        float a2 = sbx.size.x * sbx.size.z;
-                        if (sbx.size.y >= 2f && a2 < bestA) { bestA = a2; tsub = s; }
-                    }
-                    Vector3 twcD = colNode.transform.TransformPoint(cmesh.GetSubMesh(tsub).bounds.center);
-                    float agD = terrain.SampleHeight(twcD) + terrain.transform.position.y;
-                    foreach (float hy in new float[] { 0.5f, 1f, 1.5f, 2f, 2.5f, 3f })
-                    {
-                        var f2 = new Vector3(twcD.x + 6f, agD + hy, twcD.z);
-                        RaycastHit[] hs = Physics.RaycastAll(f2, new Vector3(-1f, 0f, 0f), 7f);
-                        int own = 0;
-                        foreach (var h in hs)
-                            if (h.collider.gameObject == colNode)
-                            { own++; Debug.Log(string.Format("[TreesTest] t1 h dy={0:0.0} xz=({1:0.0},{2:0.0})", h.point.y - agD, h.point.x, h.point.z)); }
-                        Debug.Log(string.Format("[TreesTest] t1 hy={0:0.0} ownhits={1}", hy, own));
-                    }
-                }
-                if (i == 1 || i == 3)
-                {
-                    for (int s = 0; s < subs; s++)
-                    {
-                        Bounds sb = cmesh.GetSubMesh(s).bounds;
-                        Vector3 wlo = colNode.transform.TransformPoint(sb.center - sb.extents);
-                        Vector3 whi = colNode.transform.TransformPoint(sb.center + sb.extents);
-                        Debug.Log(string.Format("[TreesTest] t{0} sub{1} y=({2:0.0}..{3:0.0}) xlo=({4:0.0},{5:0.0}) xhi=({6:0.0},{7:0.0})",
-                            i, s, wlo.y, whi.y, wlo.x, wlo.z, whi.x, whi.z));
-                    }
-                    var dDown = new Vector3(0f, -1f, 0f);
-                    var aims = new System.Collections.Generic.List<Vector3> { pos };
-                    for (int s = 0; s < subs; s++)
-                        aims.Add(colNode.transform.TransformPoint(cmesh.GetSubMesh(s).bounds.center));
-                    foreach (var aim in aims)
-                    {
-                        float ag = terrain.SampleHeight(aim) + terrain.transform.position.y;
-                        var top = new Vector3(aim.x, ag + 15f, aim.z);
-                        RaycastHit[] all = Physics.RaycastAll(top, dDown, 16f);
-                        foreach (var h in all)
-                            if (h.collider.gameObject == colNode)
-                                Debug.Log(string.Format("[TreesTest] t{0} down dy={1:0.0} xz=({2:0.0},{3:0.0})",
-                                    i, h.point.y - ag, h.point.x, h.point.z));
-                    }
-                }
                 // Blocking check: (a) downcasts over the footprint, (b) horizontal casts at body
                 // height toward the trunk-submesh center. RaycastAll so terrain/other colliders in
                 // front do not hide a hit on THIS tree's collider inside the body-height band.
