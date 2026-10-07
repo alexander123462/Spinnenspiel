@@ -147,16 +147,33 @@ cV, cF, cUV = deformed_sphere(32, 32, deform_ceph)
 ceph = make_obj("Spinne_Cephalothorax", cV, cF, cUV)
 
 # ---------------- Behaarung: kurze Kegel, liegen nach hinten (+Y) ----------------
-def add_hairs(ob, count, lmin, lmax, r0, tilt, seed):
+def add_hairs(ob, count, lmin, lmax, r0, tilt, seed, pole_skip=0.0):
     """count Haare flaechengewichtet auf ob verteilen. tilt = Winkel von der Normalen Richtung +Y (Grad).
-    UV = UV der Grundflaeche, die Haarfarbe kommt also aus der Textur."""
+    pole_skip > 0: keine Haare setzen, wenn die Face-Center closer als pole_skip to the body pole
+    (-> bald star at the rear pole of the abdomen)."""
     r = np.random.default_rng(seed)
     bm = bmesh.new(); bm.from_mesh(ob.data); bm.faces.ensure_lookup_table()
     uv = bm.loops.layers.uv.active; ob["n_body"] = len(bm.faces)
     faces = list(bm.faces); areas = np.array([f.calc_area() for f in faces])
     picks = r.choice(len(faces), count, p=areas / areas.sum())
+    skipped = 0
+    if pole_skip > 0.0:
+        # Pole = extreme body vertices along Y (hinten +Y / vorne -Y)
+        top = None; bot = None
+        for v in bm.verts:
+            c = v.co
+            if top is None or c.y > top.y: top = c.copy()
+            if bot is None or c.y < bot.y: bot = c.copy()
+        d2t = lambda c: (c - top).length_squared
+        d2b = lambda c: (c - bot).length_squared
+        lim = pole_skip * pole_skip
+    else:
+        d2t = d2b = None; lim = 0.0
     for fi in picks:
         f = faces[fi]; n = f.normal.copy(); c = f.calc_center_median()
+        if pole_skip > 0.0 and (d2t(c) < lim or d2b(c) < lim):
+            skipped += 1
+            continue
         base = c.lerp(f.verts[int(r.integers(len(f.verts)))].co, float(r.random()) * 0.8)
         u = f.loops[0][uv].uv.copy(); u.y = 0.995  # Haarfarbe: heller Streifen am vorderen Pol der Textur
         tb = Vector((0, 1, 0)) - n * n.y
@@ -170,9 +187,9 @@ def add_hairs(ob, count, lmin, lmax, r0, tilt, seed):
             fc = bm.faces.new((ring[k], ring[(k + 1) % 3], tip)); fc.smooth = False
             for lp in fc.loops: lp[uv].uv = u
     bm.to_mesh(ob.data); bm.free(); ob.data.update()
-    print(f"{ob.name}: {count} Haare, Dreiecke jetzt {sum(len(p.vertices) - 2 for p in ob.data.polygons)}")
+    print(f"{ob.name}: {count - skipped} Haare ({skipped} out at poles), Dreiecke jetzt {sum(len(p.vertices) - 2 for p in ob.data.polygons)}")
 
-add_hairs(abdomen, 7000, 0.12, 0.28, 0.012, 58, seed + 11)
+add_hairs(abdomen, 7000, 0.12, 0.28, 0.012, 58, seed + 11, pole_skip=0.15)
 add_hairs(ceph, 2500, 0.06, 0.14, 0.008, 68, seed + 12)
 
 # ---------------- Normalisieren (Bounds -> 1.0) + ausgeben ----------------
