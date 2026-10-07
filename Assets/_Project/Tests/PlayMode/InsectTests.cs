@@ -499,6 +499,28 @@ namespace Spinnenspiel.Tests
                 "In 20 s ist keine Fliege ins fertige Netz geflogen");
         }
 
+        [UnityTest]
+        public IEnumerator Hunger_RisesOverTimeAndSinksWithPrey()
+        {
+            yield return LoadScene();
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "No Spider in scene.");
+            SpiderHunger hunger = spider.GetComponent<SpiderHunger>();
+            Assert.IsNotNull(hunger, "SpiderHunger fehlt");
+
+            float start = hunger.Hunger;
+            yield return new WaitForSeconds(2f);
+            // risePerSecond default 1/180 -> ~0.0111 in 2 s; allow loose bounds (timer jitter).
+            Assert.Greater(hunger.Hunger, start + 0.002f,
+                "Hunger did not rise over time: " + start + " -> " + hunger.Hunger);
+
+            float beforeEat = hunger.Hunger;
+            hunger.Eat(0.5f);
+            Assert.Less(hunger.Hunger, beforeEat, "Eat() must sink Hunger.");
+            Debug.Log("[InsectTest] hunger rose " + start + " -> " + hunger.Hunger.ToString("F3"));
+            yield return null;
+        }
+
         private static IEnumerator LoadScene()
         {
             SceneManager.LoadScene(SceneName);
