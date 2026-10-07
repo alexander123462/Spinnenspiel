@@ -92,6 +92,10 @@ namespace Spinnenspiel.EditorTools
             gen.library = lib;
 
             new GameObject("Wind").AddComponent<WindController>();
+            // Z4 Tag/Nacht: Sun rotates slowly (one day = 20 min), ambient light adapts.
+            GameObject dayNight = new GameObject("Tag/Nacht");
+            DayNightCycle dayCycle = dayNight.AddComponent<DayNightCycle>();
+            dayCycle.sun = Object.FindFirstObjectByType<Light>();
             new GameObject("Sky Ambient").AddComponent<SkyAmbientUpdater>();
             new GameObject("Debug Overlay").AddComponent<DebugOverlay>();
 
