@@ -15,10 +15,31 @@ klettert und Netze spinnt.
 3. Scans laden (Poly Haven, außerhalb von `Assets/`):
    `powershell -ExecutionPolicy Bypass -File Tools/polyhaven_download.ps1`
 4. Projekt in Unity Hub öffnen (Editor 6000.3.24f1).
-5. Urwald-Szene bauen: Menü `Spinnenspiel/Build/Urwald`
+5. Input-Actions generieren: Menü `Spinnenspiel/Build/Input`
+   (`-executeMethod Spinnenspiel.EditorTools.CreateInputActions.Build`;
+   produce `SpiderControls.inputactions` + Wrapperclass).
+6. Urwald-Szene bauen: Menü `Spinnenspiel/Build/Urwald`
    (alternativ `-executeMethod Spinnenspiel.EditorTools.UrwaldSceneBuilder.Build`).
-6. Szene öffnen: `Assets/_Project/Scenes/Urwald.unity`
-7. Play.
+7. Szene öffnen: `Assets/_Project/Scenes/Urwald.unity`
+8. Play.
+
+## Steuerung
+- Move: WASD / Gamepad Left-Stick (Deadzone 0.1)
+- Look: Mouse-Delta / Gamepad Right-Stick
+- Sprint: Left-Shift / Gamepad Left-Stick-Press
+- Zoom: Mouse-Scroll-Rad
+- Silk (Faden): F / RMB / Gamepad Right-Shoulder
+- Release: Space / Gamepad Button-South (A/Cross)
+- Pause: Esc (GameMenu) — Sensitivity in Options (PlayerPrefs)
+- F1: Help-Overlay on/off (auto-hide after 15 s)
+
+## Build
+Windows-Player-Build (Scene Urwald → `Builds/Windows/Spinnenspiel.exe`):
+```
+powershell -ExecutionPolicy Bypass -File Tools/ci.ps1 -Name build -Method Spinnenspiel.EditorTools.BuildWindowsTool.BuildWindows
+```
+- Output-Verzeichnis `Builds/` not in git (gitignore).
+- Unity muss closed sein während Build.
 
 ## Tests
 ```
