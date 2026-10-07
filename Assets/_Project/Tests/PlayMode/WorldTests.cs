@@ -18,6 +18,30 @@ namespace Spinnenspiel.Tests
             return spider;
         }
 
+        [UnityTest]
+        public IEnumerator ControlsHelp_AutoHidesAndToggles()
+        {
+            yield return LoadWorld();
+            GameObject spider = LoadedSpider();
+            ControlsHelp help = spider.GetComponent<ControlsHelp>();
+            Assert.IsNotNull(help, "ControlsHelp fehlt");
+            Assert.IsTrue(help.Visible, "ControlsHelp must be visible at start.");
+
+            // After the auto-hide delay it must be gone (AutoHideSeconds = 15).
+            float t = 0f;
+            while (t < 17f)
+            {
+                t += Time.deltaTime;
+                yield return null;
+            }
+            Assert.IsFalse(help.Visible, "ControlsHelp still visible after 17 s.");
+
+            // F1 toggles it back on.
+            help.Toggle();
+            yield return new WaitForSeconds(0.1f);
+            Assert.IsTrue(help.Visible, "Toggle must show ControlsHelp again.");
+        }
+
         private static IEnumerator LoadWorld()
         {
             SceneManager.LoadScene(SceneName);

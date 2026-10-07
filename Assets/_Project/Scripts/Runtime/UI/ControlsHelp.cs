@@ -47,13 +47,19 @@ namespace Spinnenspiel
             bool select = Gamepad.current != null && Gamepad.current.selectButton.wasPressedThisFrame;
             if (f1 || select)
             {
-                Visible = !Visible;
+                Toggle();
             }
         }
 
         private void HideAfterDelay()
         {
             Visible = false;
+        }
+
+        /// <summary>F1 / Select-Druck oder Test-Aufruf: Visibility flip.</summary>
+        public void Toggle()
+        {
+            Visible = !Visible;
         }
 
         private void OnGUI()
