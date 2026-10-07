@@ -42,7 +42,10 @@ namespace Spinnenspiel
             // Esc toggles pause while playing/paused.
             if (k.escapeKey.wasPressedThisFrame && (_state == 1 || _state == 2))
             {
-                TogglePause();
+                if (!EscIsBuildAbort())
+                {
+                    TogglePause();
+                }
             }
             // Q while paused: quit the game (Quitting fires first, e.g. for saving).
             if (k.qKey.wasPressedThisFrame && _state == 2)
@@ -55,6 +58,17 @@ namespace Spinnenspiel
                 }
                 Application.Quit();
             }
+        }
+
+        /// <summary>Z6: True, wenn der aktuelle Esc-Druck statt eine Pause ein Netzbau-Aborting abhannt.</summary>
+        private bool EscIsBuildAbort()
+        {
+            SpiderWebBuilder builder = FindFirstObjectByType<SpiderWebBuilder>();
+            if (builder == null)
+            {
+                return false;
+            }
+            return builder.IsBuilding || builder.LastCancelFrame == Time.frameCount;
         }
 
         /// <summary>Startscreen -> Playing.</summary>

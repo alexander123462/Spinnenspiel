@@ -42,6 +42,7 @@ namespace Spinnenspiel
         private Vector3 _normal = Vector3.up;
         private Quaternion _currentRotation = Quaternion.identity;
         private bool _sittingInWeb;
+        private bool _cancelRequested;
 
         private static readonly OrbWeb.WebStage[] Stages =
         {
@@ -73,6 +74,7 @@ namespace Spinnenspiel
             CurrentStage = OrbWeb.WebStage.Frame;
             _sittingInWeb = false;
             _currentRotation = transform.rotation;
+            _cancelRequested = false;
 
             // Netznormale zeigt zur Seite der Spinne, danach bleibt sie fest.
             Vector3 toSpider = transform.position - web.Layout.Hub;
@@ -155,6 +157,20 @@ namespace Spinnenspiel
             AbortBuild();
         }
 
+        /// <summary>Z6: Aborts a running web build (Esc via SpiderWebPlacer).</summary>
+        public void CancelBuild()
+        {
+            if (IsBuilding)
+            {
+                _cancelRequested = true;
+                LastCancelFrame = Time.frameCount;
+                AbortBuild();
+            }
+        }
+
+        /// <summary>Z6: Frame in dem der letzte Netzbau-Aborting happened (0 = nie).</summary>
+        public int LastCancelFrame;
+
         /// <summary>
         /// Beendet einen laufenden Netzbau: IsBuilding = false,
         /// Bau-Faden versteckt, Spinne lässt los.
@@ -198,6 +214,11 @@ namespace Spinnenspiel
 
             for (int s = 0; s < Stages.Length; s++)
             {
+                if (_cancelRequested)
+                {
+                    yield break;
+                }
+
                 OrbWeb.WebStage stage = Stages[s];
                 CurrentStage = stage;
                 Vector3[] path = web.ConstructionPath(stage);
@@ -210,6 +231,7 @@ namespace Spinnenspiel
                 if (!Progress(web, stage, 0f)) yield break;
                 HideBauFaden();
                 yield return WalkTo(path[0], 0.4f * durationScale, LookTowards(path[0]));
+                if (_cancelRequested) yield break;
 
                 // 2. Pfad in der Stufendauer mit konstanter Geschwindigkeit ablaufen.
                 float total = PathLength(path);
@@ -218,6 +240,11 @@ namespace Spinnenspiel
                 float travelled = 0f;
                 while (travelled < total)
                 {
+                    if (_cancelRequested)
+                    {
+                        yield break;
+                    }
+
                     travelled = Mathf.Min(travelled + speed * Time.deltaTime, total);
                     int i;
                     float f;
@@ -251,6 +278,11 @@ namespace Spinnenspiel
             }
 
             // 3. Fertig: Fangspirale komplett, Hilfsspirale weg.
+            if (_cancelRequested)
+            {
+                HideBauFaden();
+                yield break;
+            }
             if (!Progress(web, OrbWeb.WebStage.Done, 1f)) yield break;
             web.showAux = false;
 
@@ -340,6 +372,11 @@ namespace Spinnenspiel
             float t = 0f;
             while (t < duration)
             {
+                if (_cancelRequested)
+                {
+                    yield break;
+                }
+
                 t += Time.deltaTime;
                 float k = Mathf.Clamp01(t / duration);
                 transform.position = Vector3.Lerp(from, target, k) + _normal * bodyOffset;

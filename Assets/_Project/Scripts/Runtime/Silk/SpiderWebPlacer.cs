@@ -28,6 +28,9 @@ namespace Spinnenspiel
         /// <summary>Ob die weiße Netz-Vorschau gerade sichtbar ist.</summary>
         public bool PreviewVisible { get; private set; }
 
+        /// <summary>Z6: True, wenn die Vorschau rot anzeigt (kein Platz mehr).</summary>
+        public bool PreviewBlocked { get; private set; }
+
         /// <summary>Anzahl aktuell registrierter Netze.</summary>
         public int WebCount => _webs.Count;
 
@@ -65,7 +68,7 @@ namespace Spinnenspiel
                     }
                     else
                     {
-                        HidePreview();
+                        ShowBlockedPreview();
                     }
                 }
                 else
@@ -108,6 +111,19 @@ namespace Spinnenspiel
             {
                 pressed = Gamepad.current.buttonNorth.wasPressedThisFrame;
             }
+
+            // Z6: Esc waahrend ein Netzbau aborts it (Pause stays on GameMenu).
+            if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+            {
+                SpiderWebBuilder escBuilder = FindFirstObjectByType<SpiderWebBuilder>();
+                if (escBuilder != null && escBuilder.IsBuilding)
+                {
+                    escBuilder.CancelBuild();
+                    CanBuild = false;
+                    HidePreview();
+                }
+            }
+
             if (pressed && CanBuild)
             {
                 TryPlaceWebNow();
@@ -352,6 +368,29 @@ namespace Spinnenspiel
                 _previewGo.SetActive(false);
             }
             PreviewVisible = false;
+            PreviewBlocked = false;
+        }
+
+        /// <summary>Z6: Vorschau exists and the spot went bad -> show it red instead of hiding.</summary>
+        private void ShowBlockedPreview()
+        {
+            if (_previewGo == null || _lastPreviewFrame == null)
+            {
+                HidePreview();
+                return;
+            }
+            SetPreviewColor(new Color(1f, 0.15f, 0.15f, 0.5f));
+            _previewGo.SetActive(true);
+            PreviewVisible = true;
+            PreviewBlocked = true;
+        }
+
+        private void SetPreviewColor(Color c)
+        {
+            if (_previewMat != null)
+            {
+                _previewMat.color = c;
+            }
         }
 
         /// <summary>
