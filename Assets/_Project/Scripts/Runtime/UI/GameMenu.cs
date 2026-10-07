@@ -17,6 +17,8 @@ namespace Spinnenspiel
         public bool QuitRequested;
 
         public event System.Action Resumed;
+        public event System.Action Quitting;
+        public event System.Action Starting;
 
         private void Awake()
         {
@@ -42,12 +44,28 @@ namespace Spinnenspiel
             {
                 TogglePause();
             }
+            // Q while paused: quit the game (Quitting fires first, e.g. for saving).
+            if (k.qKey.wasPressedThisFrame && _state == 2)
+            {
+                QuitRequested = true;
+                System.Action quitting = Quitting;
+                if (quitting != null)
+                {
+                    quitting();
+                }
+                Application.Quit();
+            }
         }
 
         /// <summary>Startscreen -> Playing.</summary>
         public void StartGame()
         {
             _state = 1;
+            System.Action starting = Starting;
+            if (starting != null)
+            {
+                starting();
+            }
         }
 
         /// <summary>Playing <-> Paused (Esc). Resume fires Resumed.</summary>
