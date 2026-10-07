@@ -10,7 +10,7 @@
   - [x] B3.3 done — Commit 8584a5c (LoadPHTrees: LOD0/1 per FBX, MAT_PHTree_* Wood/Leaf, ValidateMaterial; Library-Fill gruen: Jacaranda 30 m, Island 12-15 m; CI b3full 83/0 fehlgeschlagen 0. NOTE: Mesh[][] nested NOT serialized -> flat phTreeLod0/1+WoodMats/LeafMats)
   - [x] B3.4 done — Commit f0d87d9 (CreateTree: PH LOD0/1 + MeshCollider on LOD1 + SurfaceTag Wood; Wood/Leaf per GetSubMesh(i).bounds; Build Exit 0, Jacaranda 30 m, Island 12-15 m)
   - [x] B3.5 done — Commits 89cd67d+f0863e8 (TreesTests.cs: collider+SurfaceTag Wood+footprint-downcast blocking; LOD0 collider, physics-based planting via RaycastAll foot-measure; full CI b37c 83/0 green)
-  - [ ] B3.6 Full CI + commit (incl. ArtSource/Baeume/*.py/*.sh)
+  - [x] B3.6 done 2026-10-07 — full CI b36 green (Build Exit 0, Tests Exit 0, fehlgeschlagen 0, Trees_HaveCollidersAndBlockSpider Passed); ArtSource/Baeume already in 8584a5c; TreesTests.cs.meta committed
 - [ ] B4 Lianen: die 1500 geraden Stäbe ersetzen. Ca. 300 Lianen, die an Ästen der neuen Bäume hängen (Startpunkt in der Krone), leicht durchhängend/geschwungen, unteres Ende 0.2-0.8 m über Boden. Collider als Kette kurzer Kapseln, SurfaceTag Wood, bleiben als Netzanker nutzbar. Test: Spinne kann an einer Liane hochklettern.
 - [ ] B5 Kollisionstest für alle Pflanzenarten (Bäume, Lianen, Baumfarne, Riesenblätter): Spinne läuft dagegen und wird aufgehalten oder klettert.
 - [ ] B6 Spielschleife prüfen: Hunger sinkt, Fliegen fliegen ins Netz, Spinne fängt und frisst sie (SpiderHunger, SpiderPredation). Fehlt etwas: ergänzen, mit Test.
