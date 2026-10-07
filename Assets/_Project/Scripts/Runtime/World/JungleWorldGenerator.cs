@@ -581,9 +581,45 @@ namespace Spinnenspiel
             Material woodMat = library.phTreeWoodMats[variant];
             Material leafMat = library.phTreeLeafMats[variant];
 
+            // Planting: align the tree so no TRUNK vertex floats more than 0.35 m above the
+            // terrain under it (measured in TreesTests: root-pos and footprint-corner sampling
+            // both floated leaning/offset trunks 3..6 m, so the Spider was not blocked).
+            float baseDrop = lod0.bounds.min.y * scale;
+            Vector3 woodCenterLocal = lod0.bounds.center;
+            Vector3 woodExtLocal = lod0.bounds.extents;
+            int woodSub = -1;
+            if (lod0.subMeshCount >= 2)
+            {
+                float bestArea = 1e9f;
+                for (int s = 0; s < lod0.subMeshCount; s++)
+                {
+                    Bounds sb = lod0.GetSubMesh(s).bounds;
+                    float area = sb.size.x * sb.size.z;
+                    if (sb.size.y >= 1f && area < bestArea) { bestArea = area; woodSub = s; }
+                }
+                if (woodSub >= 0)
+                {
+                    baseDrop = lod0.GetSubMesh(woodSub).bounds.min.y * scale;
+                    woodCenterLocal = lod0.GetSubMesh(woodSub).bounds.center;
+                    woodExtLocal = lod0.GetSubMesh(woodSub).bounds.extents;
+                }
+            }
             GameObject tree = new GameObject("PH-Tree");
             tree.transform.SetParent(parent, false);
-            tree.transform.position = pos;
+            Terrain terr = Terrain.activeTerrain;
+            float groundAtPos = pos.y;
+            if (terr != null)
+            {
+                Vector3 terrPos = terr.transform.position;
+                groundAtPos = terr.SampleHeight(pos) + terrPos.y;
+                Quaternion rotYq = Quaternion.Euler(0f, rotY, 0f);
+                float rootY = groundAtPos + 0.35f - baseDrop;
+                tree.transform.position = new Vector3(pos.x, rootY, pos.z);
+            }
+            else
+            {
+                tree.transform.position = new Vector3(pos.x, pos.y + 0.35f, pos.z) - Vector3.up * baseDrop;
+            }
             tree.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
             tree.transform.localScale = Vector3.one * scale;
             tree.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Wood;
@@ -607,12 +643,52 @@ namespace Spinnenspiel
                 r1.sharedMaterials = PickMaterialsPerSubmesh(lod1, woodMat, leafMat, variant);
             }
 
-            // Collider on the LOD1-Mesh: concave MeshCollider so the Spider gets stopped.
+            // Collider on the LOD0-Mesh: LOD1 lacks lower-trunk triangles (measured in TreesTests),
+            // so blocking the Spider needs the full scan mesh (concave).
             GameObject colNode = new GameObject("TreeCollider");
             colNode.transform.SetParent(tree.transform, false);
             var mc = colNode.AddComponent<MeshCollider>();
-            mc.sharedMesh = lod1;
+            mc.sharedMesh = lod0;
             mc.convex = false;
+
+            // Planting fix (runtime): scans are not vertex-readable at runtime, so measure the
+            // trunk-bottom offset via downcasts on the TreeCollider within the TRUNK footprint
+            // and sink the tree until no trunk column floats more than 0.35 m over terrain
+            // (measured in TreesTests: offset/leaning trunks floated 3..6 m, Spider not blocked).
+            if (terr != null && woodSub >= 0)
+            {
+                Bounds wsb = lod0.GetSubMesh(woodSub).bounds;
+                Vector3 wl = colNode.transform.TransformPoint(wsb.center - wsb.extents);
+                Vector3 wh = colNode.transform.TransformPoint(wsb.center + wsb.extents);
+                float rootY0 = tree.transform.position.y;
+                float footOffset = 1e9f;   // lowest trunk point relative to rootY
+                float footGround = -1e9f;
+                for (float x = wl.x; x <= wh.x; x += 0.5f)
+                {
+                    for (float z = wl.z; z <= wh.z; z += 0.5f)
+                    {
+                        var top = new Vector3(x, wh.y + 2f, z);
+                        RaycastHit[] hits = Physics.RaycastAll(top, Vector3.down, (wh.y - wl.y) + 6f);
+                        float lowestOwn = 1e9f;
+                        foreach (var h in hits)
+                            if (h.collider.gameObject == colNode && h.point.y < lowestOwn) lowestOwn = h.point.y;
+                        if (lowestOwn >= 1e9f) continue; // no geometry in this column
+                        float offset = lowestOwn - rootY0;
+                        if (offset < footOffset)
+                        {
+                            footOffset = offset;
+                            footGround = terr.SampleHeight(new Vector3(x, 0f, z)) + terr.transform.position.y;
+                        }
+                    }
+                }
+                if (footOffset < 1e9f)
+                {
+                    // Plant so the trunk FOOT sits ~0.25 m above the terrain under it.
+                    float newRootY = footGround + 0.25f - footOffset;
+                    if (newRootY < rootY0 && rootY0 - newRootY <= 10f)
+                        tree.transform.position = new Vector3(tree.transform.position.x, newRootY, tree.transform.position.z);
+                }
+            }
 
             var lod = tree.AddComponent<LODGroup>();
             lod.SetLODs(new[]
