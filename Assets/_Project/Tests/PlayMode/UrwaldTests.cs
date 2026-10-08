@@ -428,5 +428,24 @@ namespace Spinnenspiel.Tests
             RenderTexture.active = null;
             System.IO.File.WriteAllBytes(file, png);
         }
+
+        [UnityTest]
+        public IEnumerator Urwald_SpiderScaleDebrisPresent()
+        {
+            JungleWorldGenerator.NextSeed = 4242;
+            SceneManager.LoadScene("Urwald");
+            yield return null;
+            yield return WaitReady();
+            Assert.IsNotNull(readyGen, "Welt (Seed 4242) nicht fertig.");
+            JungleWorldGenerator gen = readyGen;
+
+            Assert.GreaterOrEqual(gen.DebrisCount, 3000, "Zu few spinngscale debris (< 3000).");
+
+            GameObject debrisRoot = GameObject.Find("Debris");
+            Assert.IsNotNull(debrisRoot, "Debris-Root not found.");
+            Assert.GreaterOrEqual(gen.DebrisMaxSizeMeters, 0.01f, "Debris-Messung missing (0 m).");
+            UnityEngine.Debug.Log($"[Urwald-Test] Debris: {gen.DebrisCount} Objekte, grösste {gen.DebrisMaxSizeMeters * 100f:0.0} cm");
+            Assert.LessOrEqual(gen.DebrisMaxSizeMeters, 0.12f, "Debris not spider-scale: largest > 12 cm.");
+        }
     }
 }

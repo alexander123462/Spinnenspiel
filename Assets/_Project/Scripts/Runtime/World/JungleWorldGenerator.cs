@@ -35,6 +35,8 @@ namespace Spinnenspiel
         public int GroundCoverCount { get; private set; }
         public int PlantColliderCount { get; private set; }
         public int LianaCount { get; private set; }
+        public int DebrisCount { get; private set; }
+        public float DebrisMaxSizeMeters { get; private set; }
         public int LogCount { get; private set; }
         public int RockCount { get; private set; }
 
@@ -301,6 +303,76 @@ namespace Spinnenspiel
                 GroundCoverCount = groundN;
                 UnityEngine.Debug.Log($"[Jungle] Bodendecker: {groundN} Objekte, mittlere Höhe 0.25–0.60 m (bounds-basiert)");
             }
+
+            // 5c) M7-10.5 Spinngscale Debris: cm-sized Laubstreu, Zweiglein, Kieselchen.
+            // Fein detail for the spider macro-perspective; no colliders (walk on ground).
+            GameObject debris = new GameObject("Debris");
+            var leafMeshes = new Mesh[6];
+            for (int k = 0; k < 6; k++) leafMeshes[k] = JunglePlantFactory.FallenLeaf(Seed * 11 + k + 1);
+            var twigMeshes = new Mesh[4];
+            for (int k = 0; k < 4; k++) twigMeshes[k] = JunglePlantFactory.GroundTwig(Seed * 13 + k + 1);
+            int debrisN = 0;
+            const int debrisMax = 9000;
+            const float debrisRadius = 26f;
+            const float debrisStep = 0.34f;
+            {
+                int dn = Mathf.CeilToInt(debrisRadius / debrisStep);
+                for (int i = -dn; i <= dn && debrisN < debrisMax; i++)
+                {
+                    for (int j = -dn; j <= dn && debrisN < debrisMax; j++)
+                    {
+                        int hi = i + 10000, hj = j + 10000;
+                        float x = _spawnXZ.x + i * debrisStep + (World.Hash01(hi, hj, 91) - 0.5f) * 0.3f;
+                        float z = _spawnXZ.z + j * debrisStep + (World.Hash01(hi, hj, 92) - 0.5f) * 0.3f;
+                        float ddx = x - _spawnXZ.x, ddz = z - _spawnXZ.z;
+                        if (ddx * ddx + ddz * ddz > debrisRadius * debrisRadius) continue;
+                        if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
+                        if (!IsDryFlat(World, x, z)) continue;
+                        if (World.Height(x, z) < JungleWorld.WaterLevel + 0.05f) continue;
+
+                        float kind = World.Hash01(i, j, 93);
+                        Mesh mesh; Material mat; float scale;
+                        if (kind < 0.6f)
+                        {
+                            int v = Mathf.FloorToInt(World.Hash01(i, j, 94) * leafMeshes.Length) % leafMeshes.Length;
+                            mesh = leafMeshes[v]; mat = library.leaves; scale = 1f;
+                        }
+                        else if (kind < 0.85f)
+                        {
+                            int v = Mathf.FloorToInt(World.Hash01(i, j, 95) * twigMeshes.Length) % twigMeshes.Length;
+                            mesh = twigMeshes[v]; mat = library.logMat; scale = 1f;
+                        }
+                        else
+                        {
+                            int v = Mathf.FloorToInt(World.Hash01(i, j, 96) * Math.Min(5, library.rocks.Length)) % Math.Max(1, library.rocks.Length);
+                            mesh = library.rocks[v]; mat = library.rockMat;
+                            float ext = Mathf.Max(Mathf.Max(mesh.bounds.size.x, mesh.bounds.size.y), mesh.bounds.size.z);
+                            scale = 0.02f / Mathf.Max(ext, 0.01f); // max-dimension ~2 cm
+                        }
+                        if (mesh == null || mat == null) continue;
+
+                        float rot = World.Hash01(i, j, 97) * 360f;
+                        float h = World.Height(x, z);
+                        GameObject g = new GameObject();
+                        g.transform.SetParent(debris.transform, false);
+                        g.layer = 0;
+                        g.transform.position = new Vector3(x, h + 0.001f, z);
+                        g.transform.rotation = Quaternion.Euler(0f, rot, 0f);
+                        g.transform.localScale = Vector3.one * scale;
+                        g.AddComponent<MeshFilter>().sharedMesh = mesh;
+                        var r = g.AddComponent<MeshRenderer>();
+                        r.sharedMaterial = mat;
+                        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                        Vector3 worldSize = mesh.bounds.size * scale;
+                        float maxDim = Mathf.Max(Mathf.Max(worldSize.x, worldSize.y), worldSize.z);
+                        if (maxDim > DebrisMaxSizeMeters) DebrisMaxSizeMeters = maxDim;
+                        debrisN++;
+                    }
+                }
+                StaticBatchingUtility.Combine(debris);
+            }
+            DebrisCount = debrisN;
+            UnityEngine.Debug.Log($"[Jungle] Spinngscale-Debris: {debrisN} Objekte (Laubstreu/Zweiglein/Kieseln, cm-sized), grösste {DebrisMaxSizeMeters * 100f:0.0} cm");
 
             // 5b) Lianen: an Ästen der PH-Bäume hängen (Startpunkt in der Kronen-Bounds),
             // leicht geschwung, unteres Ende 0.2-0.8 m über Boden. Collider = Kette kurzer

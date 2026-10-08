@@ -202,5 +202,87 @@ namespace Spinnenspiel
             m.RecalculateBounds();
             return m;
         }
+
+        /// <summary>M7-10.5: Spinngscale Laubblatt lieing on the ground (cm-sized).</summary>
+        public static Mesh FallenLeaf(int seed)
+        {
+            var rng = new System.Random(seed);
+            float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+
+            float len = R(0.03f, 0.06f);
+            float wid = len * R(0.5f, 0.8f);
+            float curl = R(0f, 0.25f);
+            int ribs = rng.Next(3, 6);
+
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            var uvs = new List<Vector2>();
+
+            // Central spine along X, width in Z; slight upward curl at the tip.
+            for (int i = 0; i <= ribs; i++)
+            {
+                float t = (float)i / ribs;
+                float x = (t - 0.5f) * len;
+                float w = wid * 0.5f * Mathf.Sin(t * Mathf.PI) + 0.002f;
+                float y = curl * len * t * t;
+                verts.Add(new Vector3(x, y, -w));
+                verts.Add(new Vector3(x, y, w));
+                uvs.Add(new Vector2(t, 0f));
+                uvs.Add(new Vector2(t, 1f));
+            }
+            for (int i = 0; i < ribs; i++)
+            {
+                int a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+                tris.Add(a); tris.Add(c); tris.Add(b);
+                tris.Add(b); tris.Add(c); tris.Add(d);
+            }
+
+            var m = new Mesh { name = "FallenLeaf_" + seed };
+            m.SetVertices(verts);
+            m.SetTriangles(tris, 0);
+            m.SetUVs(0, uvs);
+            m.RecalculateNormals();
+            m.RecalculateBounds();
+            return m;
+        }
+
+        /// <summary>M7-10.5: Small twig (1–4 cm) lying on the ground.</summary>
+        public static Mesh GroundTwig(int seed)
+        {
+            var rng = new System.Random(seed);
+            float len = 0.01f + (float)rng.NextDouble() * 0.03f;
+            float r = 0.0015f + (float)rng.NextDouble() * 0.0015f;
+            int sides = 5;
+
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            var uvs = new List<Vector2>();
+
+            // Cylinder along X (lying flat), no caps (too small to see).
+            for (int s = 0; s <= sides; s++)
+            {
+                float a = s % sides * (Mathf.PI * 2f / sides);
+                float y = Mathf.Cos(a) * r + r; // lie on ground: bottom at y=0
+                float z = Mathf.Sin(a) * r;
+                verts.Add(new Vector3(-len * 0.5f, y, z));
+                verts.Add(new Vector3(len * 0.5f, y, z));
+                uvs.Add(new Vector2(0f, (float)s / sides));
+                uvs.Add(new Vector2(1f, (float)s / sides));
+            }
+            for (int s = 0; s < sides; s++)
+            {
+                int a0 = s * 2, b0 = a0 + 1, c0 = a0 + 2, d0 = a0 + 3;
+                tris.Add(a0); tris.Add(c0); tris.Add(b0);
+                tris.Add(b0); tris.Add(c0); tris.Add(d0);
+            }
+
+            var m = new Mesh { name = "GroundTwig_" + seed };
+            m.SetVertices(verts);
+            m.SetTriangles(tris, 0);
+            m.SetUVs(0, uvs);
+            m.RecalculateNormals();
+            m.RecalculateBounds();
+            return m;
+        }
     }
 }
