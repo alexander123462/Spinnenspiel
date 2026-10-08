@@ -81,6 +81,12 @@ namespace Spinnenspiel
         private float nextTargetTime;
         private float bobPhase;
         private float lastBob;
+        /// <summary>Z9 Perf: Physics-Casts throttled (every 0.2 s), cached between checks.</summary>
+        private const float castInterval = 0.2f;
+        private float nextCastTime;
+        private float cachedGroundY;
+        private bool blockedAhead;
+        private Vector3 blockedPoint;
 
         private void Awake()
         {
@@ -100,6 +106,9 @@ namespace Spinnenspiel
             {
                 home = transform.position;
             }
+
+            // Z9 Perf: Seed cached ground height so the first frames use a sane value.
+            cachedGroundY = GroundHeight(transform.position);
 
             target = home + Vector3.up * 0.5f;
             currentDirection = Vector3.forward;
@@ -333,12 +342,25 @@ namespace Spinnenspiel
 
             // Hindernis? SphereCast 0.3 m voraus – dann Ziel auf die Gegenseite.
             Vector3 facing = hasDirection ? currentDirection.normalized : transform.forward;
-            RaycastHit blocked;
-            if (Time.time >= _webRunUntil &&
-                Physics.SphereCast(transform.position, 0.03f, facing, out blocked, 0.3f,
-                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            // Z9 Perf: Cast only every castInterval s, otherwise cached result reused.
+            bool doCast = Time.time >= nextCastTime;
+            if (doCast)
             {
-                Vector3 away = transform.position + (transform.position - blocked.point).normalized * wanderRadius;
+                nextCastTime = Time.time + castInterval;
+            }
+            if (doCast && Time.time >= _webRunUntil)
+            {
+                RaycastHit blocked;
+                blockedAhead = Physics.SphereCast(transform.position, 0.03f, facing, out blocked, 0.3f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+                if (blockedAhead)
+                {
+                    blockedPoint = blocked.point;
+                }
+            }
+            if (blockedAhead && Time.time >= _webRunUntil)
+            {
+                Vector3 away = transform.position + (transform.position - blockedPoint).normalized * wanderRadius;
                 away.y = GroundHeight(away) + Mathf.Clamp(Random.Range(minHeight, maxHeight), minHeight, maxHeight);
                 target = away;
                 nextTargetTime = Time.time + Random.Range(2f, 4f);
@@ -362,17 +384,21 @@ namespace Spinnenspiel
             // Höhe absichern: Raycast startet KNAPP UNTER der Fliege – so trifft er
             // weder den eigenen Collider noch Überhänge/Baumkronen über uns (das
             // würde sonst jeden Frame nach oben teleportieren). Max. 10 m in den Boden.
-            RaycastHit ground;
-            float groundY;
-            if (Physics.Raycast(transform.position - Vector3.up * 0.05f, Vector3.down, out ground, 10f,
-                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            // Z9 Perf: Ground-Raycast throttled to the same castInterval and cached.
+            if (doCast)
             {
-                groundY = ground.point.y;
+                RaycastHit ground;
+                if (Physics.Raycast(transform.position - Vector3.up * 0.05f, Vector3.down, out ground, 10f,
+                        Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                {
+                    cachedGroundY = ground.point.y;
+                }
+                else
+                {
+                    cachedGroundY = GroundHeight(transform.position);
+                }
             }
-            else
-            {
-                groundY = GroundHeight(transform.position);
-            }
+            float groundY = cachedGroundY;
 
             float heightAboveGround = transform.position.y - groundY;
             if (heightAboveGround < minHeight * 0.5f)

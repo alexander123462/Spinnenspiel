@@ -41,3 +41,5 @@
 2026-10-07 | Z5 Speichern | GREEN | Commit 352210c (SaveGame JSON in persistentDataPath, GameMenu Q-Quit/Starting hooks, SaveGameTests roundtrip; full CI r102 Build Exit 0 / Tests Exit 0 / fehlgeschlagen 0, 94/95 Passed)
 
 2026-10-07 | Z6 Netzbau-Komfort | GREEN | Commit 5ea1204 (SpiderWebBuilder.CancelBuild + cancel-flag in BuildRoutine/WalkTo; SpiderWebPlacer Esc->CancelBuild + red ShowBlockedPreview/PreviewBlocked; GameMenu EscIsBuildAbort skips Pause; NetbuildComfortTests CancelBuild_StopsRunningBuild + RedPreview_WhenSpotGoesBad green; full CI r103 Build Exit 0 / Tests Exit 0 / fehlgeschlagen 0, 96/97 Passed +1 Skipped)
+
+2026-10-08 | Z9 Leistung 2: Cost-Breakdown-Test + Insects-Optimization (throttled casts) | gruen (z9opt1 Build Exit 0, Tests Exit 0, fehlgeschlagen 0, 98/99 +1 Skipped; base 6.57 ms, Insects ~5.88 ms)

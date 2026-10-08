@@ -84,6 +84,33 @@ namespace Spinnenspiel.Tests
             }
         }
 
+        /// <summary>Mittl. CPU-Work-ms per Frame via FrameTimingManager; result in _lastMeanCpuMs.</summary>
+        private float _lastMeanCpuMs = -1f;
+
+        private IEnumerator MeasureMeanCpuMs(int samples)
+        {
+            FrameTiming[] timing = new FrameTiming[8];
+            float sumCpuMs = 0f;
+            int measured = 0;
+            for (int i = 0; i < samples; i++)
+            {
+                FrameTimingManager.CaptureFrameTimings();
+                uint got = FrameTimingManager.GetLatestTimings((uint)timing.Length, timing);
+                for (int t = 0; t < (int)got; t++)
+                {
+                    float cpuWorkMs = (float)(timing[t].cpuFrameTime - timing[t].cpuMainThreadPresentWaitTime);
+                    if (cpuWorkMs > 0.0)
+                    {
+                        sumCpuMs += cpuWorkMs;
+                        measured++;
+                    }
+                }
+                yield return null;
+            }
+            Assert.Greater(measured, samples / 2, "Too few valid FrameTiming samples.");
+            _lastMeanCpuMs = sumCpuMs / measured;
+        }
+
         [UnityTest]
         public IEnumerator Performance_MeanFrameTimeUnderBudget()
         {
@@ -131,6 +158,43 @@ namespace Spinnenspiel.Tests
                 Debug.Log("[Perf] Urwald mittl. GPU-Framezeit: " + meanGpu.ToString("0.00") + " ms");
             }
             Assert.Less(meanCpu, 16.7f, "Mittl. CPU-Work-Framezeit ueber 16.7 ms Budget.");
+        }
+
+        [UnityTest]
+        public IEnumerator Performance_Z9CostBreakdownPerSystem()
+        {
+            // Z9: Per-System costs measured via disable-and-measure (A/B).
+            JungleWorldGenerator.NextSeed = 4242;
+            SceneManager.LoadScene("Urwald");
+            yield return null;
+            yield return WaitReady();
+
+            GameObject vegetation = GameObject.Find("Unterholz");
+            GameObject flies = GameObject.Find("Insekten");
+            GameObject moths = GameObject.Find("Insekten_Motte");
+            Assert.IsNotNull(vegetation, "No Unterholz-Group.");
+            Assert.IsNotNull(flies, "No Insekten-Group.");
+
+            yield return MeasureMeanCpuMs(240);
+            float baseline = _lastMeanCpuMs;
+
+            vegetation.SetActive(false);
+            yield return MeasureMeanCpuMs(240);
+            float vegCost = baseline - _lastMeanCpuMs;
+
+            vegetation.SetActive(true);
+            flies.SetActive(false);
+            moths.SetActive(false);
+            yield return MeasureMeanCpuMs(240);
+            float insectCost = baseline - _lastMeanCpuMs;
+            flies.SetActive(true);
+            moths.SetActive(true);
+
+            Debug.Log("[Z9] Cost-Breakdown (ms/Frame): base " + baseline.ToString("0.00")
+                + " | Vegetation " + vegCost.ToString("0.00")
+                + " | Insects " + insectCost.ToString("0.00"));
+            Assert.GreaterOrEqual(vegCost, -1f, "Vegetation-Cost messung insane (-): " + vegCost);
+            Assert.Less(baseline, 16.7f, "Base frame time already over budget.");
         }
 
         [UnityTest]
