@@ -312,9 +312,9 @@ namespace Spinnenspiel
             var twigMeshes = new Mesh[4];
             for (int k = 0; k < 4; k++) twigMeshes[k] = JunglePlantFactory.GroundTwig(Seed * 13 + k + 1);
             int debrisN = 0;
-            const int debrisMax = 9000;
+            const int debrisMax = 4500;
             const float debrisRadius = 26f;
-            const float debrisStep = 0.34f;
+            const float debrisStep = 0.55f;
             {
                 int dn = Mathf.CeilToInt(debrisRadius / debrisStep);
                 for (int i = -dn; i <= dn && debrisN < debrisMax; i++)
