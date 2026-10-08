@@ -265,22 +265,35 @@ namespace Spinnenspiel.Tests
 
             // Beweisfotos: Gesamtansicht + Nahaufnahme der Spinne.
             float half = gen.World.Size / 2f;
-            GameObject camGo = new GameObject("UrwaldFotoCam");
-            Camera cam = camGo.AddComponent<Camera>();
-            cam.clearFlags = CameraClearFlags.Skybox;
-            camGo.transform.position = new Vector3(half, 40f, half - 40f);
-            camGo.transform.LookAt(new Vector3(half, 3f, half));
-            var rt = new RenderTexture(1280, 720, 24);
+            VegetationSystem veg = Object.FindFirstObjectByType<VegetationSystem>();
+            var cycle = Object.FindFirstObjectByType<DayNightCycle>();
+            if (cycle != null) cycle.SetDayProgress(0.45f); // Vormittag-Light for the proof shots
+            yield return null; // one frame so DayNightCycle rotates the sun to morning
+            Camera main = Camera.main;
+            var overviewPos = new Vector3(half, 14f, half - 14f);
+            main.transform.position = overviewPos;
+            main.transform.LookAt(new Vector3(half, 3f, half));
+            var rt = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32);
+            rt.antiAliasing = 4;
             rt.Create();
-            cam.targetTexture = rt;
-            SaveFrame(cam, rt, 1280, 720, "Logs/ci/urwald_oben.png");
-            Object.DestroyImmediate(camGo);
+            main.targetTexture = rt;
+            if (veg != null) veg.RenderForCamera(main);
+            SaveFrame(main, rt, 1280, 720, "Logs/ci/urwald_oben.png");
+            main.targetTexture = null;
             Object.DestroyImmediate(rt);
 
-            Camera main = Camera.main;
-            var rt2 = new RenderTexture(1280, 720, 24);
+            var spiderGo = GameObject.Find("Spider");
+            if (spiderGo != null)
+            {
+                Vector3 s = spiderGo.transform.position;
+                main.transform.position = s + new Vector3(0.25f, 0.18f, -0.35f);
+                main.transform.LookAt(s + new Vector3(0f, 0.05f, 0f));
+            }
+            var rt2 = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32);
+            rt2.antiAliasing = 4;
             rt2.Create();
             main.targetTexture = rt2;
+            if (veg != null) veg.RenderForCamera(main);
             SaveFrame(main, rt2, 1280, 720, "Logs/ci/urwald_spinne.png");
             main.targetTexture = null;
             Object.DestroyImmediate(rt2);

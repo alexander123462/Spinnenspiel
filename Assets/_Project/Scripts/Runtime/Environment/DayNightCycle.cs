@@ -52,6 +52,13 @@ namespace Spinnenspiel
             }
         }
 
+        /// <summary>Tests/Screenshot: Jump to a day progress (0 = midnight, 0.5 = noon).</summary>
+        public void SetDayProgress(float progress)
+        {
+            dayFraction = progress - Mathf.Floor(progress);
+            DayProgress = dayFraction;
+        }
+
         private void Update()
         {
             float lengthMinutes = dayLengthMinutes > 0.01f ? dayLengthMinutes : 0.01f;
