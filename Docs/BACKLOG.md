@@ -42,6 +42,7 @@
   - [x] Z6.1..Z6.5 done — Commit 5ea1204 (CancelBuild+frame-stamp, ShowBlockedPreview red, GameMenu Esc-guard, NetbuildComfortTests 2 green; r103 97/0)
 - [x] Z7 Beute: zweite Insektenart (Motte, langsamer, groesser) ueber denselben Spawner, eigenes Blender-Modellskript in ArtSource/Insekten/.
   - [x] Z7.1 done 2026-10-08 — Commit b85550c: motte.py (Blender, FBX) + Assets/_Project/Art/Insekten/Motte.fbx; InsectBuilder.CreateMoth loads all FBX meshes, MAT_MothBody; FlyingInsect.SetFlightParams(0.45, 1.8); 2nd InsectSpawner count=4 in UrwaldSceneBuilder; CI z7full1 96/0 (1 Skipped wie ueblich)
-- [ ] Z8 Klänge: Schrittgeräusche je Untergrund (Holz/Erde/Blatt) prüfen und fehlende ergänzen (prozedural wie ProceduralAudio).
+- [x] Z8 Klänge: Schrittgeräusche je Untergrund (Holz/Erde/Blatt) prüfen und fehlende ergänzen (prozedural wie ProceduralAudio).
 - [ ] Z9 Leistung 2: nach B10 die drei teuersten Systeme per Profiler-Marker messen und im Bericht nennen; das teuerste optimieren.
 - [ ] Z10 Docs/ARCHITEKTUR.md: Überblick über Ordner, wichtigste Klassen, Datenfluss Eingabe -> Bewegung -> Beine -> Kamera, Tests und CI.
+  - [x] Z8.1 done 2026-10-08 — all 6 SurfaceTypes have own procedural step clips (ProceduralAudio.Footsteps); new test Audio_FootstepClipsDifferPerSurface in WorldTests; CI z8full5 97/0

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -186,6 +187,33 @@ namespace Spinnenspiel.Tests
             yield return new WaitForSeconds(1.5f);
             movement.SetExternalMoveInput(Vector2.zero);
             Assert.Greater(steps.StepsPlayed, 4, "Keine Trittgeräusche");
+        }
+
+        [UnityTest]
+        public IEnumerator Audio_FootstepClipsDifferPerSurface()
+        {
+            // Z8: Every SurfaceType must have its own procedural step clips.
+            yield return null;
+            SurfaceType[] surfaces =
+            {
+                SurfaceType.Ground, SurfaceType.Grass, SurfaceType.Rock,
+                SurfaceType.Wood, SurfaceType.Water, SurfaceType.Mud
+            };
+            HashSet<string> names = new HashSet<string>();
+            int expected = 0;
+            foreach (SurfaceType surface in surfaces)
+            {
+                AudioClip[] clips = ProceduralAudio.Footsteps(surface);
+                Assert.IsNotEmpty(clips, "No clips for surface: " + surface);
+                expected += clips.Length;
+                foreach (AudioClip clip in clips)
+                {
+                    Assert.IsNotNull(clip, "Null-Clip under surface: " + surface);
+                    Assert.IsTrue(clip.name.Contains(surface.ToString()), "Clip-name lacks surface: " + clip.name);
+                    names.Add(clip.name);
+                }
+            }
+            Assert.AreEqual(expected, names.Count, "Clip-names not unique per surface+variant");
         }
 
         [UnityTest]
