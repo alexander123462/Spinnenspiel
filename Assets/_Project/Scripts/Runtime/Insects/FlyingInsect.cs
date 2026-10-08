@@ -31,6 +31,13 @@ namespace Spinnenspiel
         /// <summary>Wahrscheinlichkeit (0..1) pro Neu-Zielen, ein fertiges Netz anzufliegen (simulierte Flugschneise).</summary>
         public float webAttraction = 0.35f;
 
+        /// <summary>Z7: Motte-Parameter-Preset (slower + calmer than the fly).</summary>
+        public void SetFlightParams(float newSpeed, float newWanderRadius)
+        {
+            speed = newSpeed;
+            wanderRadius = newWanderRadius;
+        }
+
         /// <summary>Festhalten, damit es nicht aus dem Netz ausbricht (z. B. beim Einwickeln).</summary>
         public void Hold()
         {

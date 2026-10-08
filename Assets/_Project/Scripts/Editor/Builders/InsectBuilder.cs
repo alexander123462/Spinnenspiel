@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -50,6 +51,55 @@ namespace Spinnenspiel.EditorTools
             CreateWing(root.transform, "Wing_R", new Vector3(0.009f, 0.006f, -0.004f), wing);
 
             return root;
+        }
+
+        /// <summary>Z7: Motte (Insekten 2) from ArtSource/Insekten/motte.py FBX; bigger + slower than the fly.</summary>
+        public static GameObject CreateMoth()
+        {
+            const string fbxPath = "Assets/_Project/Art/Insekten/Motte.fbx";
+            Object[] assets = AssetDatabase.LoadAllAssetsAtPath(fbxPath);
+            List<Mesh> meshes = new List<Mesh>();
+            foreach (Object asset in assets)
+            {
+                if (asset is Mesh)
+                {
+                    meshes.Add((Mesh)asset);
+                }
+            }
+            if (meshes.Count == 0)
+            {
+                Debug.LogError("[Insect] Motte FBX has no mesh: " + fbxPath);
+                return null;
+            }
+
+            GameObject root = new GameObject("Motte");
+            FlyingInsect insect = root.AddComponent<FlyingInsect>();
+            insect.SetFlightParams(0.45f, 1.8f); // slower than the fly (0.8)
+
+            Material mothMaterial = CreateMothMaterial();
+            int index = 0;
+            foreach (Mesh mesh in meshes)
+            {
+                GameObject part = new GameObject("Motte_" + index++);
+                part.transform.SetParent(root.transform, false);
+                MeshFilter mf = part.AddComponent<MeshFilter>();
+                MeshRenderer mr = part.AddComponent<MeshRenderer>();
+                mf.sharedMesh = mesh;
+                mr.sharedMaterial = mothMaterial;
+            }
+            // Blender-Export: ~0.10 m body length; scale up so it reads bigger than the fly (~0.044 m).
+            root.transform.localScale = Vector3.one * 1.6f;
+
+            return root;
+        }
+
+        /// <summary>Z7: Dreckig-beige Motte-Body (HDRP Lit) als Asset MAT_MothBody.</summary>
+        private static Material CreateMothMaterial()
+        {
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.55f, 0.45f, 0.32f));
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.15f);
+            material.enableInstancing = true;
+            return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_MothBody.mat");
         }
 
         private static void CreateEye(Transform parent, string name, Vector3 localPos, Material material)

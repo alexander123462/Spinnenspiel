@@ -123,6 +123,20 @@ namespace Spinnenspiel.EditorTools
             vorlage.SetActive(false);
             insektenSpawner.template = vorlage;
 
+            // Insekten 2 (Z7): Motte-Spawner — same spawner class, Motte template (slower, bigger).
+            GameObject insekten2 = new GameObject("Insekten_Motte");
+            InsectSpawner motteSpawner = insekten2.AddComponent<InsectSpawner>();
+            motteSpawner.count = 4;
+            motteSpawner.center = spider.transform;
+            GameObject motteVorlage = InsectBuilder.CreateMoth();
+            if (motteVorlage != null)
+            {
+                motteVorlage.name = "Vorlage_Motte";
+                motteVorlage.transform.SetParent(insekten2.transform, false);
+                motteVorlage.SetActive(false);
+                motteSpawner.template = motteVorlage;
+            }
+
             CameraBuilder.Bind(cam, spider.transform);
             cam.transform.position = spawn + new Vector3(0f, 0.35f, -0.95f);
             cam.transform.LookAt(spawn + Vector3.up * 0.1f);

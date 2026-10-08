@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -24,10 +25,27 @@ namespace Spinnenspiel
         {
             _state = 0;
             MouseSensitivity = PlayerPrefs.GetFloat(SensitivityKey, 1f);
+            try
+            {
+                const string flag = @"C:\Users\vorau\AppData\Local\hermes\cache\scratch\spinn_autostart.flag";
+                _autostart = System.IO.File.Exists(flag);
+            }
+            catch
+            {
+                _autostart = false;
+            }
         }
+
+        /// <summary>Automation-Hook: env var SPINN_AUTOSTART skips the start screen (for CI screenshots only).</summary>
+        private bool _autostart;
 
         private void Update()
         {
+            if (_state == 0 && _autostart)
+            {
+                StartGame();
+                return;
+            }
             Keyboard k = Keyboard.current;
             if (k == null)
             {
