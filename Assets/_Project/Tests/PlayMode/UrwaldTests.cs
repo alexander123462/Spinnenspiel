@@ -161,7 +161,10 @@ namespace Spinnenspiel.Tests
             {
                 Debug.Log("[Perf] Urwald mittl. GPU-Framezeit: " + meanGpu.ToString("0.00") + " ms");
             }
-            Assert.Less(medianCpu, 16.7f, "Median CPU-Work-Framezeit ueber 16.7 ms Budget.");
+            Assert.Less(medianCpu, 16.7f, "Steady-State (Median) CPU-Work-Framezeit ueber 16.7 ms Budget.");
+            float p90 = cpuSamples[(int)(cpuSamples.Count * 0.9)];
+            Debug.Log("[Perf] CPU-Work p90: " + p90.ToString("0.00") + " ms | max " + cpuSamples[cpuSamples.Count - 1].ToString("0.00")
+                + " ms (Hitch-Spike; Median " + medianCpu.ToString("0.00") + " ms is the Budget-Kriterium)");
         }
 
         [UnityTest]
