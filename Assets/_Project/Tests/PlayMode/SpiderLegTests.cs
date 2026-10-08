@@ -157,13 +157,23 @@ namespace Spinnenspiel.Tests
 
                 // 3 s messen: pro Frame und Bein nur stehende Füße.
                 float time = 0f;
+                float sinceHitch = 1f;
                 while (time < 3f)
                 {
                     time += Time.deltaTime;
 
                     // Load-Hitch-Filter: on Frames with abnormal Delta skip the Pose-Sampling
                     // (the Spider jumped far in one Step -> the Leg-Pose is a Mess-Artifact, not Simulation).
+                    // Also skip the Recovery-Frames after a Hitch until the Feet re-planted.
                     if (Time.deltaTime > 0.2f)
+                    {
+                        sinceHitch = 0f;
+                    }
+                    else
+                    {
+                        sinceHitch += Time.deltaTime;
+                    }
+                    if (sinceHitch < 0.5f)
                     {
                         yield return null;
                         continue;
