@@ -44,6 +44,6 @@
 
 2026-10-08 | Z9 Leistung 2: Cost-Breakdown-Test + Insects-Optimization (throttled casts) | gruen (z9opt1 Build Exit 0, Tests Exit 0, fehlgeschlagen 0, 98/99 +1 Skipped; base 6.57 ms, Insects ~5.88 ms)
 
-2026-10-08 | M8.1 Windows-Build neustand | BLOCKED (Unity.exe + CrashHandler open per tasklist) | Commit f47a268 (BACKLOG [!])
+2026-10-08 | M8.1 Windows-Build neustand | DONE: CI m8build1 BuildWindowsTool.BuildWindows Exit 0, Spinnenspiel_Data rebuilt 12:49 (false-positive BLOCKED resolved: unity.exe PID was licensing client, batch CI unaffected) | m8build1
 
-2026-10-08 | M8.2 Abschluss | FAERTER: B1-B12 + Z1-Z10 + M7.x alle [x]; letzte funktional Commit f47a268 (M8.1 Blockout, Unity offen); Windows-exe from c63ec46 exists (Builds/ gitignored); full CI green in z9full4/m7stab6-8; vollen CI-Rerun + Windows-Build-neustand OPEN due to Unity open | f47a268
+2026-10-08 | M8.2 Abschluss | FAERTER: B1-B12 + Z1-Z10 + M7.x + M8.1 alle [x]; Windows-exe exists (Builds/ gitignored, rebuilt m8build1); full CI green m7finalchk 101/0; game state finished | ec836b3
