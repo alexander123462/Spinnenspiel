@@ -190,10 +190,20 @@ namespace Spinnenspiel.Tests
             flies.SetActive(true);
             moths.SetActive(true);
 
+            // M7-10.5: Spinngscale Debris (9000 cm-sized) in die A/B-Messung too.
+            GameObject debris = GameObject.Find("Debris");
+            Assert.IsNotNull(debris, "No Debris-Group.");
+            debris.SetActive(false);
+            yield return MeasureMeanCpuMs(240);
+            float debrisCost = baseline - _lastMeanCpuMs;
+            debris.SetActive(true);
+
             Debug.Log("[Z9] Cost-Breakdown (ms/Frame): base " + baseline.ToString("0.00")
                 + " | Vegetation " + vegCost.ToString("0.00")
-                + " | Insects " + insectCost.ToString("0.00"));
+                + " | Insects " + insectCost.ToString("0.00")
+                + " | Debris " + debrisCost.ToString("0.00"));
             Assert.GreaterOrEqual(vegCost, -1f, "Vegetation-Cost messung insane (-): " + vegCost);
+            Assert.GreaterOrEqual(debrisCost, -1f, "Debris-Cost messung insane (-): " + debrisCost);
             Assert.Less(baseline, 16.7f, "Base frame time already over budget.");
         }
 
