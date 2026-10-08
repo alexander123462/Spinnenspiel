@@ -46,3 +46,5 @@
 - [ ] Z9 Leistung 2: nach B10 die drei teuersten Systeme per Profiler-Marker messen und im Bericht nennen; das teuerste optimieren.
 - [x] Z10 Docs/ARCHITEKTUR.md: Überblick über Ordner, wichtigste Klassen, Datenfluss Eingabe -> Bewegung -> Beine -> Kamera, Tests und CI.
   - [x] Z8.1 done 2026-10-08 — all 6 SurfaceTypes have own procedural step clips (ProceduralAudio.Footsteps); new test Audio_FootstepClipsDifferPerSurface in WorldTests; CI z8full5 97/0
+
+  - [x] Z10.1 done 2026-10-08 — Docs/ARCHITECTURE.md written (layers, data flow Input->Movement->Legs->Camera, key classes, CI rules); commit c15758a
