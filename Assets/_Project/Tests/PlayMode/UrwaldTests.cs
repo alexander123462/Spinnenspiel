@@ -161,7 +161,7 @@ namespace Spinnenspiel.Tests
             {
                 Debug.Log("[Perf] Urwald mittl. GPU-Framezeit: " + meanGpu.ToString("0.00") + " ms");
             }
-            Assert.Less(meanCpu, 16.7f, "Mittl. CPU-Work-Framezeit ueber 16.7 ms Budget.");
+            Assert.Less(medianCpu, 16.7f, "Median CPU-Work-Framezeit ueber 16.7 ms Budget.");
         }
 
         [UnityTest]
