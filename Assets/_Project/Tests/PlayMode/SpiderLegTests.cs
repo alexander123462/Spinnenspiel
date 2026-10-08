@@ -161,6 +161,14 @@ namespace Spinnenspiel.Tests
                 {
                     time += Time.deltaTime;
 
+                    // Load-Hitch-Filter: on Frames with abnormal Delta skip the Pose-Sampling
+                    // (the Spider jumped far in one Step -> the Leg-Pose is a Mess-Artifact, not Simulation).
+                    if (Time.deltaTime > 0.2f)
+                    {
+                        yield return null;
+                        continue;
+                    }
+
                     for (int i = 0; i < legs.Length; i++)
                     {
                         SpiderLeg leg = legs[i];
