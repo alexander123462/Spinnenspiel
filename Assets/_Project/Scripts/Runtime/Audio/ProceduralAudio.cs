@@ -15,6 +15,7 @@ namespace Spinnenspiel
         private static AudioClip _wind;
         private static AudioClip _stream;
         private static AudioClip[] _birds;
+        private static AudioClip _rainforest;
 
         /// <summary>Kurze Tritt-Geräusche (mehrere Varianten) für eine Oberfläche.</summary>
         public static AudioClip[] Footsteps(SurfaceType surface)
@@ -182,6 +183,54 @@ namespace Spinnenspiel
             }
 
             return _birds;
+        }
+
+        /// <summary>M7-10.6 Rainforest-Ambience: Zikaden-Drone (high stridulation trills)
+        /// plus Frosch-Pulse underneath; seamless loop for the Urwald.</summary>
+        public static AudioClip RainforestLoop()
+        {
+            if (_rainforest != null)
+            {
+                return _rainforest;
+            }
+
+            const float seconds = 10f;
+            int length = Mathf.CeilToInt(seconds * SampleRate);
+            float[] data = new float[length];
+            System.Random random = new System.Random(577);
+
+            // Zikaden: trill = ~4.2 kHz with a fast buzz (modulated) over 0.3 s, repeated.
+            for (int c = 0; c < 14; c++)
+            {
+                int start = random.Next(0, length - Mathf.CeilToInt(0.45f * SampleRate));
+                float baseFrequency = 3900f + (float)random.NextDouble() * 700f;
+                float amp = 0.03f + (float)random.NextDouble() * 0.03f;
+                int count = Mathf.FloorToInt(0.35f * SampleRate);
+                for (int i = 0; i < count && start + i < length; i++)
+                {
+                    float t = i / (float)SampleRate;
+                    float buzz = 1f + 0.25f * Mathf.Sin(t * 2f * Mathf.PI * 90f);
+                    data[start + i] += Mathf.Sin(2f * Mathf.PI * baseFrequency * buzz * t) * amp * Mathf.Sin(Mathf.Min(1f, t / 0.05f));
+                }
+            }
+
+            // Froesch: tiefe, kurze "urb"-Pulses mit nachher rising formant.
+            for (int f = 0; f < 9; f++)
+            {
+                int start = random.Next(0, length - Mathf.CeilToInt(0.3f * SampleRate));
+                float baseFrequency = 180f + (float)random.NextDouble() * 140f;
+                int count = Mathf.FloorToInt(0.22f * SampleRate);
+                for (int i = 0; i < count && start + i < length; i++)
+                {
+                    float t = i / (float)SampleRate;
+                    float f2 = baseFrequency * (1f + 0.6f * t / 0.22f);
+                    data[start + i] += (Mathf.Sin(2f * Mathf.PI * baseFrequency * t) + 0.5f * Mathf.Sin(2f * Mathf.PI * f2 * t)) * 0.06f * Mathf.Sin(t / 0.22f * Mathf.PI);
+                }
+            }
+
+            data = Crossfade(data, SampleRate / 2);
+            _rainforest = Create("Ambience_Rainforest", data);
+            return _rainforest;
         }
 
         private static float[] Crossfade(float[] data, int samples)

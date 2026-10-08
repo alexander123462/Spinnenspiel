@@ -469,5 +469,30 @@ namespace Spinnenspiel.Tests
             UnityEngine.Debug.Log($"[Urwald-Test] Debris: {gen.DebrisCount} Objekte, grösste {gen.DebrisMaxSizeMeters * 100f:0.0} cm");
             Assert.LessOrEqual(gen.DebrisMaxSizeMeters, 0.12f, "Debris not spider-scale: largest > 12 cm.");
         }
+
+        [UnityTest]
+        public IEnumerator Urwald_RainforestAmbienceRuns()
+        {
+            JungleWorldGenerator.NextSeed = 4242;
+            SceneManager.LoadScene("Urwald");
+            yield return null;
+            yield return WaitReady();
+            Assert.IsNotNull(readyGen, "Welt (Seed 4242) nicht fertig.");
+
+            JungleAmbientAudio amb = null;
+            for (int i = 0; i < 12 && amb == null; i++)
+            {
+                amb = Object.FindFirstObjectByType<JungleAmbientAudio>();
+                yield return null;
+            }
+            Assert.IsNotNull(amb, "No JungleAmbientAudio in the Urwald-Scene.");
+
+            AudioClip loop = ProceduralAudio.RainforestLoop();
+            UnityEngine.Debug.Log("[Amb-Test] RainforestLoop: " + (loop == null ? "null" : "duration=" + loop.length + " s"));
+            Assert.True(loop != null && loop.length > 5f, "RainforestLoop missing/empty.");
+
+            for (int i = 0; i < 60; i++) yield return null; // let Start() create the sources
+            Assert.True(amb.IsRunning, "Ambience-Drone/Sump-Source not running.");
+        }
     }
 }

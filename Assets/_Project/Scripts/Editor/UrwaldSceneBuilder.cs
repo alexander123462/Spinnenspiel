@@ -97,6 +97,7 @@ namespace Spinnenspiel.EditorTools
             DayNightCycle dayCycle = dayNight.AddComponent<DayNightCycle>();
             dayCycle.sun = Object.FindFirstObjectByType<Light>();
             new GameObject("Sky Ambient").AddComponent<SkyAmbientUpdater>();
+            new GameObject("Jungle Ambience").AddComponent<JungleAmbientAudio>();
             new GameObject("Debug Overlay").AddComponent<DebugOverlay>();
 
             Camera cam = CameraBuilder.Create();
