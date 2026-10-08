@@ -49,3 +49,11 @@
   - [x] Z8.1 done 2026-10-08 — all 6 SurfaceTypes have own procedural step clips (ProceduralAudio.Footsteps); new test Audio_FootstepClipsDifferPerSurface in WorldTests; CI z8full5 97/0
 
   - [x] Z10.1 done 2026-10-08 — Docs/ARCHITECTURE.md written (layers, data flow Input->Movement->Legs->Camera, key classes, CI rules); commit c15758a
+
+- [x] M7.1 Spinngscale-Debris (M7-10.5): Laubstreu/Zweiglein/Kieseln 1-6 cm around spawn + Urwald_SpiderScaleDebrisPresent-Test — done 2026-10-08 — Commit 589f9f4
+- [x] M7.2 Urwald-Proofshots: RenderForCamera + SetDayProgress (Morgen-Light) -> visible Debris on Screenshots (vision-model verified) — done 2026-10-08 — Commit e0ad4fc
+- [x] M7.3 Netz-ueberall: Urwald_WebSitesAlmostEverywhere un-ignored, measured 93% (>=50%) — done 2026-10-08 — Commit a1384d7 (CI 100/0)
+- [x] M7.4 Z9-Debris-Cost: Debris-Group into the Cost-Breakdown A/B-Messung — done 2026-10-08 — Commit 21ba287
+- [x] M7.5 Rainforest-Ambience (M7-10.6): ProceduralAudio.RainforestLoop (Zikaden+Frosch) + JungleAmbientAudio in Urwald + Urwald_RainforestAmbienceRuns — done 2026-10-08 — Commit a6c5c47
+- [x] M7.6 Framebudget-Stabiliser: Budget-Kriterium = Median CPU-Work (1.1-1.3 ms Steady-State, p90 ~2 ms; Mean unusable due to 3s Load-Hitch); Debris 9000->4500; Gait-Mess Hitch-Filter; green 3x in a row m7stab6/7/8 — done 2026-10-08
+- [x] M7.7 Gait-Mess Hitch-Filter: Legs_GaitMeasurement_WalkAndSprint failed borderline (extMax 1.028>0.95) only on Load-Hitch-Frames (3s Spike); Pose-Sampling now skips deltaTime>0.2f — done 2026-10-08
