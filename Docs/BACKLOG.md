@@ -57,5 +57,5 @@
 - [x] M7.5 Rainforest-Ambience (M7-10.6): ProceduralAudio.RainforestLoop (Zikaden+Frosch) + JungleAmbientAudio in Urwald + Urwald_RainforestAmbienceRuns — done 2026-10-08 — Commit a6c5c47
 - [x] M7.6 Framebudget-Stabiliser: Budget-Kriterium = Median CPU-Work (1.1-1.3 ms Steady-State, p90 ~2 ms; Mean unusable due to 3s Load-Hitch); Debris 9000->4500; Gait-Mess Hitch-Filter; green 3x in a row m7stab6/7/8 — done 2026-10-08
 - [x] M7.7 Gait-Mess Hitch-Filter: Legs_GaitMeasurement_WalkAndSprint failed borderline (extMax 1.028>0.95) only on Load-Hitch-Frames (3s Spike); Pose-Sampling now skips deltaTime>0.2f — done 2026-10-08
-- [ ] M8.1 Windows-Build neustand: BuildWindows (Urwald+Testwelt) rebuild with current content; exe starts (verify exe+Data on disk, Startup-Log briefly); CI-Aufruf green.
+- [!] M8.1 Windows-Build neustand: BLOCKED 2026-10-08 — Unity.exe + UnityCrashHandler64.exe detected running (tasklist), full CI cannot run with Editor open. Retry in a later round once Unity is closed.
 - [ ] M8.2 Abschluss: BERICHT.md final line with last commit hash + short summary of the finished game state.
