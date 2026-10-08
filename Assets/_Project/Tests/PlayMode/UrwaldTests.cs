@@ -127,6 +127,7 @@ namespace Spinnenspiel.Tests
             float sumGpuMs = -1f, sumCpuMs = 0f;
             int gpuValid = 0, measured = 0;
             FrameTiming[] timing = new FrameTiming[8];
+            var cpuSamples = new System.Collections.Generic.List<float>(2048);
             for (int i = 0; i < samples; i++)
             {
                 FrameTimingManager.CaptureFrameTimings();
@@ -138,6 +139,7 @@ namespace Spinnenspiel.Tests
                     {
                         sumCpuMs += cpuWorkMs;
                         measured++;
+                        cpuSamples.Add(cpuWorkMs);
                     }
                     if ((float)timing[t].gpuFrameTime > 0.0)
                     {
@@ -150,8 +152,10 @@ namespace Spinnenspiel.Tests
 
             Assert.Greater(measured, samples / 2, "Too few valid FrameTiming samples.");
             float meanCpu = sumCpuMs / measured;
-            Debug.Log("[Perf] Urwald mittl. CPU-Work-Framezeit: " + meanCpu.ToString("0.00")
-                + " ms (" + measured + " Samples; GPU valid: " + gpuValid + "/" + samples + ")");
+            cpuSamples.Sort();
+            float medianCpu = cpuSamples[cpuSamples.Count / 2];
+            Debug.Log("[Perf] Urwald CPU-Work-Framezeit: mean " + meanCpu.ToString("0.00")
+                + " ms | median " + medianCpu.ToString("0.00") + " ms (" + measured + " Samples; GPU valid: " + gpuValid + "/" + samples + ")");
             float meanGpu = gpuValid > 0 ? sumGpuMs / gpuValid : -1f;
             if (meanGpu > 0f)
             {
