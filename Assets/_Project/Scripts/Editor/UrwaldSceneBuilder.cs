@@ -424,12 +424,19 @@ namespace Spinnenspiel.EditorTools
                 }
                 // BUG-1 name ground truth: FBX slot names on the LOD0 renderer, index i =
                 // submesh i (Unity sorts slots alphabetically, so order is NOT a contract).
+                // MeshRenderer has NO public mesh accessor at all (CS1061 both for .mesh and
+                // .sharedMesh) -> select by NAME only: prefer "_LOD0" (case-insensitive), else
+                // first collected renderer with a warning (slot-name log stays ground truth).
                 MeshRenderer lod0Renderer = null;
                 for (int ri = 0; ri < nRenders; ri++)
                 {
                     var cand = fbxRenderers[ri];
-                    if (lod0Renderer == null && cand.name.Contains("_LOD0")) lod0Renderer = cand;
-                    if (lodMeshes[0] != null && cand.mesh == lodMeshes[0]) lod0Renderer = cand; // exact mesh match wins
+                    if (lod0Renderer == null && cand.name.ToLower().Contains("_lod0")) lod0Renderer = cand;
+                }
+                if (lod0Renderer == null && nRenders > 0)
+                {
+                    lod0Renderer = fbxRenderers[0];
+                    Debug.LogWarning("[Urwald] PH-Tree " + ids[i] + ": no renderer named *_LOD0*, using first FBX MeshRenderer for slot names (check the log line below)");
                 }
 
                 if (lodMeshes[0] == null || lodMeshes[1] == null)
