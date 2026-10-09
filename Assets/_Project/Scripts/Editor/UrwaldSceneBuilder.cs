@@ -429,7 +429,7 @@ namespace Spinnenspiel.EditorTools
                 {
                     var cand = fbxRenderers[ri];
                     if (lod0Renderer == null && cand.name.Contains("_LOD0")) lod0Renderer = cand;
-                    if (lodMeshes[0] != null && cand.sharedMesh == lodMeshes[0]) lod0Renderer = cand; // exact mesh match wins
+                    if (lodMeshes[0] != null && cand.mesh == lodMeshes[0]) lod0Renderer = cand; // exact mesh match wins
                 }
 
                 if (lodMeshes[0] == null || lodMeshes[1] == null)
