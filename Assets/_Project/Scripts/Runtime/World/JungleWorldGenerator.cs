@@ -763,32 +763,10 @@ namespace Spinnenspiel
             // Planting: align the tree so no TRUNK vertex floats more than 0.35 m above the
             // terrain under it (measured in TreesTests: root-pos and footprint-corner sampling
             // both floated leaning/offset trunks 3..6 m, so the Spider was not blocked).
-            float baseDrop = lod0.bounds.min.y * scale;
-            Vector3 woodCenterLocal = lod0.bounds.center;
-            Vector3 woodExtLocal = lod0.bounds.extents;
-            int woodSub = -1;
-            if (lod0.subMeshCount >= 2)
-            {
-                // Collider/anchor keeps the PROVEN footprint rule (Spider tests calibrated on
-                // it): trunk = submesh with smallest footprint, height >= 1 m. The material
-                // rule in PickMaterialsPerSubmesh is separate (ground-touch + smallest area).
-                float bestArea = 1e9f;
-                for (int s = 0; s < lod0.subMeshCount; s++)
-                {
-                    Bounds sb = lod0.GetSubMesh(s).bounds;
-                    float area = sb.size.x * sb.size.z;
-                    if (sb.size.y >= 1f && area < bestArea) { bestArea = area; woodSub = s; }
-                }
-                if (woodSub >= 0)
-                {
-                    // Anchor keeps woodSub.min.y (proven in t4submeshfix): the trunk submesh
-                    // of e.g. the Jacaranda starts at minY~2.2; with OVERALL min.y the whole
-                    // tree + collider sat ~3.8 m too high and the Spider walked under it.
-                    baseDrop = lod0.GetSubMesh(woodSub).bounds.min.y * scale;
-                    woodCenterLocal = lod0.GetSubMesh(woodSub).bounds.center;
-                    woodExtLocal = lod0.GetSubMesh(woodSub).bounds.extents;
-                }
-            }
+            // ONE woodSub per tree feeds material assignment AND anchor/collider/baseDrop
+            // (BUG 1: two separate rules diverged and picked BRANCHES on the Jacaranda).
+            int woodSub = PickWoodSubmesh(lod0, variant, scale);
+            float baseDrop = lod0.GetSubMesh(woodSub).bounds.min.y * scale;
             GameObject tree = new GameObject("PH-Tree");
             tree.transform.SetParent(parent, false);
             Terrain terr = Terrain.activeTerrain;
@@ -816,7 +794,7 @@ namespace Spinnenspiel
             lod0Node.transform.localPosition = Vector3.zero;
             lod0Node.AddComponent<MeshFilter>().sharedMesh = lod0;
             r0 = lod0Node.AddComponent<MeshRenderer>();
-            r0.sharedMaterials = PickMaterialsPerSubmesh(lod0, woodMat, leafMat, variant);
+            r0.sharedMaterials = AssignMaterialsPerSubmesh(lod0, woodSub, woodMat, leafMat);
 
             if (lod1 != lod0)
             {
@@ -825,7 +803,7 @@ namespace Spinnenspiel
                 lod1Node.transform.localPosition = Vector3.zero;
                 lod1Node.AddComponent<MeshFilter>().sharedMesh = lod1;
                 r1 = lod1Node.AddComponent<MeshRenderer>();
-                r1.sharedMaterials = PickMaterialsPerSubmesh(lod1, woodMat, leafMat, variant);
+                r1.sharedMaterials = AssignMaterialsPerSubmesh(lod1, PickWoodSubmesh(lod1, variant, scale), woodMat, leafMat);
             }
 
             // Collider on the LOD0-Mesh: LOD1 lacks lower-trunk triangles (measured in TreesTests),
@@ -869,18 +847,29 @@ namespace Spinnenspiel
                 if (footOffset < 1e9f)
                 {
                     // Plant so the trunk FOOT sits ~0.25 m above the terrain under it.
+                    // BOTH directions: with a wrong woodSub (branches) the old down-only
+                    // rule sank trees ~9.5 m; now the trunk foot is raised too if needed.
                     float newRootY = footGround + 0.25f - footOffset;
-                    if (newRootY < rootY0 && rootY0 - newRootY <= 10f)
+                    if (Mathf.Abs(newRootY - rootY0) <= 10f && newRootY != rootY0)
                         tree.transform.position = new Vector3(tree.transform.position.x, newRootY, tree.transform.position.z);
                 }
             }
 
             var lod = tree.AddComponent<LODGroup>();
-            lod.SetLODs(new[]
+            if (r1 != null)
             {
-                new LOD(0.18f, new MeshRenderer[] { r0 }),
-                new LOD(0.04f, new MeshRenderer[] { r1 != null ? r1 : r0 }),
-            });
+                // BUG 3 guard was here: r0 must never sit in two LOD levels. Now the
+                // single-LOD path below handles lod1 == lod0 (FBX without LOD1).
+                lod.SetLODs(new[]
+                {
+                    new LOD(0.18f, new MeshRenderer[] { r0 }),
+                    new LOD(0.04f, new MeshRenderer[] { r1 }),
+                });
+            }
+            else
+            {
+                lod.SetLODs(new[] { new LOD(0.18f, new MeshRenderer[] { r0 }) });
+            }
             lod.fadeMode = LODFadeMode.CrossFade;
             lod.RecalculateBounds();
 
@@ -888,39 +877,52 @@ namespace Spinnenspiel
         }
 
         /// <summary>
-        /// Wood/Leaf per Submesh via bounds: der Submesh mit der grueateren Bounds.Y und der
-        /// schmalerer x/z-Footprint = Wood (Stem), die broader = Leaf (Crown). One Submesh: Wood.
-        /// Logs the measured values once per variant ("Value -> Kriterium -> Result").
+        /// UNIFIED trunk pick (BUG 1: anchor-rule and material-rule diverged and picked BRANCHES
+        /// on the Jacaranda, sinking trees ~9.5 m): ONE woodSub per tree feeds material
+        /// assignment AND anchor/collider/baseDrop. FBX slot NAMES are not readable at runtime
+        /// (Mesh carries no slot names; library would need extending), so the rule is geometry
+        /// in WORLD units (BUG 2: the old local-unit tolerance grew with scale up to 5 and
+        /// flipped Wood onto root-plate submeshes): trunk = reaches ground (0.3 m world
+        /// tolerance) + smallest footprint; short submeshes (twigs) penalised.
+        /// Logs "Value -> Kriterium -> Result" once per variant as ground truth.
         /// </summary>
-        private static Material[] PickMaterialsPerSubmesh(Mesh mesh, Material woodMat, Material leafMat, int variant)
+        private static int PickWoodSubmesh(Mesh mesh, int variant, float scale)
         {
             int subs = Math.Max(1, mesh.subMeshCount);
-            var matPerSub = new Material[subs];
-            if (subs == 1)
-            {
-                matPerSub[0] = woodMat;
-                return matPerSub;
-            }
-            // Wood = submesh with the SMALLEST footprint (trunk); every other submesh (crown,
-            // branches, flowers — the FBX may have 3+) gets the leaf material. Filling only
-            // index 0/1 left submesh 2+ null -> HDRP error-magenta over whole crowns.
-            // Trunk = submesh that REACHES THE GROUND; among those the one with the SMALLEST
-            // footprint (branches never touch the ground on buttress-root trees; the Jacaranda
-            // crown does touch but has a far bigger area than the trunk).
-            float meshMinY = mesh.bounds.min.y;
+            if (subs == 1) return 0;
+            float meshMinYWorld = mesh.bounds.min.y * scale;
             int woodSub = -1;
             float bestScore = 1e9f;
             for (int s = 0; s < subs; s++)
             {
                 Bounds sb = mesh.GetSubMesh(s).bounds;
-                bool touchesGround = sb.min.y <= meshMinY + 0.02f * Mathf.Max(1f, mesh.bounds.size.y);
-                float score = sb.size.x * sb.size.z + (touchesGround ? 0f : 1e5f);
-                UnityEngine.Debug.Log(string.Format("[Tree] v{0} s{1}: minY={2:0.000} maxY={3:0.000} h={4:0.00} f={5:0.000}",
-                    variant, s, sb.min.y, sb.max.y, sb.size.y, sb.size.x * sb.size.z));
+                float areaWorld = sb.size.x * scale * sb.size.z * scale;
+                bool touchesGround = sb.min.y * scale <= meshMinYWorld + 0.3f;
+                float score = areaWorld + (touchesGround ? 0f : 1e6f);
+                if (sb.size.y * scale < 0.5f) score += 1e5f; // twig/flower submeshes never win
+                // Name match FIRST: FBX slot names are ground truth (Poly Haven names per part;
+                // Unity sorts slots alphabetically, so index order is NOT a contract).
+                // bark|trunk|wood -> Wood, leaf|leaves|branch(es) -> Leaf. Geometry only as
+                // fallback when the slot has no usable name.
+                string slotName = "";
+                if (mesh.material != null && s < mesh.material.Length && mesh.material[s] != null)
+                    slotName = mesh.material[s].name.ToLower();
+                if (slotName.Contains("bark") || slotName.Contains("trunk")) score -= 1e7f; // wood slot
+                else if (slotName.Contains("twig")) score -= 1e4f; // twig counts as wood but weaker
+                if (slotName.Contains("leaf") || slotName.Contains("leaves") || slotName.Contains("branch")) score += 1e7f; // crown slot
+                UnityEngine.Debug.Log(string.Format("[Tree] v{0} s{1}: minY={2:0.000} maxY={3:0.000} hW={4:0.00} fW={5:0.000} touch={6} slot='{7}' score={8:0.0}",
+                    variant, s, sb.min.y, sb.max.y, sb.size.y * scale, areaWorld, touchesGround, slotName, score));
                 if (score < bestScore) { bestScore = score; woodSub = s; }
             }
-            for (int s = 0; s < subs; s++) matPerSub[s] = s == woodSub ? woodMat : leafMat;
             UnityEngine.Debug.Log(string.Format("[Tree] variant {0}: subs={1} -> Wood=Sub{2}", variant, subs, woodSub));
+            return woodSub;
+        }
+
+        private static Material[] AssignMaterialsPerSubmesh(Mesh mesh, int woodSub, Material woodMat, Material leafMat)
+        {
+            int subs = Math.Max(1, mesh.subMeshCount);
+            var matPerSub = new Material[subs];
+            for (int s = 0; s < subs; s++) matPerSub[s] = s == woodSub ? woodMat : leafMat;
             return matPerSub;
         }
 
