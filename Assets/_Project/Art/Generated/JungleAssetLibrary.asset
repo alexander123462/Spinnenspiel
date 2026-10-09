@@ -84,6 +84,12 @@ MonoBehaviour:
   - 3.5264537
   - 4.5635643
   - 3
+  phTreeSlotNames:
+  - jacaranda_tree_branches|jacaranda_tree_leaves
+  - island_tree_01_branches|island_tree_01|island_tree_01_leaves
+  - island_tree_02_branches|island_tree_02|island_tree_02_leaves
+  - island_tree_03_branches|island_tree_03|island_tree_03_leaves
+  - tree_small_02_trunk|tree_small_02_branches|tree_small_02_leaves
   logs:
   - {fileID: 4300000, guid: cc578cc4491c562498645ea4e928559b, type: 2}
   - {fileID: 4300000, guid: 50a11b4b795adf44cbf08fd3195849b4, type: 2}
