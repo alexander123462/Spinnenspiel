@@ -12,17 +12,23 @@ namespace Spinnenspiel
     {
         private AudioSource _drone;
         private AudioSource _pond;
+        private AudioSource _rain;
         [SerializeField] private float droneVolume = 0.25f;
         [SerializeField] private float pondVolume = 0.3f;
+        [SerializeField, Tooltip("Rain-Loop volume at full downpour.")] private float rainMax = 0.35f;
 
         private JungleWorldGenerator _gen;
 
         public bool IsRunning => _drone != null && _pond != null;
 
+        /// <summary>Current drone volume (for tests/telemetry).</summary>
+        public float DroneVolumeNow => _drone != null ? _drone.volume : 0f;
+
         private void Start()
         {
             _drone = CreateSource("Drone", ProceduralAudio.RainforestLoop(), 0f, droneVolume);
             _pond = CreateSource("Pond", ProceduralAudio.StreamLoop(), 1f, pondVolume);
+            _rain = CreateSource("Rain", ProceduralAudio.RainfallLoop(), 2f, 0f);
             _pond.minDistance = 2f;
             _pond.maxDistance = 30f;
         }
@@ -30,6 +36,13 @@ namespace Spinnenspiel
         private void Update()
         {
             if (_drone == null || _pond == null) return;
+            float rain = WeatherController.Instance != null ? WeatherController.Instance.Rain01 : 0f;
+            if (_rain != null)
+            {
+                // Rain fades in, the insect-drone fades out while it rains.
+                _rain.volume = rainMax * rain;
+                _drone.volume = droneVolume * (1f - 0.6f * rain);
+            }
             if (_gen == null)
             {
                 _gen = Object.FindFirstObjectByType<JungleWorldGenerator>();

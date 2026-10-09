@@ -16,6 +16,7 @@ namespace Spinnenspiel
         private static AudioClip _stream;
         private static AudioClip[] _birds;
         private static AudioClip _rainforest;
+        private static AudioClip _rain;
 
         /// <summary>Kurze Tritt-Geräusche (mehrere Varianten) für eine Oberfläche.</summary>
         public static AudioClip[] Footsteps(SurfaceType surface)
@@ -104,6 +105,51 @@ namespace Spinnenspiel
             data = Crossfade(data, SampleRate / 2);
             _wind = Create("Ambience_Wind", data);
             return _wind;
+        }
+
+        /// <summary>Sommer-Downpour: gefilterte Rauschen-Brause plus kurze Tropfen-Hitsch;
+        /// seamless loop, volume driven by WeatherController.Rain01.</summary>
+        public static AudioClip RainfallLoop()
+        {
+            if (_rain != null)
+            {
+                return _rain;
+            }
+
+            const float seconds = 8f;
+            int length = Mathf.CeilToInt(seconds * SampleRate);
+            float[] data = new float[length];
+            System.Random random = new System.Random(3111);
+
+            // Brause: two filtered noise layers (wide + narrow band) -> steady rain body.
+            float wide = 0f, narrow = 0f;
+            for (int i = 0; i < length; i++)
+            {
+                float t = i / (float)length;
+                float noise = (float)random.NextDouble() * 2f - 1f;
+                wide += (noise - wide) * 0.03f;
+                narrow += (noise - narrow) * 0.18f;
+                float swell = 0.75f + 0.25f * Mathf.Sin(t * Mathf.PI * 2f * 1.5f);
+                data[i] = (wide * 2.2f + (narrow - wide) * 0.5f) * swell * 0.42f;
+            }
+
+            // Tropfen-Hitsch: short bright chirps on top of the brause.
+            for (int d = 0; d < 60; d++)
+            {
+                int start = random.Next(0, length - Mathf.CeilToInt(0.04f * SampleRate));
+                float baseFrequency = 2200f + (float)random.NextDouble() * 3200f;
+                float amp = 0.02f + (float)random.NextDouble() * 0.03f;
+                int count = Mathf.FloorToInt(0.03f * SampleRate);
+                for (int i = 0; i < count && start + i < length; i++)
+                {
+                    float t = i / (float)SampleRate;
+                    data[start + i] += Mathf.Sin(2f * Mathf.PI * baseFrequency * t) * amp * (1f - t / 0.03f);
+                }
+            }
+
+            data = Crossfade(data, SampleRate / 2);
+            _rain = Create("Ambience_Rainfall", data);
+            return _rain;
         }
 
         /// <summary>Plätschern: viele kurze, zufällige Tropfen-Chirps über gefiltertem Rauschen.</summary>

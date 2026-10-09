@@ -92,6 +92,8 @@ namespace Spinnenspiel.EditorTools
             gen.library = lib;
 
             new GameObject("Wind").AddComponent<WindController>();
+            // Weather: deterministic dry/rain cycle driving the audio crossfade.
+            new GameObject("Weather").AddComponent<WeatherController>();
             // Z4 Tag/Nacht: Sun rotates slowly (one day = 20 min), ambient light adapts.
             GameObject dayNight = new GameObject("Tag/Nacht");
             DayNightCycle dayCycle = dayNight.AddComponent<DayNightCycle>();
