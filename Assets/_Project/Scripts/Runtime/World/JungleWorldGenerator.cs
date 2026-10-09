@@ -895,18 +895,19 @@ namespace Spinnenspiel
                 matPerSub[0] = woodMat;
                 return matPerSub;
             }
-            Bounds m0 = mesh.GetSubMesh(0).bounds;
-            Bounds m1 = mesh.GetSubMesh(1).bounds;
-            // Wood = SMALLER footprint. A height rule fails: the blooming Jacaranda crown is
-            // TALLER than its trunk (measured: s0 h=11.7 f=66 vs s1 h=17.3 f=465), so the
-            // crown won the "taller" test and got the wood material (leaf-cutout on opaque
-            // bark texture = floating debris everywhere).
-            float f0 = m0.size.x * m0.size.z, f1 = m1.size.x * m1.size.z;
-            bool sub0IsWood = f0 <= f1;
-            UnityEngine.Debug.Log(string.Format("[Tree] variant {0}: s0 h={1:0.00} f={2:0.000} | s1 h={3:0.00} f={4:0.000} -> Wood=Sub{5}",
-                variant, m0.size.y, f0, m1.size.y, f1, sub0IsWood ? 0 : 1));
-            matPerSub[0] = sub0IsWood ? woodMat : leafMat;
-            matPerSub[1] = sub0IsWood ? leafMat : woodMat;
+            // Wood = submesh with the SMALLEST footprint (trunk); every other submesh (crown,
+            // branches, flowers — the FBX may have 3+) gets the leaf material. Filling only
+            // index 0/1 left submesh 2+ null -> HDRP error-magenta over whole crowns.
+            int woodSub = -1;
+            float bestArea = 1e9f;
+            for (int s = 0; s < subs; s++)
+            {
+                Bounds sb = mesh.GetSubMesh(s).bounds;
+                float area = sb.size.x * sb.size.z;
+                if (area < bestArea) { bestArea = area; woodSub = s; }
+            }
+            for (int s = 0; s < subs; s++) matPerSub[s] = s == woodSub ? woodMat : leafMat;
+            UnityEngine.Debug.Log(string.Format("[Tree] variant {0}: subs={1} -> Wood=Sub{2}", variant, subs, woodSub));
             return matPerSub;
         }
 
