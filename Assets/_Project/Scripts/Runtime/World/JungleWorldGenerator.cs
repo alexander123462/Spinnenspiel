@@ -301,7 +301,56 @@ namespace Spinnenspiel
 
                 StaticBatchingUtility.Combine(bodendecker);
                 GroundCoverCount = groundN;
-                UnityEngine.Debug.Log($"[Jungle] Bodendecker: {groundN} Objekte, mittlere Höhe 0.25–0.60 m (bounds-basiert)");
+
+                // DENSE grass patches: extra pass in forest clearings (ForestFactor low),
+                // finer step and taller blades so meadows look really thick.
+                const float denseStep = 0.28f;
+                int denseN = Mathf.CeilToInt(groundRadius / denseStep);
+                int denseAdded = 0;
+                const int denseMax = 14000;
+                for (int i = -denseN; i <= denseN && groundN < groundMax + denseMax; i++)
+                {
+                    for (int j = -denseN; j <= denseN && groundN < groundMax + denseMax; j++)
+                    {
+                        int hi = i + 20000, hj = j + 20000;
+                        float x = _spawnXZ.x + i * denseStep + (World.Hash01(hi, hj, 81) - 0.5f) * 0.22f;
+                        float z = _spawnXZ.z + j * denseStep + (World.Hash01(hi, hj, 82) - 0.5f) * 0.22f;
+                        float ddx = x - _spawnXZ.x, ddz = z - _spawnXZ.z;
+                        if (ddx * ddx + ddz * ddz > groundRadius * groundRadius) continue;
+                        if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
+                        if (WorldLayout.ForestFactor(x, z) > 0.3f) continue; // only in clearings
+                        float patch = World.Hash01(hi / 2, hj / 2, 83); // coarse patch field
+                        if (patch < 0.45f) continue;                     // patchy, not uniform
+                        if (!IsDryFlat(World, x, z)) continue;
+                        if (World.Height(x, z) < JungleWorld.WaterLevel + 0.1f) continue;
+
+                        int variant = Mathf.FloorToInt(World.Hash01(hi, hj, 84) * (float)library.groundCover.Length);
+                        if (variant < 0 || variant >= library.groundCover.Length || variant >= library.groundCoverMats.Length) continue;
+                        Mesh mesh = library.groundCover[variant];
+                        Material mat = library.groundCoverMats[variant];
+                        if (mesh == null || mat == null) continue;
+
+                        float rot = World.Hash01(hi, hj, 85) * 360f;
+                        float targetH = 0.45f + World.Hash01(hi, hj, 86) * 0.45f; // 0.45-0.9 m
+                        float meshH = Mathf.Max(mesh.bounds.size.y, 0.01f);
+                        float scale = targetH / meshH;
+                        float h = World.Height(x, z);
+
+                        GameObject g = new GameObject();
+                        g.transform.SetParent(bodendecker.transform, false);
+                        g.layer = 0; // Default
+                        g.transform.position = new Vector3(x, h - 0.02f, z);
+                        g.transform.rotation = Quaternion.Euler(0f, rot, 0f);
+                        g.transform.localScale = Vector3.one * scale;
+                        g.AddComponent<MeshFilter>().sharedMesh = mesh;
+                        var r = g.AddComponent<MeshRenderer>();
+                        r.sharedMaterial = mat;
+                        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                        groundN++;
+                        denseAdded++;
+                    }
+                }
+                UnityEngine.Debug.Log($"[Jungle] Bodendecker: {groundN} Objekte ({denseAdded} Dense-Grass in clearings, ForestFactor<0.3, step {denseStep} m)");
             }
 
             // 5c) M7-10.5 Spinngscale Debris: cm-sized Laubstreu, Zweiglein, Kieselchen.
@@ -848,8 +897,12 @@ namespace Spinnenspiel
             }
             Bounds m0 = mesh.GetSubMesh(0).bounds;
             Bounds m1 = mesh.GetSubMesh(1).bounds;
+            // Wood = SMALLER footprint. A height rule fails: the blooming Jacaranda crown is
+            // TALLER than its trunk (measured: s0 h=11.7 f=66 vs s1 h=17.3 f=465), so the
+            // crown won the "taller" test and got the wood material (leaf-cutout on opaque
+            // bark texture = floating debris everywhere).
             float f0 = m0.size.x * m0.size.z, f1 = m1.size.x * m1.size.z;
-            bool sub0IsWood = m0.size.y >= m1.size.y && f0 <= f1;
+            bool sub0IsWood = f0 <= f1;
             UnityEngine.Debug.Log(string.Format("[Tree] variant {0}: s0 h={1:0.00} f={2:0.000} | s1 h={3:0.00} f={4:0.000} -> Wood=Sub{5}",
                 variant, m0.size.y, f0, m1.size.y, f1, sub0IsWood ? 0 : 1));
             matPerSub[0] = sub0IsWood ? woodMat : leafMat;

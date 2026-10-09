@@ -32,6 +32,10 @@ namespace Spinnenspiel
         /// <summary>Progress of the day 0..1 (0 = midnight, 0.5 = noon). Read-only for Tests.</summary>
         public float DayProgress;
 
+        /// <summary>Day progress at game start (default morning, 0.3 = just after sunrise).</summary>
+        [Tooltip("Day progress at game start (0 = midnight, 0.5 = noon)")]
+        [SerializeField] private float startDayFraction = 0.3f;
+
         private float dayFraction;
         private float ambientTimer;
 
@@ -42,6 +46,8 @@ namespace Spinnenspiel
 
         private void Start()
         {
+            dayFraction = startDayFraction - Mathf.Floor(startDayFraction);
+            DayProgress = dayFraction;
             if (sun == null)
             {
                 sun = RenderSettings.sun;
