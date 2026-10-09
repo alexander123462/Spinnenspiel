@@ -769,6 +769,9 @@ namespace Spinnenspiel
             int woodSub = -1;
             if (lod0.subMeshCount >= 2)
             {
+                // Collider/anchor keeps the PROVEN footprint rule (Spider tests calibrated on
+                // it): trunk = submesh with smallest footprint, height >= 1 m. The material
+                // rule in PickMaterialsPerSubmesh is separate (ground-touch + smallest area).
                 float bestArea = 1e9f;
                 for (int s = 0; s < lod0.subMeshCount; s++)
                 {
@@ -778,6 +781,9 @@ namespace Spinnenspiel
                 }
                 if (woodSub >= 0)
                 {
+                    // Anchor keeps woodSub.min.y (proven in t4submeshfix): the trunk submesh
+                    // of e.g. the Jacaranda starts at minY~2.2; with OVERALL min.y the whole
+                    // tree + collider sat ~3.8 m too high and the Spider walked under it.
                     baseDrop = lod0.GetSubMesh(woodSub).bounds.min.y * scale;
                     woodCenterLocal = lod0.GetSubMesh(woodSub).bounds.center;
                     woodExtLocal = lod0.GetSubMesh(woodSub).bounds.extents;
@@ -898,13 +904,20 @@ namespace Spinnenspiel
             // Wood = submesh with the SMALLEST footprint (trunk); every other submesh (crown,
             // branches, flowers — the FBX may have 3+) gets the leaf material. Filling only
             // index 0/1 left submesh 2+ null -> HDRP error-magenta over whole crowns.
+            // Trunk = submesh that REACHES THE GROUND; among those the one with the SMALLEST
+            // footprint (branches never touch the ground on buttress-root trees; the Jacaranda
+            // crown does touch but has a far bigger area than the trunk).
+            float meshMinY = mesh.bounds.min.y;
             int woodSub = -1;
-            float bestArea = 1e9f;
+            float bestScore = 1e9f;
             for (int s = 0; s < subs; s++)
             {
                 Bounds sb = mesh.GetSubMesh(s).bounds;
-                float area = sb.size.x * sb.size.z;
-                if (area < bestArea) { bestArea = area; woodSub = s; }
+                bool touchesGround = sb.min.y <= meshMinY + 0.02f * Mathf.Max(1f, mesh.bounds.size.y);
+                float score = sb.size.x * sb.size.z + (touchesGround ? 0f : 1e5f);
+                UnityEngine.Debug.Log(string.Format("[Tree] v{0} s{1}: minY={2:0.000} maxY={3:0.000} h={4:0.00} f={5:0.000}",
+                    variant, s, sb.min.y, sb.max.y, sb.size.y, sb.size.x * sb.size.z));
+                if (score < bestScore) { bestScore = score; woodSub = s; }
             }
             for (int s = 0; s < subs; s++) matPerSub[s] = s == woodSub ? woodMat : leafMat;
             UnityEngine.Debug.Log(string.Format("[Tree] variant {0}: subs={1} -> Wood=Sub{2}", variant, subs, woodSub));
