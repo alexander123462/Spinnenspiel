@@ -43,6 +43,9 @@ namespace Spinnenspiel
         public Material[] phTreeWoodMats;
         public Material[] phTreeLeafMats;
         public float[] phTreeScales;
+        /// <summary>PH-Tree FBX-Materialslotnames per Variant, '|' -separators (index = Submesh,
+        /// order = LOD0-MeshRenderer.sharedMaterials). Nested arrays NOT serialized by Unity!</summary>
+        public string[] phTreeSlotNames;
 
         public Mesh[] logs;
         public Mesh[] rocks;

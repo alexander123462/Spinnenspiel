@@ -879,17 +879,23 @@ namespace Spinnenspiel
         /// <summary>
         /// UNIFIED trunk pick (BUG 1: anchor-rule and material-rule diverged and picked BRANCHES
         /// on the Jacaranda, sinking trees ~9.5 m): ONE woodSub per tree feeds material
-        /// assignment AND anchor/collider/baseDrop. FBX slot NAMES are not readable at runtime
-        /// (Mesh carries no slot names; library would need extending), so the rule is geometry
-        /// in WORLD units (BUG 2: the old local-unit tolerance grew with scale up to 5 and
-        /// flipped Wood onto root-plate submeshes): trunk = reaches ground (0.3 m world
-        /// tolerance) + smallest footprint; short submeshes (twigs) penalised.
+        /// assignment AND anchor/collider/baseDrop. Slot NAMES come from the FBX LOD0 MeshRenderer
+        /// resolved once in the Editor (library.phTreeSlotNames[variant], '|' = submesh index;
+        /// Mesh itself has NO material-name accessor - CS1061). bark|trunk -> Wood, twig weakly
+        /// Wood, leaf|leaves|branch -> Leaf; geometry fallback in WORLD units (scale-multiplied,
+        /// BUG 2: the old local-unit tolerance grew with scale up to 5 and flipped Wood onto
+        /// root-plate submeshes): trunk = reaches ground (0.3 m) + smallest footprint; short
+        /// submeshes (twigs) penalised.
         /// Logs "Value -> Kriterium -> Result" once per variant as ground truth.
         /// </summary>
-        private static int PickWoodSubmesh(Mesh mesh, int variant, float scale)
+        private int PickWoodSubmesh(Mesh mesh, int variant, float scale)
         {
             int subs = Math.Max(1, mesh.subMeshCount);
             if (subs == 1) return 0;
+            string[] slotNames = null;
+            if (library.phTreeSlotNames != null && variant < library.phTreeSlotNames.Length &&
+                library.phTreeSlotNames[variant] != null && library.phTreeSlotNames[variant].Length > 0)
+                slotNames = library.phTreeSlotNames[variant].Split('|');
             float meshMinYWorld = mesh.bounds.min.y * scale;
             int woodSub = -1;
             float bestScore = 1e9f;
@@ -904,9 +910,7 @@ namespace Spinnenspiel
                 // Unity sorts slots alphabetically, so index order is NOT a contract).
                 // bark|trunk|wood -> Wood, leaf|leaves|branch(es) -> Leaf. Geometry only as
                 // fallback when the slot has no usable name.
-                string slotName = "";
-                if (mesh.material != null && s < mesh.material.Length && mesh.material[s] != null)
-                    slotName = mesh.material[s].name.ToLower();
+                string slotName = slotNames != null && s < slotNames.Length ? slotNames[s].ToLower() : "";
                 if (slotName.Contains("bark") || slotName.Contains("trunk")) score -= 1e7f; // wood slot
                 else if (slotName.Contains("twig")) score -= 1e4f; // twig counts as wood but weaker
                 if (slotName.Contains("leaf") || slotName.Contains("leaves") || slotName.Contains("branch")) score += 1e7f; // crown slot

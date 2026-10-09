@@ -408,15 +408,28 @@ namespace Spinnenspiel.EditorTools
             lib.phTreeWoodMats = new Material[ids.Length];
             lib.phTreeLeafMats = new Material[ids.Length];
             lib.phTreeScales = new float[ids.Length];
+            lib.phTreeSlotNames = new string[ids.Length];
 
             for (int i = 0; i < ids.Length; i++)
             {
                 string fbx = root + ids[i] + "/" + ids[i] + ".fbx";
                 var lodMeshes = new Mesh[2];
+                var fbxRenderers = new MeshRenderer[8]; // FBX takes: few Renderers per model
+                int nRenders = 0;
                 foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(fbx))
                 {
                     if (obj is Mesh mesh && mesh.name.Contains("_LOD0")) lodMeshes[0] = mesh;
                     if (obj is Mesh m1 && m1.name.Contains("_LOD1")) lodMeshes[1] = m1;
+                    if (obj is MeshRenderer mr && nRenders < fbxRenderers.Length) fbxRenderers[nRenders++] = mr;
+                }
+                // BUG-1 name ground truth: FBX slot names on the LOD0 renderer, index i =
+                // submesh i (Unity sorts slots alphabetically, so order is NOT a contract).
+                MeshRenderer lod0Renderer = null;
+                for (int ri = 0; ri < nRenders; ri++)
+                {
+                    var cand = fbxRenderers[ri];
+                    if (lod0Renderer == null && cand.name.Contains("_LOD0")) lod0Renderer = cand;
+                    if (lodMeshes[0] != null && cand.sharedMesh == lodMeshes[0]) lod0Renderer = cand; // exact mesh match wins
                 }
 
                 if (lodMeshes[0] == null || lodMeshes[1] == null)
@@ -435,6 +448,16 @@ namespace Spinnenspiel.EditorTools
 
                 lib.phTreeLod0[i] = lodMeshes[0];
                 lib.phTreeLod1[i] = lodMeshes[1];
+                // Slot names once per species (ground truth for the runtime name-match rule).
+                var slotNames = new System.Collections.Generic.List<string>();
+                if (lod0Renderer != null && lod0Renderer.sharedMaterials != null)
+                {
+                    foreach (var sm in lod0Renderer.sharedMaterials)
+                        slotNames.Add(sm != null ? sm.name : "");
+                }
+                lib.phTreeSlotNames[i] = string.Join("|", slotNames.ToArray());
+                if (lod0Renderer == null) Debug.LogWarning("[Urwald] PH-Tree FBX without LOD0 MeshRenderer: " + fbx + " (runtime falls back to geometry rule)");
+                else Debug.Log(string.Format("[Urwald] PH-Tree {0} slot names: {1}", ids[i], lib.phTreeSlotNames[i]));
                 var mats = CreatePHTreeMats(ids[i]);
                 lib.phTreeWoodMats[i] = mats[0];
                 lib.phTreeLeafMats[i] = mats[1];
