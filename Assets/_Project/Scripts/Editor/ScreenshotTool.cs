@@ -129,14 +129,33 @@ namespace Spinnenspiel.EditorTools
 
             Vector3 s = spider.transform.position;
             Debug.Log("[Spinnenspiel] Urwald Spider at " + s.ToString("F1"));
-            // Absolute views (spider is scaled up in the Urwald; relative offsets land inside its body).
-            Vector3 hub = new Vector3(49.5f, 8.4f, 50.8f); // known PH-Tree position (tests)
+            // Trees are GameObjects named "PH-Tree" (JungleWorldGenerator); each has a child
+            // "TreeCollider" with a MeshCollider. Ground level = trunk collider bounds min.y.
+            Vector3 hub = s;
+            float groundY = s.y - 12f; // fallback: spider was ~12 m above terrain at spawn
+            GameObject treeGo = GameObject.Find("PH-Tree");
+            if (treeGo != null)
+            {
+                hub = treeGo.transform.position;
+                Debug.Log("[Spinnenspiel] Urwald PH-Tree at " + hub.ToString("F1"));
+            }
+            GameObject colGo = GameObject.Find("TreeCollider");
+            if (colGo != null)
+            {
+                MeshCollider mc = colGo.GetComponent<MeshCollider>();
+                if (mc != null)
+                {
+                    groundY = mc.bounds.center.y - mc.bounds.extents.y;
+                    Debug.Log("[Spinnenspiel] Urwald trunk bottom y=" + groundY.ToString("F1"));
+                }
+            }
+
             View[] views =
             {
-                new View("urwald_ground_east", new Vector3(78f, 2.5f, 51f), hub),
-                new View("urwald_ground_west", new Vector3(20f, 2.5f, 49f), hub),
-                new View("urwald_treefoot", hub + new Vector3(2.5f, -6f, -2.5f), hub + new Vector3(0f, -7f, 0f)),
-                new View("urwald_diag", new Vector3(72f, 12f, 26f), hub)
+                new View("urwald_ground_east", hub + new Vector3(26f, 0f, 0f) + Vector3.up * (groundY - hub.y + 1.6f), hub + Vector3.up * (groundY - hub.y + 1.2f)),
+                new View("urwald_treefoot", hub + new Vector3(2.5f, 0f, -2.5f) + Vector3.up * (groundY - hub.y + 1.4f), hub + Vector3.up * (groundY - hub.y + 0.6f)),
+                new View("urwald_diag", hub + new Vector3(20f, 0f, -22f) + Vector3.up * (groundY - hub.y + 8f), hub + Vector3.up * (groundY - hub.y + 2f)),
+                new View("urwald_west", hub + new Vector3(-24f, 0f, 6f) + Vector3.up * (groundY - hub.y + 2f), hub + Vector3.up * (groundY - hub.y + 1.5f))
             };
 
             VegetationSystem vegetation = Object.FindFirstObjectByType<VegetationSystem>();
