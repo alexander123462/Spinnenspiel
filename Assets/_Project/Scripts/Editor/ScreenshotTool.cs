@@ -100,18 +100,43 @@ namespace Spinnenspiel.EditorTools
             }
 
             Physics.SyncTransforms();
+            DayNightCycle dayCycle = Object.FindFirstObjectByType<DayNightCycle>();
+            if (dayCycle != null)
+            {
+                dayCycle.SetDayProgress(0.35f); // batch render: Start() never runs -> midnight fix
+            }
+            // SetDayProgress only sets the fraction; sun pose is applied in Update() which does NOT
+            // run in batch mode -> apply morning sun (elev ~+40 deg) directly.
+            Light sunLight = RenderSettings.sun;
+            if (sunLight == null)
+            {
+                foreach (Light l in spider.GetComponentsInChildren<Light>()) { sunLight = l; break; }
+            }
+            if (sunLight != null)
+            {
+                float frac = 0.35f;
+                float phase = (frac - 0.25f) * Mathf.PI * 2f;
+                float elevDeg = Mathf.Asin(Mathf.Sin(phase)) * Mathf.Rad2Deg;
+                float azDeg = phase * Mathf.Rad2Deg + 90f;
+                sunLight.transform.rotation = Quaternion.Euler(elevDeg, azDeg, 0f);
+                DynamicGI.UpdateEnvironment();
+            }
+
             foreach (SpiderLeg leg in spider.GetComponentsInChildren<SpiderLeg>())
             {
                 leg.PoseAtRest();
             }
 
             Vector3 s = spider.transform.position;
+            Debug.Log("[Spinnenspiel] Urwald Spider at " + s.ToString("F1"));
+            // Absolute views (spider is scaled up in the Urwald; relative offsets land inside its body).
+            Vector3 hub = new Vector3(49.5f, 8.4f, 50.8f); // known PH-Tree position (tests)
             View[] views =
             {
-                new View("urwald_nah", s + new Vector3(0.25f, 0.18f, -0.35f), s + new Vector3(0f, 0.05f, 0f)),
-                new View("urwald_play", s + new Vector3(0f, 0.38f, -0.95f), s + new Vector3(0f, 0.12f, 0.4f)),
-                new View("urwald_ueber", s + new Vector3(-6f, 14f, -14f), s + new Vector3(0f, 1f, 0f)),
-                new View("urwald_west", s + new Vector3(10f, 3.5f, 2f), s + new Vector3(-8f, 3f, 6f))
+                new View("urwald_play", hub + new Vector3(-3f, 1.2f, -3f), hub + new Vector3(1f, 0.5f, 1f)),
+                new View("urwald_ueber", hub + new Vector3(-14f, 22f, -26f), hub + new Vector3(0f, 1f, 0f)),
+                new View("urwald_west", hub + new Vector3(8f, 2.5f, 2f), hub + new Vector3(-10f, 2f, 6f)),
+                new View("urwald_treefoot", hub + new Vector3(2.2f, 0.9f, -2.2f), hub + new Vector3(0f, -0.2f, 0.5f))
             };
 
             VegetationSystem vegetation = Object.FindFirstObjectByType<VegetationSystem>();
