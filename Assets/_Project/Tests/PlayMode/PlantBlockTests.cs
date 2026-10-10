@@ -1,5 +1,6 @@
 using System.Collections;
 using NUnit.Framework;
+using Path;
 using Spinnenspiel;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -171,6 +172,66 @@ namespace Spinnenspiel.Tests
             Assert.Greater(minNear, 0.35f,
                 "Spider entered the trunk of the tree at " + pick.position.ToString("F1") +
                 " (min body-height distance to trunk axis " + minNear.ToString("F2") + " m).");
+            yield return null;
+        }
+
+        [UnityTest]
+        public IEnumerator UrwaldKontrollbilder_TakeScreenshots()
+        {
+            JungleWorldGenerator.NextSeed = 4242;
+            yield from LoadUrwald();
+
+            GameObject treeGo = GameObject.Find("PH-Tree");
+            Assert.IsNotNull(treeGo, "no PH-Tree in Urwald after generator ready.");
+            MeshCollider mc = null;
+            foreach (Transform child in treeGo.transform)
+            {
+                if (child.name == "TreeCollider") { mc = child.GetComponent<MeshCollider>(); break; }
+            }
+            Assert.IsNotNull(mc, "PH-Tree has no TreeCollider child.");
+            Bounds wb = mc.bounds;
+            Vector3 hub = wb.center;
+            float size = Math.Max(wb.size.y, Math.Max(wb.size.x, wb.size.z));
+
+            DayNightCycle cycle = Object.FindFirstObjectByType<DayNightCycle>();
+            if (cycle != null) cycle.SetDayProgress(0.35f); // Update() then poses the sun each frame
+
+            Vector3[][] views =
+            {
+                // name is passed via Debug.Log; positions: eye-level east, diagonal above, foot west
+                new Vector3[] { hub.x + size * 1.1f, wb.min.y + 1.6f, hub.z },
+                new Vector3[] { hub.x - size * 0.9f, wb.max.y + size * 0.4f, hub.z - size * 1.2f },
+                new Vector3[] { hub.x - size * 0.25f, wb.min.y + 1.2f, hub.z - size * 0.25f }
+            };
+
+            string folder = Directory.GetCurrentDirectory() + "/Logs/ci";
+            Directory.CreateDirectory(folder);
+
+            RenderTexture target = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32);
+            target.antiAliasing = 4;
+            Texture2D image = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+            Camera cam = Object.FindFirstObjectByType<Camera>();
+            Assert.IsNotNull(cam, "no Camera in Urwald.");
+
+            int viewIndex = 0;
+            string[] names = { "eye", "aerial", "foot" };
+            foreach (Vector3[] v in views)
+            {
+                Vector3 eye = new Vector3(v[0], v[1], v[2]);
+                cam.transform.position = eye;
+                cam.transform.LookAt(hub);
+                cam.targetTexture = target;
+                cam.Render();
+                RenderTexture.active = target;
+                image.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
+                image.Apply();
+                RenderTexture.active = null;
+                cam.targetTexture = null;
+                string name = "shot_urwald_" + names[viewIndex++];
+                File.WriteAllBytes(Path.Combine(folder, name + ".png"), image.EncodeToPNG());
+                Debug.Log("[Spinnenspiel] Kontrollbild: " + name + ".png eye=" + eye.ToString("F1"));
+            }
+
             yield return null;
         }
     }
