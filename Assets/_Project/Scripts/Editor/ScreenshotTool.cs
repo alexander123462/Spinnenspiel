@@ -87,6 +87,64 @@ namespace Spinnenspiel.EditorTools
             Object.DestroyImmediate(image);
         }
 
+        [MenuItem("Spinnenspiel/Debug/Urwald-Kontrollbilder rendern")]
+        public static void CaptureUrwald()
+        {
+            EditorSceneManager.OpenScene(UrwaldSceneBuilder.ScenePath, OpenSceneMode.Single);
+            Camera cam = Camera.main;
+            GameObject spider = GameObject.Find("Spider");
+            if (cam == null || spider == null)
+            {
+                Debug.LogError("[Spinnenspiel] Screenshot: Kamera oder Spinne fehlt (Urwald).");
+                return;
+            }
+
+            Physics.SyncTransforms();
+            foreach (SpiderLeg leg in spider.GetComponentsInChildren<SpiderLeg>())
+            {
+                leg.PoseAtRest();
+            }
+
+            Vector3 s = spider.transform.position;
+            View[] views =
+            {
+                new View("urwald_nah", s + new Vector3(0.25f, 0.18f, -0.35f), s + new Vector3(0f, 0.05f, 0f)),
+                new View("urwald_play", s + new Vector3(0f, 0.38f, -0.95f), s + new Vector3(0f, 0.12f, 0.4f)),
+                new View("urwald_ueber", s + new Vector3(-6f, 14f, -14f), s + new Vector3(0f, 1f, 0f)),
+                new View("urwald_west", s + new Vector3(10f, 3.5f, 2f), s + new Vector3(-8f, 3f, 6f))
+            };
+
+            VegetationSystem vegetation = Object.FindFirstObjectByType<VegetationSystem>();
+            string folder = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ci");
+            Directory.CreateDirectory(folder);
+
+            RenderTexture target = new RenderTexture(1600, 900, 24, RenderTextureFormat.ARGB32);
+            target.antiAliasing = 4;
+            Texture2D image = new Texture2D(1600, 900, TextureFormat.RGB24, false);
+            foreach (View view in views)
+            {
+                cam.transform.position = view.position;
+                cam.transform.LookAt(view.lookAt);
+                cam.targetTexture = target;
+                if (vegetation != null)
+                {
+                    vegetation.RenderForCamera(cam);
+                }
+
+                cam.Render();
+                RenderTexture.active = target;
+                image.ReadPixels(new Rect(0, 0, 1600, 900), 0, 0);
+                image.Apply();
+                RenderTexture.active = null;
+                cam.targetTexture = null;
+                File.WriteAllBytes(Path.Combine(folder, "shot_" + view.name + ".png"), image.EncodeToPNG());
+                Debug.Log("[Spinnenspiel] Kontrollbild: shot_" + view.name + ".png");
+            }
+
+            Object.DestroyImmediate(target);
+            Object.DestroyImmediate(image);
+        }
+
         /// <summary>
         /// Rendert Kletter-Kontrollbilder der Spinne (Wand, Stamm, Unterseite des Ueberhangs)
         /// aus der Szene "Klettertest" mit einer temporären, schräg seitlichen Kamera nach
