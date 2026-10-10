@@ -192,16 +192,18 @@ namespace Spinnenspiel.Tests
             Bounds wb = mc.bounds;
             Vector3 hub = wb.center;
             float size = Mathf.Max(wb.size.y, Mathf.Max(wb.size.x, wb.size.z));
+            Debug.Log("[Spinnenspiel] Urwald TreeCollider center=" + wb.center.ToString("F1") + " size=" + wb.size.ToString("F1"));
 
             DayNightCycle cycle = Object.FindFirstObjectByType<DayNightCycle>();
             if (cycle != null) cycle.SetDayProgress(0.35f); // Update() then poses the sun each frame
 
             Vector3[] eyes =
             {
-                new Vector3(hub.x + size * 1.1f, wb.min.y + 1.6f, hub.z),
-                new Vector3(hub.x - size * 0.9f, wb.max.y + size * 0.4f, hub.z - size * 1.2f),
-                new Vector3(hub.x - size * 0.25f, wb.min.y + 1.2f, hub.z - size * 0.25f)
+                new Vector3(hub.x + size * 0.6f + 10f, wb.min.y + 1.6f, hub.z + 4f),
+                new Vector3(hub.x - 25f, wb.max.y + 8f, hub.z - 28f),
+                new Vector3(hub.x - 9f, wb.min.y + 1.4f, hub.z - 7f)
             };
+            Vector3 lookTrunk = new Vector3(hub.x, wb.min.y + 2.5f, hub.z); // trunk base, not canopy center
 
             string folder = Directory.GetCurrentDirectory() + "/Logs/ci";
             Directory.CreateDirectory(folder);
@@ -217,7 +219,7 @@ namespace Spinnenspiel.Tests
             foreach (Vector3 eye in eyes)
             {
                 cam.transform.position = eye;
-                cam.transform.LookAt(hub);
+                cam.transform.LookAt(lookTrunk);
                 cam.targetTexture = target;
                 cam.Render();
                 RenderTexture.active = target;
