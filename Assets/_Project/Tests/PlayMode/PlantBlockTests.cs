@@ -191,17 +191,16 @@ namespace Spinnenspiel.Tests
             Assert.IsNotNull(mc, "PH-Tree has no TreeCollider child.");
             Bounds wb = mc.bounds;
             Vector3 hub = wb.center;
-            float size = Math.Max(wb.size.y, Math.Max(wb.size.x, wb.size.z));
+            float size = Mathf.Max(wb.size.y, Mathf.Max(wb.size.x, wb.size.z));
 
             DayNightCycle cycle = Object.FindFirstObjectByType<DayNightCycle>();
             if (cycle != null) cycle.SetDayProgress(0.35f); // Update() then poses the sun each frame
 
-            Vector3[][] views =
+            Vector3[] eyes =
             {
-                // name is passed via Debug.Log; positions: eye-level east, diagonal above, foot west
-                new Vector3[] { hub.x + size * 1.1f, wb.min.y + 1.6f, hub.z },
-                new Vector3[] { hub.x - size * 0.9f, wb.max.y + size * 0.4f, hub.z - size * 1.2f },
-                new Vector3[] { hub.x - size * 0.25f, wb.min.y + 1.2f, hub.z - size * 0.25f }
+                new Vector3(hub.x + size * 1.1f, wb.min.y + 1.6f, hub.z),
+                new Vector3(hub.x - size * 0.9f, wb.max.y + size * 0.4f, hub.z - size * 1.2f),
+                new Vector3(hub.x - size * 0.25f, wb.min.y + 1.2f, hub.z - size * 0.25f)
             };
 
             string folder = Directory.GetCurrentDirectory() + "/Logs/ci";
@@ -215,9 +214,8 @@ namespace Spinnenspiel.Tests
 
             int viewIndex = 0;
             string[] names = { "eye", "aerial", "foot" };
-            foreach (Vector3[] v in views)
+            foreach (Vector3 eye in eyes)
             {
-                Vector3 eye = new Vector3(v[0], v[1], v[2]);
                 cam.transform.position = eye;
                 cam.transform.LookAt(hub);
                 cam.targetTexture = target;
