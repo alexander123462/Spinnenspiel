@@ -133,10 +133,10 @@ namespace Spinnenspiel.EditorTools
             Vector3 hub = new Vector3(49.5f, 8.4f, 50.8f); // known PH-Tree position (tests)
             View[] views =
             {
-                new View("urwald_play", hub + new Vector3(-3f, 1.2f, -3f), hub + new Vector3(1f, 0.5f, 1f)),
-                new View("urwald_ueber", hub + new Vector3(-14f, 22f, -26f), hub + new Vector3(0f, 1f, 0f)),
-                new View("urwald_west", hub + new Vector3(8f, 2.5f, 2f), hub + new Vector3(-10f, 2f, 6f)),
-                new View("urwald_treefoot", hub + new Vector3(2.2f, 0.9f, -2.2f), hub + new Vector3(0f, -0.2f, 0.5f))
+                new View("urwald_ground_east", new Vector3(78f, 2.5f, 51f), hub),
+                new View("urwald_ground_west", new Vector3(20f, 2.5f, 49f), hub),
+                new View("urwald_treefoot", hub + new Vector3(2.5f, -6f, -2.5f), hub + new Vector3(0f, -7f, 0f)),
+                new View("urwald_diag", new Vector3(72f, 12f, 26f), hub)
             };
 
             VegetationSystem vegetation = Object.FindFirstObjectByType<VegetationSystem>();
