@@ -179,7 +179,7 @@ namespace Spinnenspiel.Tests
         public IEnumerator UrwaldKontrollbilder_TakeScreenshots()
         {
             JungleWorldGenerator.NextSeed = 4242;
-            yield from LoadUrwald();
+            yield return LoadUrwald();
 
             GameObject treeGo = GameObject.Find("PH-Tree");
             Assert.IsNotNull(treeGo, "no PH-Tree in Urwald after generator ready.");
