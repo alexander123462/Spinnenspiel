@@ -61,12 +61,17 @@ namespace Spinnenspiel.EditorTools
             ApplyScanMesh(body.transform.Find("Cephalothorax"), "Assets/_Project/Art/Spider/Spinne_Cephalothorax.fbx", carapaceMat);
 
             // Augen: zwei große vordere Mittelaugen, zwei kleinere darüber, zwei seitliche.
-            AddPart(body.transform, "Eye_AL", new Vector3(-0.007f, 0.011f, 0.055f), Vector3.one * 0.009f, eyeMat);
-            AddPart(body.transform, "Eye_AR", new Vector3(0.007f, 0.011f, 0.055f), Vector3.one * 0.009f, eyeMat);
-            AddPart(body.transform, "Eye_PL", new Vector3(-0.009f, 0.018f, 0.046f), Vector3.one * 0.0065f, eyeMat);
-            AddPart(body.transform, "Eye_PR", new Vector3(0.009f, 0.018f, 0.046f), Vector3.one * 0.0065f, eyeMat);
-            AddPart(body.transform, "Eye_LL", new Vector3(-0.016f, 0.012f, 0.047f), Vector3.one * 0.005f, eyeMat);
-            AddPart(body.transform, "Eye_LR", new Vector3(0.016f, 0.012f, 0.047f), Vector3.one * 0.005f, eyeMat);
+            // 2026-10-11 Augenfix: alte Z=0.046..0.055 put the WHOLE eye sphere up to 6.5 mm
+            // OUTSIDE the carapace (head surface along eye ray is only ~0.022-0.025 from head
+            // center). New centers sit 0.35*r inside the scan-mesh surface (raycast against
+            // Spinne_Cephalothorax.fbx, see Logs/ci/eye_calc.py) -> eye dome embedded, only
+            // ~0.65*r of the sphere visible. Values symmetrised L/R.
+            AddPart(body.transform, "Eye_AL", new Vector3(-0.0052f, 0.0088f, 0.0475f), Vector3.one * 0.009f, eyeMat);
+            AddPart(body.transform, "Eye_AR", new Vector3(0.0052f, 0.0088f, 0.0475f), Vector3.one * 0.009f, eyeMat);
+            AddPart(body.transform, "Eye_PL", new Vector3(-0.0070f, 0.0145f, 0.0415f), Vector3.one * 0.0065f, eyeMat);
+            AddPart(body.transform, "Eye_PR", new Vector3(0.0070f, 0.0145f, 0.0415f), Vector3.one * 0.0065f, eyeMat);
+            AddPart(body.transform, "Eye_LL", new Vector3(-0.0132f, 0.0103f, 0.0432f), Vector3.one * 0.005f, eyeMat);
+            AddPart(body.transform, "Eye_LR", new Vector3(0.0132f, 0.0103f, 0.0432f), Vector3.one * 0.005f, eyeMat);
 
             // Kieferklauen (Cheliceren) und Taster (Pedipalpen)
             AddPart(body.transform, "Chelicera_L", new Vector3(-0.006f, -0.006f, 0.058f), new Vector3(0.009f, 0.014f, 0.009f), thoraxMat);
