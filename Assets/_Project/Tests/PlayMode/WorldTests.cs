@@ -51,10 +51,10 @@ namespace Spinnenspiel.Tests
             GameMenu menu = spider.GetComponent<GameMenu>();
             Assert.IsNotNull(menu, "GameMenu fehlt");
 
-            // Startscreen at start; StartGame -> Playing.
-            Assert.AreEqual(menu.State, 0, "Start at Startscreen.");
+            // No start screen any more: game starts directly in Playing.
+            Assert.AreEqual(menu.State, 1, "Start directly in Playing.");
             menu.StartGame();
-            Assert.AreEqual(menu.State, 1, "StartGame -> Playing.");
+            Assert.AreEqual(menu.State, 1, "StartGame keeps Playing.");
 
             // Esc-Pause: TogglePause pauses, then resumes (Resumed fires).
             bool resumed = false;

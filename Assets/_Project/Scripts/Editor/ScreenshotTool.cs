@@ -60,9 +60,10 @@ namespace Spinnenspiel.EditorTools
             string folder = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ci");
             Directory.CreateDirectory(folder);
 
-            RenderTexture target = new RenderTexture(1600, 900, 24, RenderTextureFormat.ARGB32);
-            target.antiAliasing = 4;
+            // HDR RT: cam.Render() skips HDRP post-processing, so ACES tonemap is applied manually.
+            RenderTexture target = new RenderTexture(1600, 900, 0, RenderTextureFormat.ARGBHalf);
             Texture2D image = new Texture2D(1600, 900, TextureFormat.RGB24, false);
+            Texture2D hdrTex = new Texture2D(1600, 900, TextureFormat.RGBAHalf, false);
             foreach (View view in views)
             {
                 cam.transform.position = view.position;
@@ -75,16 +76,52 @@ namespace Spinnenspiel.EditorTools
 
                 cam.Render();
                 RenderTexture.active = target;
-                image.ReadPixels(new Rect(0, 0, 1600, 900), 0, 0);
-                image.Apply();
+                hdrTex.ReadPixels(new Rect(0, 0, 1600, 900), 0, 0);
+                hdrTex.Apply();
                 RenderTexture.active = null;
                 cam.targetTexture = null;
+                TonemapToPng(hdrTex, image);
                 File.WriteAllBytes(Path.Combine(folder, "shot_" + view.name + ".png"), image.EncodeToPNG());
                 Debug.Log("[Spinnenspiel] Kontrollbild: shot_" + view.name + ".png");
             }
 
             Object.DestroyImmediate(target);
             Object.DestroyImmediate(image);
+            Object.DestroyImmediate(hdrTex);
+        }
+
+        // Filmic/ACES-Annäherung plus Auto-Exposure: CI-Shots ohne Post-Processing-Pipeline.
+        private static void TonemapToPng(Texture2D hdr, Texture2D ldr)
+        {
+            Color[] px = hdr.GetPixels();
+            int n = px.Length;
+            float sumLog = 0f;
+            for (int i = 0; i < n; i++)
+            {
+                Color c = px[i];
+                float lum = 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+                sumLog += Mathf.Log(Mathf.Max(lum, 1e-5f));
+            }
+            // Geometric mean -> target mid-grey (0.35), clamped so night shots do not explode.
+            float exposure = 0.35f / Mathf.Exp(sumLog / n);
+            exposure = Mathf.Clamp(exposure, 0.0005f, 50f);
+            Color[] outPx = new Color[n];
+            for (int i = 0; i < n; i++)
+            {
+                Color c = px[i];
+                float r = Mathf.Max(c.r * exposure, 0f);
+                float g = Mathf.Max(c.g * exposure, 0f);
+                float b = Mathf.Max(c.b * exposure, 0f);
+                outPx[i] = new Color(AcesTone(r), AcesTone(g), AcesTone(b), 1f);
+            }
+            ldr.SetPixels(outPx);
+            ldr.Apply();
+        }
+
+        private static float AcesTone(float x)
+        {
+            x = Mathf.Max(x - 0.003f, 0f);
+            return (x * (2.51f * x + 0.03f)) / ((x * (2.43f * x + 0.59f) + 0.14f));
         }
 
         [MenuItem("Spinnenspiel/Debug/Urwald-Kontrollbilder rendern")]
@@ -162,9 +199,10 @@ namespace Spinnenspiel.EditorTools
             string folder = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ci");
             Directory.CreateDirectory(folder);
 
-            RenderTexture target = new RenderTexture(1600, 900, 24, RenderTextureFormat.ARGB32);
-            target.antiAliasing = 4;
+            // HDR RT: cam.Render() skips HDRP post-processing, so ACES tonemap is applied manually.
+            RenderTexture target = new RenderTexture(1600, 900, 0, RenderTextureFormat.ARGBHalf);
             Texture2D image = new Texture2D(1600, 900, TextureFormat.RGB24, false);
+            Texture2D hdrTex = new Texture2D(1600, 900, TextureFormat.RGBAHalf, false);
             foreach (View view in views)
             {
                 cam.transform.position = view.position;
@@ -177,16 +215,18 @@ namespace Spinnenspiel.EditorTools
 
                 cam.Render();
                 RenderTexture.active = target;
-                image.ReadPixels(new Rect(0, 0, 1600, 900), 0, 0);
-                image.Apply();
+                hdrTex.ReadPixels(new Rect(0, 0, 1600, 900), 0, 0);
+                hdrTex.Apply();
                 RenderTexture.active = null;
                 cam.targetTexture = null;
+                TonemapToPng(hdrTex, image);
                 File.WriteAllBytes(Path.Combine(folder, "shot_" + view.name + ".png"), image.EncodeToPNG());
                 Debug.Log("[Spinnenspiel] Kontrollbild: shot_" + view.name + ".png");
             }
 
             Object.DestroyImmediate(target);
             Object.DestroyImmediate(image);
+            Object.DestroyImmediate(hdrTex);
         }
 
         /// <summary>

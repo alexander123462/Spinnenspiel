@@ -23,38 +23,15 @@ namespace Spinnenspiel
 
         private void Awake()
         {
-            _state = 0;
+            _state = 1;
             MouseSensitivity = PlayerPrefs.GetFloat(SensitivityKey, 1f);
-            try
-            {
-                const string flag = @"C:\Users\vorau\AppData\Local\hermes\cache\scratch\spinn_autostart.flag";
-                _autostart = System.IO.File.Exists(flag);
-            }
-            catch
-            {
-                _autostart = false;
-            }
         }
-
-        /// <summary>Automation-Hook: env var SPINN_AUTOSTART skips the start screen (for CI screenshots only).</summary>
-        private bool _autostart;
 
         private void Update()
         {
-            if (_state == 0 && _autostart)
-            {
-                StartGame();
-                return;
-            }
             Keyboard k = Keyboard.current;
             if (k == null)
             {
-                return;
-            }
-            // Startscreen: Enter or E starts the game.
-            if (_state == 0 && (k.spaceKey.wasPressedThisFrame || k.enterKey.wasPressedThisFrame))
-            {
-                StartGame();
                 return;
             }
             // Esc toggles pause while playing/paused.
@@ -127,15 +104,6 @@ namespace Spinnenspiel
 
         private void OnGUI()
         {
-            if (_state == 0)
-            {
-                GUI.DrawTexture(new Rect(0f, 0f, Screen.width, Screen.height), Texture2D.whiteTexture);
-                GUI.color = Color.black;
-                GUI.Label(new Rect(0f, Screen.height / 3f, Screen.width, 48f),
-                    new GUIContent("Spinnenspiel — Enter/Space: Start"));
-                GUI.color = Color.white;
-                return;
-            }
             if (_state != 2)
             {
                 return;
