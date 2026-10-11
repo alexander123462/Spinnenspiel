@@ -2,7 +2,7 @@
 # Aufruf: blender -b -P ph_baum_reduzieren.py -- <fbx> <id> <outdir> [lod0_holz lod0_blatt lod1_holz lod1_blatt]
 import bpy, bmesh, sys, os, math, shutil
 import numpy as np
-from mathutils import Matrix
+from mathutils import Matrix, Vector
 
 A = sys.argv[sys.argv.index("--") + 1:]
 fbx, tid, out = os.path.abspath(A[0]), A[1], os.path.abspath(A[2])
@@ -11,6 +11,25 @@ os.makedirs(out, exist_ok=True)
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.fbx(filepath=fbx)
 sc = bpy.context.scene
+
+# Straigthten: Poly-Haven-Scans can be leaning trees (island_tree_02 ~19° Centerline).
+# Rotate whole scan about its base so centerline becomes vertical; threshold 15°.
+_v0 = [o for o in sc.objects if o.type == "MESH"]
+import numpy as _np
+_V = _np.vstack([_np.array([(o.matrix_world @ v.co)[:] for v in o.data.vertices]) for o in _v0]) if _v0 else None
+if _V is not None:
+    _zmin, _zmax = float(_V[:,2].min()), float(_V[:,2].max()); _hgt = (_zmax - _zmin) or 1.0
+    _base = _V[_V[:,2] < _zmin + 0.10*_hgt][:,:2].mean(axis=0)
+    _top  = _V[_V[:,2] > _zmax - 0.10*_hgt][:,:2].mean(axis=0)
+    _v3 = _np.array([_top[0]-_base[0], _top[1]-_base[1], 0.75*_hgt])
+    _phi = float(_np.arctan2(_np.hypot(_v3[0], _v3[1]), _v3[2]))
+    print(f"DEBUG straighten: Centerline-Lean {_np.degrees(_phi):.1f}deg", flush=True)
+    if _np.degrees(_phi) > 15.0:
+        _axis = Vector((0,0,1)).cross(Vector(_v3)).normalized()
+        from mathutils import Quaternion as _Q
+        _M = Matrix.Translation(Vector((_base[0], _base[1], _zmin))) @ _Q(_axis, _phi).to_matrix().to_4x4() @ Matrix.Translation(-Vector((_base[0], _base[1], _zmin)))
+        for o in _v0: o.matrix_world = _M @ o.matrix_world
+        print(f"DEBUG straighten: rotated {-_np.degrees(_phi):.1f}deg about base -> upright", flush=True)
 
 def sel(objs, active):
     bpy.ops.object.select_all(action="DESELECT")
