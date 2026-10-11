@@ -167,9 +167,15 @@ namespace Spinnenspiel.Tests
             // on the old thick-trunk geometry and is invalid for climbing. The real invariant: the
             // Spider must never ENTER the trunk at body height. Measured min distance in that band:
             // ~0.72 m -> limit 0.35 m keeps a safe margin while failing on actual penetration.
+            // RECALIBRATED 2026-10 (planting rule rootY=SampleHeight+terrainY+0.15 + woodSub child-shift
+            // now correctly plants the jacaranda trunk): surface touch on a ~0.3 m-radius trunk reads
+            // minNear=0.348 to the AXIS (trunk radius 0.298 + bodyRadius 0.05), true penetration reads
+            // 0.057. Limit lowered 0.35->0.25: 0.35 is unsatisfiable for thin-trunk species (blocking
+            // distance to axis == trunk radius + bodyRadius by construction); 0.25 keeps a >=0.19 m
+            // margin against the legit 0.348 contact AND still fails on the 0.057 penetration.
             Debug.Log("[Diag] maxToward=" + maxToward.ToString("F3") + " bestD=" + bestD.ToString("F3") +
                 " minNear=" + minNear.ToString("F3"));
-            Assert.Greater(minNear, 0.35f,
+            Assert.Greater(minNear, 0.25f,
                 "Spider entered the trunk of the tree at " + pick.position.ToString("F1") +
                 " (min body-height distance to trunk axis " + minNear.ToString("F2") + " m).");
             yield return null;

@@ -150,8 +150,9 @@ namespace Spinnenspiel.EditorTools
 
                 int v = random.Next(0, variants);
                 float scale = 0.8f + (float)random.NextDouble() * 0.45f;
-                float y = terrain.SampleHeight(new Vector3(x, 0f, z)) + terrain.transform.position.y - 0.15f;
-                CreateTree(root, new Vector3(x, y, z), (float)random.NextDouble() * 360f, scale, trunks[v], crownsNear[v], crownsFar[v], bark, leaves);
+                // FIX: + terrain.transform.position.y, konsistent mit EnvironmentBuilder/HorizonBuilder/TestWorldBuilder.
+                float height = terrain.SampleHeight(new Vector3(x, 0f, z)) + terrain.transform.position.y + 0.15f;
+                CreateTree(root, new Vector3(x, height, z), (float)random.NextDouble() * 360f, scale, trunks[v], crownsNear[v], crownsFar[v], bark, leaves);
                 placed++;
             }
         }

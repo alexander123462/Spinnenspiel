@@ -90,6 +90,7 @@ namespace Spinnenspiel
             t.name = "Urwaldboden";
             t.GetComponent<Terrain>().drawInstanced = true;
             t.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Ground;
+            Terrain terrain = t.GetComponent<Terrain>();
 
             // 3) Sumpfwasser (als Wasser erkennbar: dünner BoxCollider + SurfaceTag Water + WaterBody)
             GameObject water = GameObject.CreatePrimitive(PrimitiveType.Quad);
@@ -138,7 +139,9 @@ namespace Spinnenspiel
                     float rot = World.Hash01(gx, gz, 5) * 360f;
                     // Zufalls-Skalierung mal Library-Scale (Jacaranda ca. 30 m, Inselbäume 12-15 m).
                     float scale = (0.8f + World.Hash01(gx, gz, 6) * 0.5f) * library.phTreeScales[variant];
-                    float y = h - 0.15f;
+                    // FIX: SampleHeight statt World.Height, damit Baum-Base bei Terrain + 0.15m steht (konsistent mit VegetationBuilder.BuildTrees()).
+                    // + terrain.transform.position.y: Terrain is y=0 today, but the test's groundY adds it; keep root contract exact either way.
+                    float y = terrain.SampleHeight(new Vector3(x, 0f, z)) + terrain.transform.position.y + 0.15f;
 
                     Transform tree = CreateTree(new Vector3(x, y, z), rot, scale, variant, treesRoot);
                     if (tree == null) continue;
@@ -441,8 +444,9 @@ namespace Spinnenspiel
                 Vector3 gb = lod0.bounds.center, ge = lod0.bounds.extents;
                 float ts = Mathf.Max(0.01f, tree.transform.localScale.x);
                 Vector3 rootPos = tree.transform.position;
+                float lod0WorldY = mf.transform.position.y;
                 // Kronen in WORLD-space: obere Drittel der (schiertas) Bounds.
-                float crownTopY = rootPos.y + (gb.y + ge.y) * ts;
+                float crownTopY = lod0WorldY + (gb.y + ge.y) * ts;
                 float crownBotY = crownTopY - 2f * ge.y * ts;
                 float radiusX = ge.x * ts, radiusZ = ge.z * ts;
                 int wantedThisTree = 3 + (int)(World.Hash01(tIdx, 0, 71) * 6f); // 3..8 per Tree
@@ -776,7 +780,7 @@ namespace Spinnenspiel
                 Vector3 terrPos = terr.transform.position;
                 groundAtPos = terr.SampleHeight(pos) + terrPos.y;
                 Quaternion rotYq = Quaternion.Euler(0f, rotY, 0f);
-                float rootY = groundAtPos + 0.35f - baseDrop;
+                float rootY = groundAtPos + 0.15f;
                 tree.transform.position = new Vector3(pos.x, rootY, pos.z);
             }
             else
@@ -796,9 +800,10 @@ namespace Spinnenspiel
             r0 = lod0Node.AddComponent<MeshRenderer>();
             r0.sharedMaterials = AssignMaterialsPerSubmesh(lod0, woodSub, woodMat, leafMat);
 
+            GameObject lod1Node = null;
             if (lod1 != lod0)
             {
-                GameObject lod1Node = new GameObject("TreeLOD1");
+                lod1Node = new GameObject("TreeLOD1");
                 lod1Node.transform.SetParent(tree.transform, false);
                 lod1Node.transform.localPosition = Vector3.zero;
                 lod1Node.AddComponent<MeshFilter>().sharedMesh = lod1;
@@ -821,20 +826,60 @@ namespace Spinnenspiel
             if (terr != null && woodSub >= 0)
             {
                 Bounds wsb = lod0.GetSubMesh(woodSub).bounds;
-                Vector3 wl = colNode.transform.TransformPoint(wsb.center - wsb.extents);
-                Vector3 wh = colNode.transform.TransformPoint(wsb.center + wsb.extents);
+                // WELT-AABB aus ALLEN 8 Eckpunkten: nur die beiden Diagonalecken
+                // (center ∓ extents) zu transformieren liefert bei Y-Rotation KEIN gültiges
+                // min/max (z. B. center (2,0,0), ext (1,1,1), rotY 150°: wl.x > wh.x),
+                // wodurch die Scan-Loops leer liefen und das Einpflanzen übersprungen wurde.
+                Vector3 bc = wsb.center, be = wsb.extents;
+                Vector3 wl = new Vector3(1e30f, 1e30f, 1e30f);
+                Vector3 wh = new Vector3(-1e30f, -1e30f, -1e30f);
+                for (int ci = 0; ci < 8; ci++)
+                {
+                    Vector3 corner = colNode.transform.TransformPoint(new Vector3(
+                        (ci & 1) == 0 ? bc.x - be.x : bc.x + be.x,
+                        (ci & 2) == 0 ? bc.y - be.y : bc.y + be.y,
+                        (ci & 4) == 0 ? bc.z - be.z : bc.z + be.z));
+                    wl = Vector3.Min(wl, corner);
+                    wh = Vector3.Max(wh, corner);
+                }
+                // PERF: cap the scan to a trunk-centred box. A wide root-plate/flare woodSub
+                // would otherwise span tens of metres -> 1e4 rays/tree (GenSeed 11s, vegCost 45ms).
+                // The trunk foot can sit FAR from the woodSub XZ centre (jacaranda: woodSub is the
+                // leaves submesh, crown-centred, trunk foot offset >3 m) -> a centred box missed it
+                // and the planting shift never ran. Centre the cap on the TRUNK AXIS instead.
+                Vector3 wc = new Vector3(tree.transform.position.x, 0f, tree.transform.position.z);
+                float scanHalf = 3f;
+                float sx0 = Mathf.Max(wl.x, wc.x - scanHalf), sx1 = Mathf.Min(wh.x, wc.x + scanHalf);
+                float sz0 = Mathf.Max(wl.z, wc.z - scanHalf), sz1 = Mathf.Min(wh.z, wc.z + scanHalf);
+                float scanStep = 1f;
                 float rootY0 = tree.transform.position.y;
                 float footOffset = 1e9f;   // lowest trunk point relative to rootY
                 float footGround = -1e9f;
-                for (float x = wl.x; x <= wh.x; x += 0.5f)
+                // Reusable NonAlloc-Buffer, local to this Tree-Scan (no per-Sample-Allocations)
+                RaycastHit[] scanHits = new RaycastHit[64];
+                for (float x = sx0; x <= sx1; x += scanStep)
                 {
-                    for (float z = wl.z; z <= wh.z; z += 0.5f)
+                    for (float z = sz0; z <= sz1; z += scanStep)
                     {
                         var top = new Vector3(x, wh.y + 2f, z);
-                        RaycastHit[] hits = Physics.RaycastAll(top, Vector3.down, (wh.y - wl.y) + 6f);
+                        float rayLen = (wh.y - wl.y) + 6f;
                         float lowestOwn = 1e9f;
-                        foreach (var h in hits)
-                            if (h.collider.gameObject == colNode && h.point.y < lowestOwn) lowestOwn = h.point.y;
+                        int hitCount = Physics.RaycastNonAlloc(top, Vector3.down, scanHits, rayLen);
+                        if (hitCount >= scanHits.Length)
+                        {
+                            // Buffer filled: fall back to RaycastAll, so the result stays correct
+                            RaycastHit[] hits = Physics.RaycastAll(top, Vector3.down, rayLen);
+                            foreach (var h in hits)
+                                if (h.collider.gameObject == colNode && h.point.y < lowestOwn) lowestOwn = h.point.y;
+                        }
+                        else
+                        {
+                            for (int i = 0; i < hitCount; i++)
+                            {
+                                var h = scanHits[i];
+                                if (h.collider.gameObject == colNode && h.point.y < lowestOwn) lowestOwn = h.point.y;
+                            }
+                        }
                         if (lowestOwn >= 1e9f) continue; // no geometry in this column
                         float offset = lowestOwn - rootY0;
                         if (offset < footOffset)
@@ -844,14 +889,24 @@ namespace Spinnenspiel
                         }
                     }
                 }
-                if (footOffset < 1e9f)
+                // Planting via woodSub-Bottom (Bounds), not via raycast foot: species whose FBX pivot sits high above the wood bottom (island_tree_03, jacaranda) need the full bounds drop; a small clamp would leave them floating.
+                float newRootY = footGround + 0.25f - wsb.min.y * scale;
+                // Sanity guard: never push a whole crown below ground, never lift more than 3 m.
+                float woodWorldH = (wsb.max.y - wsb.min.y) * scale;
+                if (newRootY != rootY0 && (rootY0 - newRootY) <= woodWorldH + 1f && (newRootY - rootY0) <= 3f)
                 {
-                    // Plant so the trunk FOOT sits ~0.25 m above the terrain under it.
+                    // Plant so the woodSub BOTTOM sits ~0.25 m above the terrain under it.
                     // BOTH directions: with a wrong woodSub (branches) the old down-only
                     // rule sank trees ~9.5 m; now the trunk foot is raised too if needed.
-                    float newRootY = footGround + 0.25f - footOffset;
-                    if (Mathf.Abs(newRootY - rootY0) <= 10f && newRootY != rootY0)
-                        tree.transform.position = new Vector3(tree.transform.position.x, newRootY, tree.transform.position.z);
+                    // FIX: shift the VISUAL+COLLIDER CHILDREN, never the tree root: the
+                    // root must stay at SampleHeight + 0.15 (VegetationContactTest contract);
+                    // moving the root broke it deterministically (-3.2..-4.6 m on variants
+                    // whose FBX pivot is not at the trunk base, e.g. jacaranda woodSub min.y=2.2).
+                    float dropLocal = (newRootY - rootY0) / scale; // local units
+                    lod0Node.transform.localPosition += new Vector3(0f, dropLocal, 0f);
+                    colNode.transform.localPosition += new Vector3(0f, dropLocal, 0f);
+                    if (lod1Node != null)
+                        lod1Node.transform.localPosition += new Vector3(0f, dropLocal, 0f);
                 }
             }
 
