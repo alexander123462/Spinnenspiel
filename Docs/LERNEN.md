@@ -28,3 +28,9 @@
 - Aborting a coroutine build: AbortBuild() alone does NOT stop the BuildRoutine loop -> set a cancel-flag and check it at every yield point (also in WalkTo, where `return` must be `yield break`, CS1622).
 
 - Shared key (Esc) for two systems (Pause vs Netzbau-Abort): both read wasPressedThisFrame; the later Update() must detect "handled this frame" via a frame-stamp, not only current state.
+
+- The 4 reds (Climb_TreeFullHeight, Climb_TreeInWorld, RedPreview_WhenSpotGoesBad, Spider_StopsAgainstTree) are DETERMINISTIC (r102u2 + r102u2b identical numbers) — real regressions from Testwelt rebuild churn (87fe1ea/108194f), not wacklers. Investigate climb/net code before any further full-CI gate attempts.
+
+- ScreenshotTool U2 facts: Testwelt course objects DO exist (m_Name counts Stone 12, Branch 72, Log/Boulder/Stump 1); obstacles only 5-30 cm tall -> parcours cam must sit ~0.3 m up and look along course z+0.9..4.6. Fog is Exp2 density 0.022 -> uebersicht cam within ~20 m. MSAA: target.antiAliasing=4 on the ARGBHalf RT fixes jagged edges.
+
+- FindObjectsByType needs FindObjectsSortMode.None (bare, already in scope of UnityEngine.Test import); UnityEngine.TestTools.FindSortMode does not exist (CS compile error).
