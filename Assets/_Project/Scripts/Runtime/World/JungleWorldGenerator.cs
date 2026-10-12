@@ -771,6 +771,9 @@ namespace Spinnenspiel
             // (BUG 1: two separate rules diverged and picked BRANCHES on the Jacaranda).
             int woodSub = PickWoodSubmesh(lod0, variant, scale);
             float baseDrop = lod0.GetSubMesh(woodSub).bounds.min.y * scale;
+            // Rohslotnames (LOD0 MeshRenderer.sharedMaterials[i].name, '|' = submesh) for
+            // name-based Wood/Leaf classification. LOD1 slot order identical (verified).
+            string phSlotNames = library.phTreeSlotNames != null && variant < library.phTreeSlotNames.Length ? library.phTreeSlotNames[variant] : null;
             GameObject tree = new GameObject("PH-Tree");
             tree.transform.SetParent(parent, false);
             Terrain terr = Terrain.activeTerrain;
@@ -798,7 +801,7 @@ namespace Spinnenspiel
             lod0Node.transform.localPosition = Vector3.zero;
             lod0Node.AddComponent<MeshFilter>().sharedMesh = lod0;
             r0 = lod0Node.AddComponent<MeshRenderer>();
-            r0.sharedMaterials = AssignMaterialsPerSubmesh(lod0, woodSub, woodMat, leafMat);
+            r0.sharedMaterials = AssignMaterialsPerSubmesh(lod0, woodSub, woodMat, leafMat, phSlotNames);
 
             GameObject lod1Node = null;
             if (lod1 != lod0)
@@ -808,7 +811,7 @@ namespace Spinnenspiel
                 lod1Node.transform.localPosition = Vector3.zero;
                 lod1Node.AddComponent<MeshFilter>().sharedMesh = lod1;
                 r1 = lod1Node.AddComponent<MeshRenderer>();
-                r1.sharedMaterials = AssignMaterialsPerSubmesh(lod1, PickWoodSubmesh(lod1, variant, scale), woodMat, leafMat);
+                r1.sharedMaterials = AssignMaterialsPerSubmesh(lod1, PickWoodSubmesh(lod1, variant, scale), woodMat, leafMat, phSlotNames);
             }
 
             // Collider on the LOD0-Mesh: LOD1 lacks lower-trunk triangles (measured in TreesTests),
@@ -977,11 +980,34 @@ namespace Spinnenspiel
             return woodSub;
         }
 
-        private static Material[] AssignMaterialsPerSubmesh(Mesh mesh, int woodSub, Material woodMat, Material leafMat)
+        /// <summary>
+        /// Wood/Leaf per Submesh classified by the FBX SLOT NAME (ground truth; '|' separated,
+        /// index = submesh; Unity sorts slots alphabetically so index order is NOT a contract).
+        /// trunk|bark|wood|branch(es)|twig -> Wood, leaf(s) -> Leaf. There is NO separate branch
+        /// material, so branches MUST take the Wood (opaque bark) shader; the old single-woodSub
+        /// rule gave every other submesh the alpha-clipped Leaf shader (jacaranda: brown crown
+        /// + invisible trunk/branches). woodSub is only a fallback HINT for slots whose name
+        /// matches neither keyword (island_* bare species slug) or when the name list is
+        /// missing/stale (length != subMeshCount).
+        /// </summary>
+        private static Material[] AssignMaterialsPerSubmesh(Mesh mesh, int woodSub, Material woodMat, Material leafMat, string slotNamesRaw)
         {
             int subs = Math.Max(1, mesh.subMeshCount);
             var matPerSub = new Material[subs];
-            for (int s = 0; s < subs; s++) matPerSub[s] = s == woodSub ? woodMat : leafMat;
+            string[] slotNames = null;
+            if (slotNamesRaw != null && slotNamesRaw.Length > 0)
+                slotNames = slotNamesRaw.Split('|');
+            if (slotNames == null || slotNames.Length != subs)
+                slotNames = null; // name list missing or stale vs mesh: fall back to woodSub hint
+            for (int s = 0; s < subs; s++)
+            {
+                string n = slotNames != null ? slotNames[s].ToLower() : "";
+                bool isLeaf = n.Contains("leaf") || n.Contains("leaves") || n.Contains("foliage") || n.Contains("frond");
+                bool isWood = n.Contains("trunk") || n.Contains("bark") || n.Contains("wood") || n.Contains("branch") || n.Contains("twig");
+                if (isLeaf) matPerSub[s] = leafMat;
+                else if (isWood) matPerSub[s] = woodMat;
+                else matPerSub[s] = s == woodSub ? woodMat : leafMat;
+            }
             return matPerSub;
         }
 
