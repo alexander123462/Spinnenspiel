@@ -893,12 +893,12 @@ namespace Spinnenspiel
                     }
                 }
                 // Planting via woodSub-Bottom (Bounds), not via raycast foot: species whose FBX pivot sits high above the wood bottom (island_tree_03, jacaranda) need the full bounds drop; a small clamp would leave them floating.
-                float newRootY = footGround + 0.25f - wsb.min.y * scale;
+                float newRootY = footGround - 0.03f - wsb.min.y * scale;
                 // Sanity guard: never push a whole crown below ground, never lift more than 3 m.
                 float woodWorldH = (wsb.max.y - wsb.min.y) * scale;
                 if (newRootY != rootY0 && (rootY0 - newRootY) <= woodWorldH + 1f && (newRootY - rootY0) <= 3f)
                 {
-                    // Plant so the woodSub BOTTOM sits ~0.25 m above the terrain under it.
+                    // Plant so the woodSub BOTTOM sits ~0.03 m BELOW the terrain under it
                     // BOTH directions: with a wrong woodSub (branches) the old down-only
                     // rule sank trees ~9.5 m; now the trunk foot is raised too if needed.
                     // FIX: shift the VISUAL+COLLIDER CHILDREN, never the tree root: the
