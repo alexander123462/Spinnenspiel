@@ -59,3 +59,9 @@
 - [x] M7.7 Gait-Mess Hitch-Filter: Legs_GaitMeasurement_WalkAndSprint failed borderline (extMax 1.028>0.95) only on Load-Hitch-Frames (3s Spike); Pose-Sampling now skips deltaTime>0.2f — done 2026-10-08
 - [x] M8.1 Windows-Build neustand: done 2026-10-08 — CI m8build1 (BuildWindowsTool.BuildWindows) Exit 0; Build/Windows rebuilt: Spinnenspiel_Data + Burst (globalgamemanagers, boot.config) re-written 12:49; exe unchanged (identical content, Unity does not re-stamp). The earlier "BLOCKED" was a false positive: unity.exe PID was the licensing client, batch CI ran fine.
 - [x] M8.2 Abschluss: BERICHT.md final line with last commit hash + short summary of the finished game state. — done 2026-10-08 (Abschlusszeile in Docs/BERICHT.md, see below)
+
+## Autopilot 2026-10-12 (Urwald-Wave 3)
+- [ ] U1 Nahkampfscharf: close-up PlayMode-Screenshots still near-white (raw HDR min ~0.75-0.9 at camera). Check Fog/VolumetricFog in Testwelt_VolumeProfile + Urwald scene fog (m_Fog density 0.022): reduce/remove volumetric fog for eye-height shots, rerun nah-cam test until frames have real contrast (luma stdev > 30).
+- [ ] U2 parcours/uebersicht: Testwelt screenshots lack course structures + uebersicht blurred. Verify obstacle/course GameObjects exist in generated Testwelt (grep m_Name counts), rebuild via builder if missing, reshoot.
+- [ ] U3 T4 Farne Unity-side: import fern_1..5.fbx (ArtSource/UrwaldTest/fern) via ScanModels pattern into Assets/_Project/Art/Plants, HDRP leaf material (Alpha-Cutout 0.5, double-sided), PlayMode test asserting >=5 fern variants present with collider.
+- [ ] U4 T5 Scatter: Geometry-Nodes distribution of ferns over terrain patch -> FBX scatter export + Unity placement (respect SampleHeight contract).
