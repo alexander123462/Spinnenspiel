@@ -47,3 +47,5 @@
 2026-10-08 | M8.1 Windows-Build neustand | DONE: CI m8build1 BuildWindowsTool.BuildWindows Exit 0, Spinnenspiel_Data rebuilt 12:49 (false-positive BLOCKED resolved: unity.exe PID was licensing client, batch CI unaffected) | m8build1
 
 2026-10-08 | M8.2 Abschluss | FAERTER: B1-B12 + Z1-Z10 + M7.x + M8.1 alle [x]; Windows-exe exists (Builds/ gitignored, rebuilt m8build1); full CI green m7finalchk 101/0; game state finished | ec836b3
+
+2026-10-12 | HANDOUT | Status: Commit 108194f pushed hdrp. DONE: T7a FBX ok (29 Meshes, 8x4.361x8 m); Startscreen removed (GameMenu _state=1, WorldTests adapted, full suite green nomenu-full); ScreenshotTool HDR ARGBHalf + ACES/Auto-Exposure, debug removed. Testwelt rebuilt (twrebuild1), Volume -> Testwelt_VolumeProfile.asset GUID 826061331138218489e89e320b230f32 (old M1_VolumeProfile was empty = root cause). OPEN: spinne_nah/spielkamera still near-uniform fog frames (std 5-7, raw HDR white min ~0.75-0.9 at camera, moving views did not help); parcours/uebersicht lack course structures + uebersicht blurred; next: check Fog/VolumetricFog values and whether obstacles exist in generated Testwelt.
