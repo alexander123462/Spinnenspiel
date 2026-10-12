@@ -75,3 +75,9 @@
   - [ ] U4.3 JungleWorldGenerator: Fern-Placement per SampleHeight
   - [ ] U4.4 FernScatterTests: >=N ferns near spawn, collider, Y=SampleHeight
   - [ ] U4.5 full CI r104 + commit
+
+## Autopilot 2026-10-12 (Wave 4: pre-existing reds)
+- [ ] R1 Climb_TreeFullHeight_StaysOutsideTrunk: Spider reaches only 1.05 m of 8.58 m trunk (3.70 m reached). Root-cause: climbing rule vs new planted-trunk geometry (Tree-Planting-Fix moved roots; thin trunks). Fix the climb behaviour or the test invariant so >=70% of stem height is climbed on a valid climbable tree; determinism check with single-test rerun.
+- [ ] R2 Climb_TreeInWorld: Spider climbs only 0.16 m above start in Testwelt (startY=2.677). Verify a climbable tree exists near spawn after Testwelt rebuild; fix placement/climbability, not just margins.
+- [ ] R3 RedPreview_WhenSpotGoesBad: "No trunk pair 1.5-4 m apart" — Testwelt tree layout lost close pairs after vegetation changes; rebuild course/vegetation so a trunk pair in range exists, or fix the spot-search radius to match current spacing.
+- [ ] R4 Spider_StopsAgainstTree: penetrates trunk at (49.5,8.2,50.8), min body-height dist 0.09 < 0.25. Check collider bottom/height for that species after planting fix (collider may float ~ground+2.8 per known bug); fix collider placement so blocking works.
