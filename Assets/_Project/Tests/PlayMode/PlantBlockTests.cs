@@ -131,17 +131,22 @@ namespace Spinnenspiel.Tests
             Assert.GreaterOrEqual(trees.Count, 1, "No PH-Tree nodes.");
 
             Vector3 start = spiderGo.transform.position;
-            Transform pick = null; float bestD = 0f;
+            Transform pick = null; MeshCollider tmc = null; float bestD = 0f;
             foreach (var t in trees)
             {
+                // Only a tree whose collider footprint is centred on its root pivot has a
+                // real trunk AT the pivot. Some FBX origins (e.g. jacaranda) sit laterally
+                // offset from the trunk, so walking to the pivot hits empty space and a
+                // phantom-axis distance test would falsely read penetration. Skip those.
+                MeshCollider mcTry = null;
+                foreach (var mc in t.GetComponentsInChildren<MeshCollider>()) mcTry = mc;
+                if (mcTry == null) continue;
+                Vector3 ax = mcTry.bounds.center - t.position; ax.y = 0f;
+                if (ax.magnitude > 1.5f) continue; // trunk not at pivot -> not a valid blocker target
                 float d = (t.position - start).magnitude;
-                if (d > 3f && (pick == null || d < bestD)) { pick = t; bestD = d; }
+                if (d > 3f && (pick == null || d < bestD)) { pick = t; tmc = mcTry; bestD = d; }
             }
-            Assert.IsNotNull(pick, "No tree 3+ m from spawn.");
-
-            MeshCollider tmc = null;
-            foreach (var mcTry in pick.GetComponentsInChildren<MeshCollider>()) tmc = mcTry;
-            Assert.IsNotNull(tmc, "PH-Tree has no MeshCollider child.");
+            Assert.IsNotNull(pick, "No tree with trunk at pivot 3+ m from spawn.");
 
             Vector3 dirTo = (pick.position - start); dirTo.y = 0f; dirTo.Normalize();
             movement.SetExternalMoveInput(new Vector2(dirTo.x, dirTo.z));
