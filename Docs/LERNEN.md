@@ -37,3 +37,5 @@
 
 
 - 4 reds persist AFTER rebuilding both scenes (u4pre2 Methods Exit 0): Testwelt trunk XZ identical to green 2b3b244, only Y +0.30 m -> rebuild churn NOT the cause; suspect GameMenu _state=1 (Startscreen removed 108194f) changing Spider init/leg SnapToGround timing before Climb tests run.
+- G1 skybox: MAT_Sky legacy Built-In-Shader (guid 000...f000...=Skybox) renders magenta in HDRP; fix = RenderSettings.skybox=null + HDRP Volume (VisualEnvironment skyType=PhysicallyBased). But Mittel stays ~27 (<40) even after that -> dark scene needs Exposure/ambient tuning, not just skybox removal. Gate blocked by R4 Spider_StopsAgainstTree (separate point).\n- Scene GUID refs: grep MAT_Sky NAME misses scene refs; scenes store m_SkyboxMaterial by GUID (01ce316bfe87fac49af900dcce5f435f). Always grep the .mat.meta guid before deleting a material.\n- r102 full CI = fehlgeschlagen 1 (only Spider_StopsAgainstTree left; Climb x2 + RedPreview now GREEN after 662c80c/9fa512b wave). So the 4-red blocker shrank to 1 red (R4).
+
