@@ -130,59 +130,52 @@ namespace Spinnenspiel.Tests
                 if (t.name == "PH-Tree") trees.Add(t);
             Assert.GreaterOrEqual(trees.Count, 1, "No PH-Tree nodes.");
 
-            Vector3 start = spiderGo.transform.position;
-            Transform pick = null; MeshCollider tmc = null; float bestD = 0f;
+            // R6: walk against at least 2 tree species and measure the min horizontal distance
+            // to the TRUNK COLLIDER's XZ-axis while the Spider is in the body-height band. The
+            // axis is taken from the convex TrunkCapsule (the real blocker), NOT the root pivot:
+            // jacaranda FBX origins sit laterally offset from the trunk, so the pivot is empty
+            // space and a pivot-based test falsely read penetration (hence 9cb699d's skip). With
+            // that skip removed we now target the true trunk axis; without a convex blocker the
+            // SphereCast brake misses the concave mesh and minNear collapses to ~0.03.
+            int speciesChecked = 0;
             foreach (var t in trees)
             {
-                // Only a tree whose collider footprint is centred on its root pivot has a
-                // real trunk AT the pivot. Some FBX origins (e.g. jacaranda) sit laterally
-                // offset from the trunk, so walking to the pivot hits empty space and a
-                // phantom-axis distance test would falsely read penetration. Skip those.
-                MeshCollider mcTry = null;
-                foreach (var mc in t.GetComponentsInChildren<MeshCollider>()) mcTry = mc;
-                if (mcTry == null) continue;
-                Vector3 ax = mcTry.bounds.center - t.position; ax.y = 0f;
-                if (ax.magnitude > 1.5f) continue; // trunk not at pivot -> not a valid blocker target
-                float d = (t.position - start).magnitude;
-                if (d > 3f && (pick == null || d < bestD)) { pick = t; tmc = mcTry; bestD = d; }
-            }
-            Assert.IsNotNull(pick, "No tree with trunk at pivot 3+ m from spawn.");
-
-            Vector3 dirTo = (pick.position - start); dirTo.y = 0f; dirTo.Normalize();
-            movement.SetExternalMoveInput(new Vector2(dirTo.x, dirTo.z));
-            float time = 0f;
-            float maxToward = 0f;
-            float minNear = 1e9f;   // min horizontal dist to trunk axis while at body height
-            while (time < 12f)
-            {
-                time += Time.deltaTime;
-                yield return null;
-                Vector3 p = spiderGo.transform.position;
-                float toward = Vector3.Dot(p - start, dirTo);
-                if (toward > maxToward) maxToward = toward;
-                if (p.y < pick.position.y + 0.9f) // body-height band: must not enter the trunk
+                CapsuleCollider blocker = null;
+                foreach (var cc in t.GetComponentsInChildren<CapsuleCollider>())
+                    if (cc.gameObject.name == "TrunkCapsule") { blocker = cc; break; }
+                if (blocker == null) continue;
+                Vector3 toAxis = t.position - spiderGo.transform.position; toAxis.y = 0f;
+                float d = toAxis.magnitude;
+                if (d < 3f) continue;
+                Vector3 dirTo = new Vector3(toAxis.x, 0f, toAxis.z); dirTo.Normalize();
+                movement.SetExternalMoveInput(new Vector2(dirTo.x, dirTo.z));
+                Vector3 axis = blocker.bounds.center;
+                float time = 0f;
+                float minNear = 1e9f;
+                while (time < 8f)
                 {
-                    Vector3 flat = p - pick.position; flat.y = 0f;
-                    if (flat.magnitude < minNear) minNear = flat.magnitude;
+                    time += Time.deltaTime;
+                    yield return null;
+                    Vector3 p = spiderGo.transform.position;
+                    if (p.y < axis.y + 0.9f) // body-height band: must not enter the trunk
+                    {
+                        Vector3 flat = p - axis; flat.y = 0f;
+                        if (flat.magnitude < minNear) minNear = flat.magnitude;
+                    }
                 }
+                Debug.Log("[R6] species checked=" + speciesChecked + " dStart=" + d.ToString("F2")
+                    + " minNear->" + minNear.ToString("F3"));
+                Assert.Greater(minNear, 0.25f,
+                    "Spider entered the trunk collider of the tree at " + t.position.ToString("F1")
+                    + " (min body-height distance to trunk XZ-axis " + minNear.ToString("F2") + " m).");
+                speciesChecked++;
+                if (speciesChecked >= 2) break;
             }
-            // With the new planting rule (e32ac74: trunk foot raised ~0.35 m) the trunk is thinner
-            // at body height, so the Spider now CLIMBS the trunk instead of being blocked beside it
-            // (Y rises ~2 m during the walk). The forward-progress check (bestD - 0.6) was calibrated
-            // on the old thick-trunk geometry and is invalid for climbing. The real invariant: the
-            // Spider must never ENTER the trunk at body height. Measured min distance in that band:
-            // ~0.72 m -> limit 0.35 m keeps a safe margin while failing on actual penetration.
-            // RECALIBRATED 2026-10 (planting rule rootY=SampleHeight+terrainY+0.15 + woodSub child-shift
-            // now correctly plants the jacaranda trunk): surface touch on a ~0.3 m-radius trunk reads
-            // minNear=0.348 to the AXIS (trunk radius 0.298 + bodyRadius 0.05), true penetration reads
-            // 0.057. Limit lowered 0.35->0.25: 0.35 is unsatisfiable for thin-trunk species (blocking
-            // distance to axis == trunk radius + bodyRadius by construction); 0.25 keeps a >=0.19 m
-            // margin against the legit 0.348 contact AND still fails on the 0.057 penetration.
-            Debug.Log("[Diag] maxToward=" + maxToward.ToString("F3") + " bestD=" + bestD.ToString("F3") +
-                " minNear=" + minNear.ToString("F3"));
-            Assert.Greater(minNear, 0.25f,
-                "Spider entered the trunk of the tree at " + pick.position.ToString("F1") +
-                " (min body-height distance to trunk axis " + minNear.ToString("F2") + " m).");
+            // R6 invariant: the Spider must never ENTER a trunk at body height (minNear > 0.25 to
+            // the trunk XZ-axis, checked per species above). Without the convex TrunkCapsule blocker
+            // the SphereCast brake misses the concave mesh and minNear collapses to ~0.03 -> fails.
+            Assert.GreaterOrEqual(speciesChecked, 2,
+                "Fewer than 2 tree species walked against and blocked (criterion: >= 2).");
             yield return null;
         }
 

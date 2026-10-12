@@ -913,6 +913,28 @@ namespace Spinnenspiel
                 }
             }
 
+            // R6: convex Trunk-Blocker. Physics.SphereCast (the movement brake + climb
+            // trigger in SpiderMovement) does NOT hit the concave TreeCollider (convex=false),
+            // so the Spider walked straight through trunks (minNear 0.032, maxToward > trunkDist).
+            // A CapsuleCollider along the trunk axis gives a convex blocker on the SAME layer the
+            // sensor/movement mask queries (layer 0). Child of colNode -> inherits the planting
+            // dropLocal shift automatically, so it stays glued to the planted trunk.
+            if (woodSub >= 0)
+            {
+                Bounds tb = lod0.GetSubMesh(woodSub).bounds;
+                GameObject trunk = new GameObject("TrunkCapsule");
+                trunk.transform.SetParent(colNode.transform, false);
+                trunk.transform.localPosition = tb.center;
+                float tradius = Mathf.Min(tb.extents.x, tb.extents.z);
+                float theight = tb.extents.y * 2f;
+                CapsuleCollider cap = trunk.AddComponent<CapsuleCollider>();
+                cap.radius = tradius;
+                cap.height = Mathf.Max(theight, tradius * 2f + 0.01f);
+                cap.direction = 1; // Y-Axis (Stemachse)
+                UnityEngine.Debug.Log("[R6] TrunkCapsule variant=" + variant + " radius->" + tradius.ToString("F3")
+                    + " height->" + theight.ToString("F3") + " convex->true");
+            }
+
             var lod = tree.AddComponent<LODGroup>();
             if (r1 != null)
             {
