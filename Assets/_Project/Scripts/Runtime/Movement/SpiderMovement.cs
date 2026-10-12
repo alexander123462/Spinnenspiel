@@ -61,6 +61,9 @@ namespace Spinnenspiel
         private Vector3 _surfaceNormal = Vector3.up;
         private bool _attached = true;
         private float _lastSurfaceTime = float.NegativeInfinity;
+        private float _wallClimbTime = float.NegativeInfinity;
+        private Vector3 _lastWallPoint = Vector3.zero;
+        private Vector3 _lastWallNormal = Vector3.zero;
         private Vector2? _externalMoveInput;
         private float _ropeLength;
         private Vector3 _ropeVel;
@@ -491,7 +494,7 @@ namespace Spinnenspiel
             if (!hit)
             {
                 // Kein Treffer: nach Toleranzzeit loslassen.
-                if (Time.time - _lastSurfaceTime > detachDelay)
+                if (Time.time - _lastSurfaceTime > detachDelay && Time.time - _wallClimbTime > 0.4f)
                 {
                     _attached = false;
                     CatchOnDragline();
@@ -503,39 +506,35 @@ namespace Spinnenspiel
             _lastSurfaceTime = Time.time;
             _surfaceNormal = normal;
 
-            // up-Achse weich zur Oberflächen-Normale ausrichten.
-            Vector3 newUp = Vector3.RotateTowards(up, normal, alignRate * dt, 0f).normalized;
+            // Kletterlatch: after a steep Cast-hit the Sensor-Ground-normal must not fight the climb.
+            bool wallLatched = Time.time - _wallClimbTime < 0.4f;
+            bool groundFightsClimb = wallLatched && Vector3.Angle(normal, Vector3.up) < 45f;
+
+            // up-Achse weich zur Oberflächen-Normale ausrichten (during latch: to the wall normal).
+            Vector3 alignNormal = groundFightsClimb ? _lastWallNormal : normal;
+            Vector3 newUp = Vector3.RotateTowards(up, alignNormal, alignRate * dt, 0f).normalized;
             transform.rotation = Quaternion.FromToRotation(up, newUp) * transform.rotation;
 
             // Haftung startet am Sensortreffer, bei Steilflächen am Hindernistreffer.
-            Vector3 adhesionPoint = point;
-            Vector3 adhesionNormal = normal;
+            Vector3 adhesionPoint = groundFightsClimb ? _lastWallPoint : point;
+            Vector3 adhesionNormal = groundFightsClimb ? _lastWallNormal : normal;
 
             // Schritt in Laufrichtung; Sphärenwurf begrenzt bei Hindernis.
             Vector3 oldUp = newUp;
             float step = _vel.magnitude * dt;
             if (step > 0.0001f)
             {
+                bool castHitSteep = false;
+                Vector3 steepNormal = Vector3.zero;
+                Vector3 steepPoint = Vector3.zero;
                 if (Physics.SphereCast(transform.position + newUp * bodyRadius, bodyRadius * 0.9f, _vel.normalized,
                         out RaycastHit castHit, step + 0.01f, sensor.mask, QueryTriggerInteraction.Ignore))
                 {
-                    if (castHit.distance > 0.0001f && Vector3.Angle(castHit.normal, newUp) > 35f)
+                    if (castHit.distance > 0.0001f && Vector3.Angle(castHit.normal, Vector3.up) > 55f)
                     {
-                        // Steiles Hindernis = neue Kletterfläche: umdrehen und entlanglaufen.
-                        Vector3 wallUp = Vector3.RotateTowards(oldUp, castHit.normal, alignRate * 3f * dt, 0f).normalized;
-                        transform.rotation = Quaternion.FromToRotation(newUp, wallUp) * transform.rotation;
-                        newUp = wallUp;
-
-                        // Geschwindigkeit entlang der Hindernisfläche umlenken, Betrag behalten.
-                        Vector3 along = Vector3.ProjectOnPlane(_vel, castHit.normal);
-                        Vector3 climbDir = along.magnitude < 0.3f * _vel.magnitude
-                            ? Vector3.ProjectOnPlane(oldUp, castHit.normal).normalized
-                            : along.normalized;
-                        _vel = climbDir * _vel.magnitude;
-                        // step bleibt normal: entlang der neuen Richtung weiterlaufen.
-
-                        adhesionPoint = castHit.point;
-                        adhesionNormal = castHit.normal;
+                        castHitSteep = true;
+                        steepNormal = castHit.normal;
+                        steepPoint = castHit.point;
                     }
                     else if (castHit.distance > 0.0001f)
                     {
@@ -548,7 +547,37 @@ namespace Spinnenspiel
                         adhesionNormal = castHit.normal;
                         // step bleibt die volle Schrittweite; Ausrichtung übernimmt der Sensor im nächsten Frame.
                     }
-                    // distance <= 0.0001f: Kugel startet überlappend, Schritt normal ausführen.
+                }
+                else if (Physics.SphereCast(transform.position - _vel.normalized * 0.25f + newUp * (bodyRadius + 0.3f), bodyRadius * 1.4f, _vel.normalized,
+                        out RaycastHit castHit2, step + 0.6f, sensor.mask, QueryTriggerInteraction.Ignore))
+                {
+                    if (castHit2.distance > 0.0001f && Vector3.Angle(castHit2.normal, Vector3.up) > 55f)
+                {
+                    // Leibhoch-Wurf: Steep Stoeckleib ueber dem Fusspfad (Planting-Absatz).
+                    castHitSteep = true;
+                    steepNormal = castHit2.normal;
+                    steepPoint = castHit2.point;
+                }
+                }
+                if (castHitSteep)
+                {
+                    // Steiles Hindernis = neue Kletterfläche: umdrehen und entlanglaufen.
+                    _wallClimbTime = Time.time;
+                    _lastWallPoint = steepPoint;
+                    _lastWallNormal = steepNormal;
+                    Vector3 wallUp = Vector3.RotateTowards(oldUp, steepNormal, alignRate * 3f * dt, 0f).normalized;
+                    transform.rotation = Quaternion.FromToRotation(newUp, wallUp) * transform.rotation;
+                    newUp = wallUp;
+
+                    // Geschwindigkeit entlang der Hindernisfläche umlenken, Betrag behalten.
+                    Vector3 along = Vector3.ProjectOnPlane(_vel, steepNormal);
+                    Vector3 climbDir = along.magnitude < 0.3f * _vel.magnitude
+                        ? Vector3.ProjectOnPlane(oldUp, steepNormal).normalized
+                        : along.normalized;
+                    _vel = climbDir * _vel.magnitude;
+
+                    adhesionPoint = steepPoint;
+                    adhesionNormal = steepNormal;
                 }
             }
 
