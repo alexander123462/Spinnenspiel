@@ -343,17 +343,45 @@ namespace Spinnenspiel.Tests
             if (spiderGo != null)
             {
                 Vector3 s = spiderGo.transform.position;
-                main.transform.position = s + new Vector3(0.25f, 0.18f, -0.35f);
-                main.transform.LookAt(s + new Vector3(0f, 0.05f, 0f));
+                // G2 Schritt 0: an Closeup-Kamera freestanding, ~2 m ueber dem Terrain an der
+                // Spinnenposition, Blick waagrecht mit ca. 10 Grad nach oben, Near-Plane 0.3.
+                // BUT die Bewurld-Canopa dicht und niedrig -> 2 m still in Belaep. So Measure
+                // the highest nearby tree top (renderer bounds.max.y) and place the cam ABOVE
+                // the canopy so it sees sky (per [!] diagnosis).
+                float canopyTop = 0f;
+                // Renderers live on the child nodes "TreeLOD0"/"TreeLOD1" of each "PH-Tree".
+                foreach (var tr in GameObject.FindObjectsOfType<UnityEngine.MeshRenderer>())
+                {
+                    var tn = tr.gameObject.name;
+                    if (tn != "TreeLOD0" && tn != "TreeLOD1") continue;
+                    var b = tr.bounds;
+                    if ((new Vector3(b.center.x - s.x, 0f, b.center.z - s.z)).sqrMagnitude < 12f * 12f)
+                        canopyTop = Mathf.Max(canopyTop, b.max.y);
+                }
+                float camY = (canopyTop > 0f) ? canopyTop + 0.8f : s.y + 2f;
+                main.transform.position = new Vector3(s.x, camY, s.z);
+                main.nearClipPlane = 0.3f;
+                var fwd = (new Vector3(0.6f, 0f, -0.9f)).normalized;
+                fwd = Vector3.RotateTowards(fwd, Vector3.up, 0.1745f, 0f); // ~10 Grad nach oben
+                main.transform.rotation = Quaternion.LookRotation(fwd);
+
+                float skyFrac = SkyFractionUpperHalf(main, 8f);
+
+                var rt2 = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32);
+                rt2.antiAliasing = 4;
+                rt2.Create();
+                main.targetTexture = rt2;
+                if (veg != null) veg.RenderForCamera(main);
+                SaveFrame(main, rt2, 1280, 720, "Logs/ci/urwald_spinne.png");
+                main.targetTexture = null;
+                Object.DestroyImmediate(rt2);
+
+                Debug.Log("[G2-Sky] Himmelanteil obere Haelfte: " + skyFrac.ToString("P1")
+                    + " -> Kriterium >= 15% -> " + (skyFrac >= 0.15f ? "OK" : "NOK"));
+                Assert.GreaterOrEqual(skyFrac, 0.15f,
+                    "G2 Schritt 0: Kamera sieht kein Himmel (Himmelanteil obere Haelfte "
+                    + skyFrac.ToString("P1") + " < 0.15) -> Messung wertlos.");
             }
-            var rt2 = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32);
-            rt2.antiAliasing = 4;
-            rt2.Create();
-            main.targetTexture = rt2;
-            if (veg != null) veg.RenderForCamera(main);
-            SaveFrame(main, rt2, 1280, 720, "Logs/ci/urwald_spinne.png");
-            main.targetTexture = null;
-            Object.DestroyImmediate(rt2);
         }
 
         [UnityTest]
@@ -482,6 +510,34 @@ namespace Spinnenspiel.Tests
             float anteil = (float)treffer / gesamt;
             Debug.Log("[Urwald] Netzplätze: " + anteil.ToString("P0"));
             Assert.GreaterOrEqual(anteil, 0.5f, "Nur " + anteil.ToString("P0") + " Netzplätze");
+        }
+
+        /// <summary>
+        /// G2 Schritt 0: Anteil der Viewport-Pixel in der OBEREN Bildhaelfte, die zum Himmel
+        /// gehoeren. Raycast per Pixel in die Frustum; nohit within maxDist = Himmel.
+        /// maxDist kurza enough, dass dicht Bewuchs im Umkreis nicht zae; Weitenzweigs
+        /// (offene Himmel) nohit -> Himmel. Return 0..1.
+        /// </summary>
+        private static float SkyFractionUpperHalf(Camera cam, float maxDist)
+        {
+            const int cols = 24, rows = 12;
+            int sky = 0, total = 0;
+            Vector3 origin = cam.transform.position;
+            for (int i = 0; i <= cols; i++)
+            {
+                float fx = (float)i / cols;
+                for (int j = rows; j <= 2 * rows; j++) // obere half: v 0.5..1.0
+                {
+                    float fy = 0.5f + 0.5f * (float)(j - rows) / rows;
+                    Vector3 target = cam.ViewportToWorldPoint(new Vector3(fx, fy, maxDist));
+                    Vector3 dir = target - origin;
+                    if (dir.sqrMagnitude < 1e-6f) continue;
+                    dir.Normalize();
+                    total++;
+                    if (!Physics.Raycast(origin, dir, maxDist)) sky++;
+                }
+            }
+            return total > 0 ? (float)sky / total : 0f;
         }
 
         /// <summary>Render die Kamera in die RenderTexture und speichert als PNG ab.</summary>
