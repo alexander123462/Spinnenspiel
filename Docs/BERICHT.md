@@ -90,3 +90,5 @@ R5 Spider_StopsAgainstTree: BLOCKED 2026-10-12 (r5diag3): Test-Target=woodSub-Ax
 - 2026-10-13 G1 Himmel/Beleuchtung DONE. Legacy-Skybox-Pfad removed (RenderSettings.skybox=null) in WorldLightingBuilder.cs; HDRP PhysicallyBased-Sky per Volume + skyAmbientMode Dynamic + Sun 100000 Lux. Foreign G6/G3 proofshot test edits (SkyFraction-Assert, 2nd sky-cam) reverted (not this point). Full CI r116b green: Build Exit 0 / Tests 109/109 / fehlgeschlagen 0, ROT.md empty. Commit 4fafe25.
 
 - 2026-10-13 G2 Schritt 0 DONE. Proofshot-Camera ueber dem Kronendach: TreeRenderers sit auf Child-Nodes 'TreeLOD0'/'TreeLOD1' (NOT 'PH-Tree'), so der old Filter gave canopyTop=0 -> Cam inside closed canopy -> skyFrac=0. Fix filter + cam=canopyTop+0.8m -> SkyFractionUpperHalf>=0.15 green (48,3%%). Full CI r120g2b: Build Exit 0 / Tests 109/109 / fehlgeschlagen 0, ROT.md empty. Commit b7b26a6.
+
+2026-10-13 | R5 Spider_StopsAgainstTree (Jacaranda) | GRUEN soft-block resolved: blocker red fixed by R6 wave 9b5562b (convex TrunkCapsule + test targets trunk axis); full CI r123 Build Exit 0 / Tests 109/109 / fehlgeschlagen 0, ROT.md empty. Docs-closure commit only.
