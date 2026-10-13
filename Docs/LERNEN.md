@@ -71,3 +71,9 @@
 - Deterministic scatter: implement Poisson-Disc in plain Python (grid rejection sampling, random.Random(seed)) inside the Blender script instead of Geometry-Nodes; then count/min_dist/patch-bounds are directly measurable from the JSON sidecar for the tests.
 
 - Blender 5.1 removed bpy.ops.file.reset_active; FBX imports land in scene.collections — iterate all collections recursively or use bpy.data.objects, not only scene.collection.objects.
+
+- Joined-per-instance FBX (scatter patches): one Mesh asset per instance with transforms baked into vertices; XZ-position = mesh.bounds.center via LoadAllAssetsAtPath (filter numVertices>0 by subMeshCount>0 — Unity 6 Mesh has no numVertices). Submesh order measured by GetSubMesh(i).indexCount (leaf crown >> stem), never assumed from Blender material order.
+
+- Unity C#: `System` is Unity's global class — fully-qualified stdlib needs System.IO.File / System.Collections.Generic.List / System.String; System.IO.DirectorySeparatorChar and System.Collections.List do NOT exist. SubMeshDescriptor has indexCount, not count.
+
+- HDRP material base color: mat.color = c writes _BaseColor/_Color correctly once HDMaterial.ValidateMaterial ran; verify with grep -A2 on the .mat (r/g/b match Blender tint).

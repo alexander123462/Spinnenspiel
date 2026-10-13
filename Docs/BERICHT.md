@@ -72,3 +72,5 @@ R5 Spider_StopsAgainstTree: BLOCKED 2026-10-12 (r5diag3): Test-Target=woodSub-Ax
 - U2b Screenshots parcours/uebersicht: DONE commit 4284022. ScreenshotTool cams fixed (parcours s+(-0.30,0.30,-0.50) along course z+2.2, uebersicht 9 m in fog range, MSAA=4); WorldTests Course_StructuresExistNearSpawn green (Stone 12/Branch 2/Log+Boulder+Stump je 1). Full CI r104b Build Exit 0, Tests 109/109, fehlgeschlagen 0. Reshoots fresh 07:40; parcours sharp low-angle OK (vision), uebersicht legible with scene-DoF blur (not a smear/whiteout). U2+U2b [x].
 
 - 2026-10-13 U4b/U4.1: scatter.py (deterministic Poisson-Disc, seed 17) executed in Blender -> fern_scatter.fbx + fern_scatter.json, 245 ferns over 8x8 m patch, min_d 0.42. Full CI r106 Build Exit 0 + Tests 109/109 green. Commit d747a8e.
+
+- 2026-10-13 U4b/U4.2: LoadFernScatter in UrwaldSceneBuilder imports fern_scatter.fbx (245 joined per-instance meshes) into JungleAssetLibrary (Mesh[] + XZ-offsets + count + leaf-submesh), builds opaque DoubleSided HDRP mats MAT_FernScatter_Leaf/Stem with Blender tints. Full CI r107d Build Exit 0 + Tests 109/109 green. Commit f21b545.
