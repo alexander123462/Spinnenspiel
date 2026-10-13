@@ -906,7 +906,8 @@ namespace Spinnenspiel
             {
                 Vector3 terrPos = terr.transform.position;
                 groundAtPos = terr.SampleHeight(pos) + terrPos.y;
-                Quaternion rotYq = Quaternion.Euler(0f, rotY, 0f);
+                // Root contract: SampleHeight + 0.15 (VegetationContactTest); planting shift
+                // happens on the CHILDREN below (raycast fix), not here.
                 float rootY = groundAtPos + 0.15f;
                 tree.transform.position = new Vector3(pos.x, rootY, pos.z);
             }
@@ -946,90 +947,25 @@ namespace Spinnenspiel
             mc.sharedMesh = lod0;
             mc.convex = false;
 
-            // Planting fix (runtime): scans are not vertex-readable at runtime, so measure the
-            // trunk-bottom offset via downcasts on the TreeCollider within the TRUNK footprint
-            // and sink the tree until no trunk column floats more than 0.35 m over terrain
-            // (measured in TreesTests: offset/leaning trunks floated 3..6 m, Spider not blocked).
-            if (terr != null && woodSub >= 0)
+            // Planting fix (runtime): measure the TRUE visual bottom from the LOD0 MESH
+            // VERTICES (not renderer bounds, which are stale at creation time; not a
+            // raycast foot, which grabbed crown columns on slopes and off-terrain edges)
+            // and shift the VISUAL+COLLIDER children so the mesh bottom sits 0.03 m BELOW
+            // the terrain sample under the tree root. Root stays at SampleHeight + 0.15
+            // (VegetationContactTest contract). Works for every species incl. jacaranda
+            // (FBX pivot high above wood bottom) and keeps liana crowns consistent.
+            if (terr != null && lod0 != null)
             {
-                Bounds wsb = lod0.GetSubMesh(woodSub).bounds;
-                // WELT-AABB aus ALLEN 8 Eckpunkten: nur die beiden Diagonalecken
-                // (center ∓ extents) zu transformieren liefert bei Y-Rotation KEIN gültiges
-                // min/max (z. B. center (2,0,0), ext (1,1,1), rotY 150°: wl.x > wh.x),
-                // wodurch die Scan-Loops leer liefen und das Einpflanzen übersprungen wurde.
-                Vector3 bc = wsb.center, be = wsb.extents;
-                Vector3 wl = new Vector3(1e30f, 1e30f, 1e30f);
-                Vector3 wh = new Vector3(-1e30f, -1e30f, -1e30f);
-                for (int ci = 0; ci < 8; ci++)
+                // TRUE visual bottom via the MeshCollider's world-space AABB (mc.bounds),
+                // NOT lod0.vertices (PH-FBX isReadable=false -> runtime error spam) and
+                // NOT renderer bounds (stale at creation time, floated 2.5 m unmeasured).
+                float wy0 = mc.bounds.min.y;
+                float centerGround = terr.SampleHeight(tree.transform.position) + terr.transform.position.y;
+                float shift = (centerGround - 0.03f) - wy0;
+                float meshWorldH = lod0.bounds.size.y * scale;
+                if (Mathf.Abs(shift) <= meshWorldH + 5f && shift != 0f)
                 {
-                    Vector3 corner = colNode.transform.TransformPoint(new Vector3(
-                        (ci & 1) == 0 ? bc.x - be.x : bc.x + be.x,
-                        (ci & 2) == 0 ? bc.y - be.y : bc.y + be.y,
-                        (ci & 4) == 0 ? bc.z - be.z : bc.z + be.z));
-                    wl = Vector3.Min(wl, corner);
-                    wh = Vector3.Max(wh, corner);
-                }
-                // PERF: cap the scan to a trunk-centred box. A wide root-plate/flare woodSub
-                // would otherwise span tens of metres -> 1e4 rays/tree (GenSeed 11s, vegCost 45ms).
-                // The trunk foot can sit FAR from the woodSub XZ centre (jacaranda: woodSub is the
-                // leaves submesh, crown-centred, trunk foot offset >3 m) -> a centred box missed it
-                // and the planting shift never ran. Centre the cap on the TRUNK AXIS instead.
-                Vector3 wc = new Vector3(tree.transform.position.x, 0f, tree.transform.position.z);
-                float scanHalf = 3f;
-                float sx0 = Mathf.Max(wl.x, wc.x - scanHalf), sx1 = Mathf.Min(wh.x, wc.x + scanHalf);
-                float sz0 = Mathf.Max(wl.z, wc.z - scanHalf), sz1 = Mathf.Min(wh.z, wc.z + scanHalf);
-                float scanStep = 1f;
-                float rootY0 = tree.transform.position.y;
-                float footOffset = 1e9f;   // lowest trunk point relative to rootY
-                float footGround = -1e9f;
-                // Reusable NonAlloc-Buffer, local to this Tree-Scan (no per-Sample-Allocations)
-                RaycastHit[] scanHits = new RaycastHit[64];
-                for (float x = sx0; x <= sx1; x += scanStep)
-                {
-                    for (float z = sz0; z <= sz1; z += scanStep)
-                    {
-                        var top = new Vector3(x, wh.y + 2f, z);
-                        float rayLen = (wh.y - wl.y) + 6f;
-                        float lowestOwn = 1e9f;
-                        int hitCount = Physics.RaycastNonAlloc(top, Vector3.down, scanHits, rayLen);
-                        if (hitCount >= scanHits.Length)
-                        {
-                            // Buffer filled: fall back to RaycastAll, so the result stays correct
-                            RaycastHit[] hits = Physics.RaycastAll(top, Vector3.down, rayLen);
-                            foreach (var h in hits)
-                                if (h.collider.gameObject == colNode && h.point.y < lowestOwn) lowestOwn = h.point.y;
-                        }
-                        else
-                        {
-                            for (int i = 0; i < hitCount; i++)
-                            {
-                                var h = scanHits[i];
-                                if (h.collider.gameObject == colNode && h.point.y < lowestOwn) lowestOwn = h.point.y;
-                            }
-                        }
-                        if (lowestOwn >= 1e9f) continue; // no geometry in this column
-                        float offset = lowestOwn - rootY0;
-                        if (offset < footOffset)
-                        {
-                            footOffset = offset;
-                            footGround = terr.SampleHeight(new Vector3(x, 0f, z)) + terr.transform.position.y;
-                        }
-                    }
-                }
-                // Planting via woodSub-Bottom (Bounds), not via raycast foot: species whose FBX pivot sits high above the wood bottom (island_tree_03, jacaranda) need the full bounds drop; a small clamp would leave them floating.
-                float newRootY = footGround - 0.03f - wsb.min.y * scale;
-                // Sanity guard: never push a whole crown below ground, never lift more than 3 m.
-                float woodWorldH = (wsb.max.y - wsb.min.y) * scale;
-                if (newRootY != rootY0 && (rootY0 - newRootY) <= woodWorldH + 1f && (newRootY - rootY0) <= 3f)
-                {
-                    // Plant so the woodSub BOTTOM sits ~0.03 m BELOW the terrain under it
-                    // BOTH directions: with a wrong woodSub (branches) the old down-only
-                    // rule sank trees ~9.5 m; now the trunk foot is raised too if needed.
-                    // FIX: shift the VISUAL+COLLIDER CHILDREN, never the tree root: the
-                    // root must stay at SampleHeight + 0.15 (VegetationContactTest contract);
-                    // moving the root broke it deterministically (-3.2..-4.6 m on variants
-                    // whose FBX pivot is not at the trunk base, e.g. jacaranda woodSub min.y=2.2).
-                    float dropLocal = (newRootY - rootY0) / scale; // local units
+                    float dropLocal = shift / scale; // local units
                     lod0Node.transform.localPosition += new Vector3(0f, dropLocal, 0f);
                     colNode.transform.localPosition += new Vector3(0f, dropLocal, 0f);
                     if (lod1Node != null)
