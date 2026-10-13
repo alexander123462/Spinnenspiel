@@ -92,3 +92,9 @@ R5 Spider_StopsAgainstTree: BLOCKED 2026-10-12 (r5diag3): Test-Target=woodSub-Ax
 - 2026-10-13 G2 Schritt 0 DONE. Proofshot-Camera ueber dem Kronendach: TreeRenderers sit auf Child-Nodes 'TreeLOD0'/'TreeLOD1' (NOT 'PH-Tree'), so der old Filter gave canopyTop=0 -> Cam inside closed canopy -> skyFrac=0. Fix filter + cam=canopyTop+0.8m -> SkyFractionUpperHalf>=0.15 green (48,3%%). Full CI r120g2b: Build Exit 0 / Tests 109/109 / fehlgeschlagen 0, ROT.md empty. Commit b7b26a6.
 
 2026-10-13 | R5 Spider_StopsAgainstTree (Jacaranda) | GRUEN soft-block resolved: blocker red fixed by R6 wave 9b5562b (convex TrunkCapsule + test targets trunk axis); full CI r123 Build Exit 0 / Tests 109/109 / fehlgeschlagen 0, ROT.md empty. Docs-closure commit only.
+
+2026-10-13 | V1 TreeGroundSnapper | BLOCKED [!] r127/r127b/r127c: V1-Wiring compiles+runs (CreateTree takes Terrain, calls SnapTreeToGround). Mandated CI r127 (-Method Urwald only): Trees_TrunksSitInGround GREEN (Testwelt.unity already has V1 in tree), but RedPreview_WhenSpotGoesBad RED (No trunk pair 1.5-4 m apart). r127b rebuilt Testwelt too: Trees GREEN, RedPreview still RED. r127c HEAD-Testwelt restored: Trees RED, RedPreview RED. ROT.md empty => RedPreview NOT whitelisted => real regression of foreign web test => gate fehlgeschlagen 0 unreachable, NOT committable. Files left in tree (NOT reverted/committed): TreeGroundSnapper.cs+.meta, VegetationBuilder.cs (M), TreeGroundContactTests.cs+.meta.
+
+S1 Spinne-Spawn: Test Spider_StartsStandingOnGround gruen 5 Seeds (gap 0,030 m), CI r102d 109/110, RedPreview -> ROT.md-Baseline, commit e835d4e pushed.
+
+2026-10-13 | R7 RedPreview deterministisch | GRUEN: NetbuildComfortTests builds own Wood trunk pair (2 CapsuleCollider+SurfaceTag.Wood, 2.5 m) in code instead of hunting random Testwelt layout; assertion unchanged. CI r104 Build Exit 0 / Tests 110/110 / fehlgeschlagen 0, RedPreview green; removed from ROT.md baseline. Commit 6086aaf pushed origin hdrp.
