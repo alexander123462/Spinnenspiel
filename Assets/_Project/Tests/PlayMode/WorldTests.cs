@@ -77,6 +77,49 @@ namespace Spinnenspiel.Tests
             PlayerPrefs.DeleteKey("MouseSensitivity");
         }
 
+        // U2: the parcours/uebersicht control shots need real course structures near the spawn.
+        // Count by GameObject name (EnvironmentBuilder names them Stone/Branch/Log/Boulder/Stump).
+        [UnityTest]
+        public IEnumerator Course_StructuresExistNearSpawn()
+        {
+            yield return LoadWorld();
+            GameObject spider = LoadedSpider();
+            Vector3 s = spider.transform.position;
+
+            int[] counts = new int[5]; // 0 Stone, 1 Branch, 2 Log, 3 Boulder, 4 Stump
+            foreach (GameObject go in SceneManager.GetActiveScene().GetRootGameObjects())
+            {
+                CountCourse(go.transform, s, counts);
+            }
+            Debug.Log($"[Spinnenspiel] Course near spawn: Stone {counts[0]}, Branch {counts[1]}, Log {counts[2]}, Boulder {counts[3]}, Stump {counts[4]}");
+            Assert.GreaterOrEqual(counts[0], 10, "Need >=10 Stone within 6 m of spawn for the parcours shot.");
+            Assert.GreaterOrEqual(counts[1], 2, "Need >=2 Branch within 6 m of spawn.");
+            Assert.GreaterOrEqual(counts[2] + counts[3] + counts[4], 1, "Need at least one Log/Boulder/Stump within 6 m of spawn.");
+        }
+
+        private static void CountCourse(Transform t, Vector3 s, int[] counts)
+        {
+            switch (t.name)
+            {
+                case "Stone":
+                case "Branch":
+                case "Log":
+                case "Boulder":
+                case "Stump":
+                    float dx = t.position.x - s.x;
+                    float dz = t.position.z - s.z;
+                    if (dx * dx + dz * dz <= 36f) // 6 m radius in XZ
+                    {
+                        counts[t.name == "Stone" ? 0 : t.name == "Branch" ? 1 : t.name == "Log" ? 2 : t.name == "Boulder" ? 3 : 4]++;
+                    }
+                    break;
+            }
+            for (int i = 0; i < t.childCount; i++)
+            {
+                CountCourse(t.GetChild(i), s, counts);
+            }
+        }
+
         private static IEnumerator LoadWorld()
         {
             SceneManager.LoadScene(SceneName);

@@ -50,8 +50,10 @@ namespace Spinnenspiel.EditorTools
             {
                 new View("spinne_nah", s + new Vector3(0.25f, 0.18f, -0.35f), s + new Vector3(0f, 0.05f, 0f)),
                 new View("spielkamera", s + new Vector3(0f, 0.38f, -0.95f), s + new Vector3(0f, 0.12f, 0.4f)),
-                new View("parcours", s + new Vector3(-1.2f, 0.9f, -0.6f), s + new Vector3(0.3f, 0f, 2.5f)),
-                new View("uebersicht", new Vector3(20f, 14f, 4f), new Vector3(34f, 3f, 34f)),
+                // U2: Hindernisse are only 5-30 cm tall -> cam sits ~0.3 m up and looks along the course (z+0.9..4.6).
+                new View("parcours", s + new Vector3(-0.30f, 0.30f, -0.50f), s + new Vector3(0.1f, 0.08f, 2.2f)),
+                // Fog is Exp2 density 0.022 -> uebersicht cam must stay within ~20 m of its target; 9 m height.
+                new View("uebersicht", s + new Vector3(-10f, 9f, -10f), s + new Vector3(0f, 0.2f, 2f)),
                 new View("bach", stream + new Vector3(-2.5f, 0.8f, -2.2f), stream),
                 new View("wald", new Vector3(30f, 5.5f, 44f), new Vector3(38f, 4.5f, 56f))
             };
@@ -62,6 +64,7 @@ namespace Spinnenspiel.EditorTools
 
             // HDR RT: cam.Render() skips HDRP post-processing, so ACES tonemap is applied manually.
             RenderTexture target = new RenderTexture(1600, 900, 0, RenderTextureFormat.ARGBHalf);
+            target.antiAliasing = 4; // U2: MSAA fixes jagged edges in the control shots
             Texture2D image = new Texture2D(1600, 900, TextureFormat.RGB24, false);
             Texture2D hdrTex = new Texture2D(1600, 900, TextureFormat.RGBAHalf, false);
             foreach (View view in views)
@@ -201,6 +204,7 @@ namespace Spinnenspiel.EditorTools
 
             // HDR RT: cam.Render() skips HDRP post-processing, so ACES tonemap is applied manually.
             RenderTexture target = new RenderTexture(1600, 900, 0, RenderTextureFormat.ARGBHalf);
+            target.antiAliasing = 4; // U2: MSAA fixes jagged edges in the control shots
             Texture2D image = new Texture2D(1600, 900, TextureFormat.RGB24, false);
             Texture2D hdrTex = new Texture2D(1600, 900, TextureFormat.RGBAHalf, false);
             foreach (View view in views)
