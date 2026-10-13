@@ -93,7 +93,9 @@ namespace Spinnenspiel.EditorTools
 
             var env = profile.Add<VisualEnvironment>(true); env.skyType.Override((int)SkyType.PhysicallyBased);
             profile.Add<PhysicallyBasedSky>(true);
-            var fog = profile.Add<Fog>(true); fog.enabled.Override(true); fog.meanFreePath.Override(60f); fog.maximumHeight.Override(25f); fog.enableVolumetricFog.Override(true); fog.albedo.Override(new Color(0.75f, 0.82f, 0.75f));
+            // U1: VolumetricFog AUS - der Nebel dies Dunnelesier vor allem Nahaufnahmen (Nahkampfschaerfe)
+            // und macht die Kontrast (luma-StDev) in den Abnahaengemeter laeuermisstaen fall.
+            var fog = profile.Add<Fog>(true); fog.enabled.Override(true); fog.meanFreePath.Override(60f); fog.maximumHeight.Override(25f); fog.enableVolumetricFog.Override(false); fog.albedo.Override(new Color(0.75f, 0.82f, 0.75f));
             var exp = profile.Add<Exposure>(true); exp.mode.Override(ExposureMode.AutomaticHistogram); exp.limitMin.Override(6f); exp.limitMax.Override(15f);
             var tm = profile.Add<Tonemapping>(true); tm.mode.Override(TonemappingMode.ACES);
             var bloom = profile.Add<Bloom>(true); bloom.intensity.Override(0.15f);

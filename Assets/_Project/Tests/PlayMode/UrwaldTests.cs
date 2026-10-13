@@ -501,5 +501,71 @@ namespace Spinnenspiel.Tests
             for (int i = 0; i < 60; i++) yield return null; // let Start() create the sources
             Assert.True(amb.IsRunning, "Ambience-Drone/Sump-Source not running.");
         }
+
+        /// <summary>
+        /// U1 Nahkampfschaerfe: mit VolumetricFog AUS (WorldLightingBuilder) die Nahaufnahme
+        /// der Spinne hat echte Kontrast. Reihenfolge: ERST aufnehmen, DANN messen, DANN asserten.
+        /// Kriterium: Luminanz-StDeviation >= 30 (r101c: mean 58.0, stdev 30.8).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Urwald_Nahkampfscharf()
+        {
+            JungleWorldGenerator.NextSeed = 4242;
+            SceneManager.LoadScene("Urwald");
+            yield return null;
+            yield return WaitReady();
+            Assert.IsNotNull(readyGen, "Welt (Seed 4242) nicht fertig.");
+
+            var cycle = Object.FindFirstObjectByType<DayNightCycle>();
+            if (cycle != null) cycle.SetDayProgress(0.45f); // Vormittag-Light
+            yield return null;
+
+            Camera main = Camera.main;
+            Assert.IsNotNull(main, "Hauptkamera nicht gefunden.");
+            var spiderGo = GameObject.Find("Spider");
+            Assert.IsNotNull(spiderGo, "Spider-GameObject nicht gefunden.");
+            Vector3 s = spiderGo.transform.position;
+            main.transform.position = s + new Vector3(0.25f, 0.18f, -0.35f);
+            main.transform.LookAt(s + new Vector3(0f, 0.05f, 0f));
+
+            var rt = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32);
+            rt.antiAliasing = 4;
+            rt.Create();
+            main.targetTexture = rt;
+            VegetationSystem veg = Object.FindFirstObjectByType<VegetationSystem>();
+            if (veg != null) veg.RenderForCamera(main);
+            main.Render();
+
+            // ERST: PNG-Datei written BEFORE any assert (G6-Lehre).
+            RenderTexture.active = rt;
+            var tex = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
+            tex.Apply(false);
+            System.IO.File.WriteAllBytes("Logs/ci/urwald_nahkamp.png", tex.EncodeToPNG());
+
+            // DANN: Luminanz mean/StDev ueber alle Pixel.
+            Color[] px = tex.GetPixels();
+            Object.DestroyImmediate(tex);
+            RenderTexture.active = null;
+            main.targetTexture = null;
+            Object.DestroyImmediate(rt);
+
+            double sum = 0.0, sumSq = 0.0;
+            foreach (var c in px)
+            {
+                float luma = 0.299f * c.r + 0.587f * c.g + 0.114f * c.b;
+                sum += luma;
+                sumSq += (double)luma * luma;
+            }
+            int n = px.Length;
+            double mean = sum / n;
+            double variance = sumSq / n - mean * mean;
+            double stdev = (variance > 0.0 ? (double) Mathf.Sqrt((float) variance) : 0.0) * 255.0;
+            Debug.Log("[U1-Nahcam] mean=" + mean.ToString("F1") + " stdev=" + stdev.ToString("F1"));
+
+            // DANN: asserten.
+            Assert.GreaterOrEqual(stdev, 30.0,
+                "Nahaufnahme kontrast (Luma-StDev) " + stdev.ToString("F1") + " < 30 – Nebel/VolumetricFog dies Dunnelesiert?");
+        }
     }
 }
