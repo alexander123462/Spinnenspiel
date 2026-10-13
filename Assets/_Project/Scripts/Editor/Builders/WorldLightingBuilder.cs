@@ -13,6 +13,8 @@ namespace Spinnenspiel.EditorTools
     {
         private const string Folder = AssetUtil.GeneratedRoot + "/Lighting";
 
+        private static float G6_FIXED_EV = 6f; // Fixed-Exposure EV (HDRP: hoeher = dunkler; r117 EV=-1 -> Mittel 255 blendout)
+
         public static Light Build()
         {
             GameObject sunObject = new GameObject("Sun");
@@ -36,23 +38,9 @@ namespace Spinnenspiel.EditorTools
                 // siehe ScanSky.SunRotation.
                 sunObject.transform.rotation = ScanSky.SunRotation;
 
-                Shader panoramic = Shader.Find("Skybox/Panoramic");
-                if (panoramic != null)
-                {
-                    Material sky = new Material(panoramic);
-                    sky.SetTexture("_MainTex", hdri);
-                    sky.SetFloat("_Mapping", 1f); // Latitude-Longitude (Equirect)
-                    sky.SetFloat("_ImageType", 0f);
-                    sky.SetFloat("_Exposure", 1f);
-                    RenderSettings.skybox = AssetUtil.ReplaceAsset(sky, Folder + "/MAT_Sky.mat");
-                }
-                else
-                {
-                    Debug.LogWarning("[Spinnenspiel] Shader Skybox/Panoramic nicht gefunden – Skybox bleibt leer.");
-                }
-
-                RenderSettings.ambientMode = AmbientMode.Skybox;
-                RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox;
+                // G6/G1: kein Legacy-Skybox mehr (Built-In-Shaders magenta in HDRP).
+                // HDRP rendert den PhysicallyBased-Sky per Volume (CreateVolume), skybox leer.
+                RenderSettings.skybox = null;
             }
             else
             {
@@ -91,12 +79,12 @@ namespace Spinnenspiel.EditorTools
             VolumeProfile profile = ScriptableObject.CreateInstance<VolumeProfile>();
             AssetUtil.ReplaceAsset(profile, Folder + "/Testwelt_VolumeProfile.asset");
 
-            var env = profile.Add<VisualEnvironment>(true); env.skyType.Override((int)SkyType.PhysicallyBased);
+            var env = profile.Add<VisualEnvironment>(true); env.skyType.Override((int)SkyType.PhysicallyBased); env.skyAmbientMode.Override(SkyAmbientMode.Dynamic);
             profile.Add<PhysicallyBasedSky>(true);
             // U1: VolumetricFog AUS - der Nebel dies Dunnelesier vor allem Nahaufnahmen (Nahkampfschaerfe)
             // und macht die Kontrast (luma-StDev) in den Abnahaengemeter laeuermisstaen fall.
             var fog = profile.Add<Fog>(true); fog.enabled.Override(true); fog.meanFreePath.Override(60f); fog.maximumHeight.Override(25f); fog.enableVolumetricFog.Override(false); fog.albedo.Override(new Color(0.75f, 0.82f, 0.75f));
-            var exp = profile.Add<Exposure>(true); exp.mode.Override(ExposureMode.AutomaticHistogram); exp.limitMin.Override(6f); exp.limitMax.Override(15f);
+            var exp = profile.Add<Exposure>(true); exp.mode.Override(ExposureMode.AutomaticHistogram); exp.limitMin.Override(0f); exp.limitMax.Override(15f);
             var tm = profile.Add<Tonemapping>(true); tm.mode.Override(TonemappingMode.ACES);
             var bloom = profile.Add<Bloom>(true); bloom.intensity.Override(0.15f);
             var ca = profile.Add<ColorAdjustments>(true); ca.saturation.Override(10f);
