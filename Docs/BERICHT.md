@@ -80,3 +80,9 @@ R5 Spider_StopsAgainstTree: BLOCKED 2026-10-12 (r5diag3): Test-Target=woodSub-Ax
 - 2026-10-13 U4b/U4.4: Farn-Scatter per Instance ein thin CapsuleCollider (Plants-Layer, direction=Y) in JungleWorldGenerator -> climbable/anchorable like AddPlant; UrwaldTests asserts CapsuleCollider-Anzahl == FernScatterCount. Near-spawn-count skipped (0 scatter within 12m of spawn is correct: Scatter-Tiling keeps a 3m spawn-free zone + Density-gate). Full CI r109 Build Exit 0 + Tests 109/109 green. Commit b324a9c.
 
 - 2026-10-13 U4b/U4.5: Farn-Scatter DONE. U4.1-U4.4 already committed (d747a8e/f21b545/a1409bd/b324a9c). U4.5 = vollen CI r110 green (Build Exit 0 / Tests 109/109 / fehlgeschlagen 0, ROT.md empty) + Docs-closure. U4 und U4b auf [x].
+
+- 2026-10-13 U3b: Grundfarne in Unity DONE. LoadGroundFerns loads 5 Blender fern_1..5.fbx (largest-area mesh, FBX merges Stem+Leaf into ONE submesh), opaque single leaf-mat; JungleWorldGenerator places 61 under separate 'Grundfarne'-root + own capsule colliders NOT counted in PlantColliderCount -> Unterholz-collider assert green. CI r112 Build Exit 0 / Tests 109/109 / fehlgeschlagen 0, ROT.md empty. Commit 21c76c6.
+
+- 2026-10-13 U3b: Grundfarne in Unity DONE. LoadGroundFerns loads 5 Blender fern_1..5.fbx (largest-area mesh, FBX merges Stem+Leaf into ONE submesh), opaque single leaf-mat; JungleWorldGenerator places 61 under separate 'Grundfarne'-root + own capsule colliders NOT counted in PlantColliderCount -> Unterholz-collider assert green. CI r112 Build Exit 0 / Tests 109/109 / fehlgeschlagen 0, ROT.md empty. Commit 21c76c6.
+
+- 2026-10-13 U3: Grundfarne in Unity DONE (soft-block resolved). Grundfarne assets fern_1..5.fbx + MAT_Grundfarn_Leaf committed; import code shipped earlier in U3b 21c76c6. Full CI r113 green (Build Exit 0 / Tests 109/109 / fehlgeschlagen 0, ROT.md empty); the 4 prior reds killed by R6 wave. Commit bd61620.
