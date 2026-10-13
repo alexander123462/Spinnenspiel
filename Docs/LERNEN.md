@@ -77,3 +77,9 @@
 - Unity C#: `System` is Unity's global class — fully-qualified stdlib needs System.IO.File / System.Collections.Generic.List / System.String; System.IO.DirectorySeparatorChar and System.Collections.List do NOT exist. SubMeshDescriptor has indexCount, not count.
 
 - HDRP material base color: mat.color = c writes _BaseColor/_Color correctly once HDMaterial.ValidateMaterial ran; verify with grep -A2 on the .mat (r/g/b match Blender tint).
+
+
+- C# foreach: cannot modify members of the iteration variable (CS1654, e.g. 'foreach (Vector3 p in list) p.x -= ...'). Use an index-loop and write back: 'for i { Vector3 q=list[i]; q.x-=...; list[i]=q; }'.
+
+
+- Scatter-Patch tiling: bake XZ-offsets centred around the patch centre (subtract bounds-center of all instances) so the runtime can add them to an arbitrary anchor; measure patch side = max(extents.x,extents.z) into a Library field (fernScatterPatchSize), not a magic number in placement code.

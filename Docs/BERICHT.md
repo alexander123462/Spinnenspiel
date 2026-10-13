@@ -74,3 +74,5 @@ R5 Spider_StopsAgainstTree: BLOCKED 2026-10-12 (r5diag3): Test-Target=woodSub-Ax
 - 2026-10-13 U4b/U4.1: scatter.py (deterministic Poisson-Disc, seed 17) executed in Blender -> fern_scatter.fbx + fern_scatter.json, 245 ferns over 8x8 m patch, min_d 0.42. Full CI r106 Build Exit 0 + Tests 109/109 green. Commit d747a8e.
 
 - 2026-10-13 U4b/U4.2: LoadFernScatter in UrwaldSceneBuilder imports fern_scatter.fbx (245 joined per-instance meshes) into JungleAssetLibrary (Mesh[] + XZ-offsets + count + leaf-submesh), builds opaque DoubleSided HDRP mats MAT_FernScatter_Leaf/Stem with Blender tints. Full CI r107d Build Exit 0 + Tests 109/109 green. Commit f21b545.
+
+- 2026-10-13 U4b/U4.3: Farn-Scatter tilett in JungleWorldGenerator (Patch-Anchor per 24m-Cell, Density-gate, Dry+above-water+3m Spawn-free; per Instance XZ=Library-offsets centred in LoadFernScatter, Y=terrain.SampleHeight-0.02). FernScatterCount/fernScatterPatchSize neu; UrwaldTests asserts count==MeshRenderer-Anzahl + SampleHeight-snap. 1470 Instances placed. Full CI r108b Build Exit 0 + Tests 109/109 green. Commit a1409bd.
