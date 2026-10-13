@@ -65,3 +65,9 @@
 - Unity C# math: use Mathf.Sqrt/Mathf.Max (UnityEngine.Math is not the C# stdlib Math). For doubles, Math.Sqrt exists but is fragile in HDRP asmdef context — prefer (float) casts with Mathf.* so it compiles clean in batch CI.
 - Unity Scene-Enumeration in PlayMode: SceneManager.GetActiveScene().GetRootGameObjects() — es KEEIN SceneManager.GetRootGameObjects(); GetRootGameObjects() lives on the returned Scene object, not on SceneManager.
 - Testify Assertions: Assert.GreaterOrEqual(actual, expected, msg) exists; there is NO Assert.AtLeast. Use GreaterOrEqual/Greater/LessOrEqual for count-criteria.
+
+- FBX-Export of Blender clones: src.copy() shares Mesh-Data -> the FBX exporter emits material-index warnings and Unity gets wrong submesh mats. Fix: cp.data = bpy.data.meshes.new_from_object(src) for a fresh unique mesh per clone; then 0 warnings in the run log.
+
+- Deterministic scatter: implement Poisson-Disc in plain Python (grid rejection sampling, random.Random(seed)) inside the Blender script instead of Geometry-Nodes; then count/min_dist/patch-bounds are directly measurable from the JSON sidecar for the tests.
+
+- Blender 5.1 removed bpy.ops.file.reset_active; FBX imports land in scene.collections — iterate all collections recursively or use bpy.data.objects, not only scene.collection.objects.
