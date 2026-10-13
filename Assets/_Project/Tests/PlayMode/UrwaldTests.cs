@@ -111,6 +111,37 @@ namespace Spinnenspiel.Tests
             _lastMeanCpuMs = sumCpuMs / measured;
         }
 
+        // S1: Spinne must stand ON the terrain at spawn, not inside it.
+        // Logs the four measured values from the backlog (spider center Y, terrain height
+        // at spider XZ, collider bottom Y, whether a Terrain is loaded) for several seeds.
+        [UnityTest]
+        public IEnumerator Spider_StartsStandingOnGround()
+        {
+            int[] seeds = { 7, 1234, 4242, 99, 5 };
+            foreach (int seed in seeds)
+            {
+                JungleWorldGenerator.NextSeed = seed;
+                SceneManager.LoadScene("Urwald");
+                yield return WaitReady();
+
+                var mv = Object.FindFirstObjectByType<SpiderMovement>();
+                Assert.IsNotNull(mv, $"Seed {seed}: SpiderMovement missing after load.");
+                Collider bodyCollider = mv.GetComponent<Collider>();
+                Assert.IsNotNull(bodyCollider, $"Seed {seed}: Spider body collider missing.");
+                Terrain terr = Terrain.activeTerrain;
+                Assert.IsNotNull(terr, $"Seed {seed}: no Terrain loaded at spawn time.");
+
+                Vector3 pos = mv.transform.position;
+                float terrainY = terr.SampleHeight(pos) + terr.transform.position.y;
+                float bottomY = bodyCollider.bounds.min.y;
+                float gap = bottomY - terrainY;
+                Debug.Log($"[S1] seed={seed} spiderY={pos.y:F3} terrainY={terrainY:F3} colliderBottomY={bottomY:F3} gap={gap:F3}");
+
+                Assert.GreaterOrEqual(gap, -0.02f, $"Seed {seed}: spider sunk {-gap:F3} m into the terrain.");
+                Assert.LessOrEqual(gap, 0.10f, $"Seed {seed}: spider floats {gap:F3} m above the terrain.");
+            }
+        }
+
         [UnityTest]
         public IEnumerator Performance_MeanFrameTimeUnderBudget()
         {
