@@ -260,6 +260,19 @@ namespace Spinnenspiel.Tests
                     "Farn-Scatter CapsuleCollider-Anzahl weicht von FernScatterCount ab.");
             }
 
+            // U3b: Grundfarne (Blender fern_1..5.fbx) in separate root 'Grundfarne', own capsule colliders.
+            if (gen.GroundFernCount > 0)
+            {
+                GameObject grundfarneGrp = GameObject.Find("Grundfarne");
+                Assert.IsNotNull(grundfarneGrp, "Grundfarne-Gruppe missing despite GroundFernCount > 0.");
+                var gfMeshes = grundfarneGrp.GetComponentsInChildren<MeshRenderer>();
+                Assert.AreEqual(gen.GroundFernCount, gfMeshes.Length,
+                    "Grundfarn Instance-Anzahl weicht von GroundFernCount ab.");
+                var gfCaps = grundfarneGrp.GetComponentsInChildren<CapsuleCollider>();
+                Assert.AreEqual(gen.GroundFernCount, gfCaps.Length,
+                    "Grundfarn CapsuleCollider-Anzahl weicht von GroundFernCount ab.");
+            }
+
             Assert.IsNotNull(Object.FindFirstObjectByType<TerrainCollider>(),
                 "Terrain mit TerrainCollider nicht gefunden.");
 

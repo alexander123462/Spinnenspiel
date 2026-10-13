@@ -31,6 +31,13 @@ namespace Spinnenspiel
         public Material treeFernLeafMat;
         public Material treeFernStemMat;
 
+        // Grundfarn (Blender fern_1..5.fbx, 5 Varianten): each FBX = 1 Mesh with 2 submeshes
+        // (0 = Stem, 1 = Leaf, order measured). Ground fern is real geometry -> OPAQUE, no Cutout.
+        public Mesh[] groundFerns;
+        public Material groundFernLeafMat;
+        public Material groundFernStemMat;
+        public int groundFernLeafSubmesh;
+
         /// <summary>Scan-Bodendecker (Gras/Kraut), gleiche Länge und Reihenfolge wie die Materialien.</summary>
         public Mesh[] groundCover;
         public Material[] groundCoverMats;

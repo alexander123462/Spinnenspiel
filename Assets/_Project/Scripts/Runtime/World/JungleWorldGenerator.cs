@@ -34,6 +34,7 @@ namespace Spinnenspiel
         public int TreeFernCount { get; private set; }
         public int FernScatterCount { get; private set; }
         public int GroundCoverCount { get; private set; }
+        public int GroundFernCount { get; private set; }
         public int PlantColliderCount { get; private set; }
         public int LianaCount { get; private set; }
         public int DebrisCount { get; private set; }
@@ -315,6 +316,40 @@ namespace Spinnenspiel
                 StaticBatchingUtility.Combine(fernScatter);
                 FernScatterCount = scatterN;
                 UnityEngine.Debug.Log("[Jungle] Farn-Scatter: " + scatterN + " Instances placed (Y=SampleHeight)");
+            }
+
+            // 6c) Grundfarne (U3b): Blender fern_1..5.fbx, 5 Varianten, je 2 Submeshes (Stem+Leaf).
+            // Separate root 'Grundfarne' (like Baumfarne/Farn-Scatter), own GroundFernCount.
+            // Capsule-Collider per Farn (Plants-Layer, climbable/anchorable) but NOT counted in
+            // PlantColliderCount -> keeps the Unterholz-collider assert consistent (Fix-Naechste b).
+            if (library.groundFerns != null && library.groundFernLeafMat != null)
+            {
+                GameObject grundfarne = new GameObject("Grundfarne");
+                int gfN = 0;
+                const int gfMax = 160;
+                int gcells = Mathf.FloorToInt(size / 6f);
+                for (int i = 0; i < gcells && gfN < gfMax; i++)
+                {
+                    for (int j = 0; j < gcells && gfN < gfMax; j++)
+                    {
+                        float x = 3f + i * 6f + (World.Hash01(i, j, 201) - 0.5f) * 3f;
+                        float z = 3f + j * 6f + (World.Hash01(i, j, 202) - 0.5f) * 3f;
+                        if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
+                        if (NearSpawn(x, z, 1.2f)) continue;
+                        if (!IsDryFlat(World, x, z)) continue;
+                        if (World.Hash01(i, j, 203) >= World.Density(x, z) * 0.45f) continue;
+                        int variant = Mathf.FloorToInt(World.Hash01(i, j, 204) * (float)library.groundFerns.Length);
+                        if (variant < 0 || variant >= library.groundFerns.Length) continue;
+                        if (library.groundFerns[variant] == null) continue;
+                        float rot = World.Hash01(i, j, 205) * 360f;
+                        float scale = 0.7f + World.Hash01(i, j, 206) * 0.6f;
+                        AddGroundFern(grundfarne.transform, library.groundFerns[variant],
+                            new Vector3(x, World.Height(x, z) - 0.03f, z), rot, scale);
+                        gfN++;
+                    }
+                }
+                GroundFernCount = gfN;
+                UnityEngine.Debug.Log("[Jungle] Grundfarne: " + gfN + " (separate root, own capsule colliders)");
             }
 
             // 6b) Bodendecker: Scan-Gras/Kraut als reine Optik (keine Collider), dicht über dem Boden.
@@ -753,6 +788,31 @@ namespace Spinnenspiel
             foreach (Vector3 q in pos)
                 if ((q - p).sqrMagnitude < d2) return true;
             return false;
+        }
+
+        /// <summary>Grundfarn (U3b): 2 Submeshes per Mesh (Stem + Leaf), order = groundFernLeafSubmesh.
+        /// Real geometry -> opaque mats. Thin CapsuleCollider (Plants-Layer) so the spider can climb/anchor,
+        /// but NOT counted in PlantColliderCount (separate 'Grundfarne' root).</summary>
+        private void AddGroundFern(Transform parent, Mesh mesh, Vector3 pos, float rotY, float scale)
+        {
+            GameObject g = new GameObject();
+            g.transform.SetParent(parent, false);
+            g.transform.position = pos;
+            g.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
+            g.transform.localScale = Vector3.one * scale;
+            g.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var r = g.AddComponent<MeshRenderer>();
+            r.sharedMaterials = new Material[] { library.groundFernLeafMat };
+
+            Bounds b = mesh.bounds;
+            GameObject c = new GameObject("GrundfarnCollider");
+            c.transform.SetParent(g.transform, false);
+            c.layer = GameLayers.Plants;
+            var cc = c.AddComponent<CapsuleCollider>();
+            cc.direction = 1; // Y-Achse
+            cc.height = b.size.y * scale;
+            cc.radius = Mathf.Clamp(0.25f * Mathf.Min(b.size.x, b.size.z) * scale, 0.02f, 0.14f);
+            c.transform.position = g.transform.TransformPoint(b.center);
         }
 
         /// <summary>

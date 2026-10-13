@@ -71,6 +71,9 @@ namespace Spinnenspiel.EditorTools
             // U4: Farn-Scatter-Patch (Blender scatter.py, 245 Instances per 8x8 m Patch).
             LoadFernScatter(lib);
 
+            // U3b: Grundfarne (Blender fern_1..5.fbx, 5 Varianten) in die Library.
+            LoadGroundFerns(lib);
+
             // Bodendecker (Scan-Gras/Kraut): nur Optik, keine Collider; um die Spinne herum.
             LoadGroundCover(lib);
 
@@ -502,6 +505,74 @@ namespace Spinnenspiel.EditorTools
 
             Debug.Log("[Urwald] Fern-Scatter: " + lib.fernScatterCount + " Instances, leaf-submesh "
                 + lib.fernScatterLeafSubmesh + " (idx0 " + idx0 + ", idx1 " + idx1 + ")");
+        }
+
+        /// <summary>U3b: Grundfarne (Blender fern_1..5.fbx) — 5 Varianten, je 1 Mesh. Der FBX-Importer
+        /// merges Stem+Leaf into ONE submesh, so we take the largest-area mesh and paint it with one
+        /// opaque leaf material (real geometry -> no Cutout). Fills lib.groundFerns / groundFernLeafMat.</summary>
+        private static void LoadGroundFerns(JungleAssetLibrary lib)
+        {
+            const string artFolder = "Assets/_Project/Art/Plants/UrwaldTestFern/";
+            const string srcFolder = "ArtSource/UrwaldTest/fern/";
+            Shader hdrpLit = Shader.Find("HDRP/Lit");
+            if (hdrpLit == null)
+                throw new System.InvalidOperationException("[Urwald] Shader nicht gefunden: HDRP/Lit");
+
+            var meshes = new System.Collections.Generic.List<Mesh>();
+            for (int v = 1; v <= 5; v++)
+            {
+                string artPath = artFolder + "fern_" + v + ".fbx";
+                if (!System.IO.File.Exists(artPath))
+                {
+                    string src = srcFolder + "fern_" + v + ".fbx";
+                    if (System.IO.File.Exists(src))
+                    {
+                        AssetUtil.EnsureFolder("Assets/_Project/Art/Plants/UrwaldTestFern");
+                        System.IO.File.Copy(src, artPath, true);
+                        AssetDatabase.ImportAsset(artPath, ImportAssetOptions.ForceUpdate);
+                    }
+                }
+                if (!System.IO.File.Exists(artPath))
+                {
+                    Debug.LogWarning("[Urwald] Grundfarn-FBX fehlt: " + artPath);
+                    continue;
+                }
+                Mesh found = null;
+                int bestTris = 0;
+                foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(artPath))
+                {
+                    if (obj is Mesh mesh && mesh != null)
+                    {
+                        int tris = 0;
+                        for (int s = 0; s < mesh.subMeshCount; s++) tris += mesh.GetSubMesh(s).indexCount / 3;
+                        if (tris > bestTris) { bestTris = tris; found = mesh; }
+                    }
+                }
+                if (found == null || bestTris == 0)
+                {
+                    Debug.LogWarning("[Urwald] Grundfarn ohne Triangles: " + artPath);
+                    continue;
+                }
+                meshes.Add(found);
+            }
+            if (meshes.Count == 0) { Debug.LogWarning("[Urwald] Kein Grundfarn-Mesh loaded."); return; }
+
+            lib.groundFerns = meshes.ToArray();
+
+            Material leaf = GetOrCreateMat("MAT_Grundfarn_Leaf", hdrpLit, new Color(0.09f, 0.24f, 0.06f));
+            leaf.SetFloat("_SurfaceType", 0f);
+            leaf.SetFloat("_AlphaCutoffEnable", 0f);
+            leaf.SetFloat("_Smoothness", 0.15f);
+            leaf.SetFloat("_DoubleSidedEnable", 1f);
+            leaf.SetFloat("_DoubleSidedNormalMode", 2f);
+            leaf.enableInstancing = true;
+
+            HDMaterial.ValidateMaterial(leaf);
+            EditorUtility.SetDirty(leaf);
+            AssetDatabase.SaveAssets();
+
+            lib.groundFernLeafMat = leaf;
+            Debug.Log("[Urwald] Grundfarne: " + lib.groundFerns.Length + " Varianten loaded (opaque, single leaf-mat)");
         }
 
         /// <summary>U4: load or create an HDRP/Lit material asset in MatFolder with a base color.</summary>
