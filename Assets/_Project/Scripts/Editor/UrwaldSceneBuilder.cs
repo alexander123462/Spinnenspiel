@@ -445,12 +445,28 @@ namespace Spinnenspiel.EditorTools
             lib.fernScatterLeafSubmesh = idx1 > idx0 ? 1 : 0;
 
             // XZ-Positions: mesh bounds centre (transforms baked into the vertices).
+            // Centred around the patch centre so the generator can add them to an anchor point.
             var xz = new System.Collections.Generic.List<Vector3>();
+            Vector3 min = new Vector3(float.MaxValue, 0f, float.MaxValue);
+            Vector3 max = new Vector3(-float.MaxValue, 0f, -float.MaxValue);
             foreach (Mesh m in collected)
             {
                 var b = m.bounds;
+                min.x = System.Math.Min(min.x, b.center.x - b.extents.x);
+                min.z = System.Math.Min(min.z, b.center.z - b.extents.z);
+                max.x = System.Math.Max(max.x, b.center.x + b.extents.x);
+                max.z = System.Math.Max(max.z, b.center.z + b.extents.z);
                 xz.Add(new Vector3(b.center.x, 0f, b.center.z));
             }
+            Vector3 patchCenter = new Vector3((min.x + max.x) * 0.5f, 0f, (min.z + max.z) * 0.5f);
+            for (int pi = 0; pi < xz.Count; pi++)
+            {
+                Vector3 q = xz[pi];
+                q.x -= patchCenter.x;
+                q.z -= patchCenter.z;
+                xz[pi] = q;
+            }
+            lib.fernScatterPatchSize = System.Math.Max(max.x - min.x, max.z - min.z);
 
             lib.fernScatterMeshes = collected.ToArray();
             lib.fernScatterXZ = xz.ToArray();

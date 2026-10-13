@@ -46,6 +46,8 @@ namespace Spinnenspiel
         public Material fernScatterStemMat;
         /// <summary>U4: Index of the Leaf-Submesh within each Instance-Mesh (measured, 0 or 1).</summary>
         public int fernScatterLeafSubmesh;
+        /// <summary>U4: Side length (m) of the square scatter patch (measured from mesh bounds).</summary>
+        public float fernScatterPatchSize;
 
         /// <summary>Poly-Haven-Baumes. Index 0..4 = Baumart (Jacaranda, island_tree_01..03, tree_small_02).
         /// phTreeLod0/1[i]=LOD-Mesh, phTreeWoodMats[i]/phTreeLeafMats[i]=Holz/Blätter-Material.

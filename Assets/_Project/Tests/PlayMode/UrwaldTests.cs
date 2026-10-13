@@ -233,6 +233,28 @@ namespace Spinnenspiel.Tests
             Assert.GreaterOrEqual(gen.LogCount, 12, "Zu wenige Stämme (< 12).");
             Assert.GreaterOrEqual(gen.RockCount, 25, "Zu wenige Steine (< 25).");
 
+            // U4.3: Farn-Scatter-Patch tilett, Y per SampleHeight (Terrain-Surface)
+            GameObject fernScatterGrp = GameObject.Find("Farn-Scatter");
+            if (gen.FernScatterCount > 0)
+            {
+                Assert.IsNotNull(fernScatterGrp, "Farn-Scatter-Gruppe missing despite FernScatterCount > 0.");
+                var scatterMeshes = fernScatterGrp.GetComponentsInChildren<MeshRenderer>();
+                Assert.AreEqual(gen.FernScatterCount, scatterMeshes.Length,
+                    "Farn-Scatter Instance-Anzahl weicht von FernScatterCount ab.");
+                bool foundSink = false;
+                foreach (var mr in scatterMeshes)
+                {
+                    float bottom = mr.transform.position.y;
+                    float ground = Terrain.activeTerrain.SampleHeight(mr.transform.position) + Terrain.activeTerrain.transform.position.y;
+                    if (bottom - ground > 0.6f || bottom - ground < -0.3f)
+                    {
+                        foundSink = true;
+                        break;
+                    }
+                }
+                Assert.IsFalse(foundSink, "Farn-Scatter Instance not snapped to SampleHeight (> 0.6 m above or > 0.3 m below ground).");
+            }
+
             Assert.IsNotNull(Object.FindFirstObjectByType<TerrainCollider>(),
                 "Terrain mit TerrainCollider nicht gefunden.");
 

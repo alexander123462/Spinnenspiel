@@ -32,6 +32,7 @@ namespace Spinnenspiel
         public int ReedCount { get; private set; }
         public int GiantLeafCount { get; private set; }
         public int TreeFernCount { get; private set; }
+        public int FernScatterCount { get; private set; }
         public int GroundCoverCount { get; private set; }
         public int PlantColliderCount { get; private set; }
         public int LianaCount { get; private set; }
@@ -251,6 +252,58 @@ namespace Spinnenspiel
                 }
                 TreeFernCount = fernN;
                 UnityEngine.Debug.Log("[Jungle] Baumfarne: " + fernN + " (inkl. 3 garantiert vor dem Spawn)");
+            }
+
+            // 6a) Farn-Scatter-Patch (U4): der Blender-Patch (fern_scatter.fbx, 245 Instance-Meshes)
+            // tilett ueber der Urwald. Per Instance: Zufalls-Cell als Patch-Anker, Y = SampleHeight.
+            // XZ come Library-offsets (Baked im FBX), Patch-Footprint = fernScatterPatchSize m.
+            if (library.fernScatterMeshes != null && library.fernScatterCount > 0
+                && library.fernScatterLeafMat != null && library.fernScatterStemMat != null)
+            {
+                GameObject fernScatter = new GameObject("Farn-Scatter");
+                int scatterN = 0;
+                // Patch-Anchor per 24-m-Cell, Zufalls-offset, Dry+above-water pruef, Spawn 3 m free.
+                for (int i = 0; i < Mathf.FloorToInt(size / 24f); i++)
+                {
+                    for (int j = 0; j < Mathf.FloorToInt(size / 24f); j++)
+                    {
+                        if (World.Hash01(i, j, 101) >= World.Density(i * 24f, j * 24f)) continue;
+                        float ax = 12f + i * 24f + (World.Hash01(i, j, 102) - 0.5f) * 8f;
+                        float az = 12f + j * 24f + (World.Hash01(i, j, 103) - 0.5f) * 8f;
+                        if (!IsDryFlat(World, ax, az)) continue;
+                        if (NearSpawn(ax, az, 3f)) continue;
+                        float half = library.fernScatterPatchSize * 0.5f;
+                        if (ax - half < 1f || ax + half > size - 1f || az - half < 1f || az + half > size - 1f) continue;
+                        for (int k = 0; k < library.fernScatterCount && k < library.fernScatterMeshes.Length; k++)
+                        {
+                            Mesh fm = library.fernScatterMeshes[k];
+                            if (fm == null) continue;
+                            Vector3 o = library.fernScatterXZ != null && k < library.fernScatterXZ.Length
+                                ? library.fernScatterXZ[k] : Vector3.zero;
+                            float px = ax + o.x, pz = az + o.z;
+                            if (px < 0.5f || px > size - 0.5f || pz < 0.5f || pz > size - 0.5f) continue;
+                            GameObject g = new GameObject();
+                            g.transform.SetParent(fernScatter.transform, false);
+                            // Y per SampleHeight (Terrain-Surface), FBX-Bottom im Mesh y=0 -> sink 0.02 m.
+                            float fy = terrain.SampleHeight(new Vector3(px, 0f, pz)) + terrain.transform.position.y - 0.02f;
+                            g.transform.position = new Vector3(px, fy, pz);
+                            g.transform.rotation = Quaternion.Euler(0f, World.Hash01(i, j, 110 + k % 97) * 360f, 0f);
+                            g.transform.localScale = Vector3.one;
+                            g.AddComponent<MeshFilter>().sharedMesh = fm;
+                            var r = g.AddComponent<MeshRenderer>();
+                            // Submesh-Order measured in LoadFernScatter: leaf index fernScatterLeafSubmesh.
+                            int leafIdx = library.fernScatterLeafSubmesh;
+                            r.sharedMaterials = new Material[] {
+                                leafIdx == 0 ? library.fernScatterLeafMat : library.fernScatterStemMat,
+                                leafIdx == 0 ? library.fernScatterStemMat : library.fernScatterLeafMat,
+                            };
+                            scatterN++;
+                        }
+                    }
+                }
+                StaticBatchingUtility.Combine(fernScatter);
+                FernScatterCount = scatterN;
+                UnityEngine.Debug.Log("[Jungle] Farn-Scatter: " + scatterN + " Instances placed (Y=SampleHeight)");
             }
 
             // 6b) Bodendecker: Scan-Gras/Kraut als reine Optik (keine Collider), dicht über dem Boden.
