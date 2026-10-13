@@ -90,32 +90,19 @@ namespace Spinnenspiel.Tests
             SpiderWebPlacer placer = spider.GetComponent<SpiderWebPlacer>();
             Assert.IsNotNull(placer, "SpiderWebPlacer fehlt");
 
-            // Two trunks 1.5-4 m apart (like WorldWebTests).
-            Transform a = null;
-            Transform b = null;
-            float best = float.MaxValue;
-            foreach (GameObject go in Object.FindObjectsOfType<GameObject>())
-            {
-                if (go.name != "Trunk" || go.GetComponent<MeshCollider>() == null) continue;
-                Transform other = null;
-                foreach (GameObject go2 in Object.FindObjectsOfType<GameObject>())
-                {
-                    if (go2 == go || go2.name != "Trunk" || go2.GetComponent<MeshCollider>() == null) continue;
-                    other = go2.transform;
-                    break;
-                }
-                if (other == null) continue;
-                float dx = go.transform.position.x - other.position.x;
-                float dz = go.transform.position.z - other.position.z;
-                float dist = Mathf.Sqrt(dx * dx + dz * dz);
-                if (dist >= 1.5f && dist <= 4.0f && dist < best)
-                {
-                    best = dist;
-                    a = go.transform;
-                    b = other;
-                }
-            }
-            Assert.IsNotNull(a, "No trunk pair 1.5-4 m apart");
+            // R7: deterministic trunk pair instead of hunting the random layout.
+            // Two simple cylinder colliders with SurfaceTag Wood, 2.5 m apart,
+            // built right in front of the spider; stands on the Testwelt terrain.
+            Vector3 fwd = spider.transform.forward;
+            fwd.y = 0f;
+            if (fwd.sqrMagnitude < 1e-6f) fwd = Vector3.forward;
+            fwd.Normalize();
+            Vector3 right = new Vector3(-fwd.z, 0f, fwd.x);
+            Vector3 centerXZ = spider.transform.position + fwd * 1.5f;
+            GameObject trunkA = MakeWoodTrunk(centerXZ - right * 1.25f);
+            GameObject trunkB = MakeWoodTrunk(centerXZ + right * 1.25f);
+            Transform a = trunkA.transform;
+            Transform b = trunkB.transform;
 
             // Slanted thread: high (2 m) at A, low (0.2 m) at B.
             float groundA, groundB;
@@ -148,6 +135,32 @@ namespace Spinnenspiel.Tests
             Assert.IsTrue(placer.PreviewBlocked, "Preview not red-blocked at the bad spot");
 
             Object.DestroyImmediate(threadGo);
+            if (trunkA != null) Object.DestroyImmediate(trunkA);
+            if (trunkB != null) Object.DestroyImmediate(trunkB);
+        }
+
+        /// <summary>R7: one wood trunk (CapsuleCollider + SurfaceTag Wood) at an XZ spot, base on terrain.</summary>
+        private static GameObject MakeWoodTrunk(Vector3 xzPos)
+        {
+            float groundY = 0f;
+            bool found = false;
+            var hits = Physics.RaycastAll(new Vector3(xzPos.x, 60f, xzPos.z), Vector3.down, 120f);
+            foreach (RaycastHit hit in hits)
+            {
+                SurfaceTag tag = hit.collider.GetComponentInParent<SurfaceTag>();
+                if (tag != null && tag.surfaceType == SurfaceType.Wood) continue;
+                groundY = hit.point.y;
+                found = true;
+                break;
+            }
+            if (!found) groundY = xzPos.y;
+            var go = new GameObject("Trunk");
+            go.transform.position = new Vector3(xzPos.x, groundY + 2f, xzPos.z);
+            CapsuleCollider cyl = go.AddComponent<CapsuleCollider>();
+            cyl.height = 4f;
+            cyl.radius = 0.15f;
+            go.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Wood;
+            return go;
         }
 
         /// <summary>Ground height under a trunk: vertical downcast, skip spider and Wood.</summary>

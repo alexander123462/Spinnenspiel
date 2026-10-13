@@ -10,4 +10,4 @@ der NICHT in dieser Liste steht -> das ist eine echte Regression von dir, nicht
 committen. Wird ein Punkt dieser Liste gruen, Zeile hier entfernen und im selben
 Commit mitnehmen.
 
-- NetbuildComfortTests.RedPreview_WhenSpotGoesBad (Backlog R7): red bei regenerierter Zufallslayout ("No trunk pair 1.5-4 m apart"), independent of S1 code.
+(Baseline currently empty: RedPreview_WhenSpotGoesBad made deterministic and green in R7.)
