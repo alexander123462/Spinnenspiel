@@ -98,3 +98,5 @@
 - LEFTOVER-Datei routing: modified Scripts/Tests files from a prior round of THIS loop belong to the topmost OPEN point. If they carry that point fix -> finish+commit; if they belong to a DIFFERENT point (e.g. G6/G3 SkyFraction proofshot assert sitting in the same UrwaldTests.cs as G1 lighting) -> git checkout -- them, commit ONLY the own point file. A foreign proofshot-Assert red is NOT your regression.
 
 - G1 closed once the foreign test edits are reverted: r116 (foreign SkyFraction assert kept) = fehlgeschlagen 1; revert UrwaldTests.cs+asmdef -> r116b green 109/109. WorldLightingBuilder.cs alone (skybox=null + HDRP Volume sky) is the whole G1 fix.
+
+- TreeRenderer-Node-Finder: die MeshRenderers of a PH-Tree sit NOT on the 'PH-Tree' GameObject but on its child LOD nodes 'TreeLOD0'/'TreeLOD1'. A name-filter for 'PH-Tree' silently finds zero renderers (canopyTop=0), so any camera placed from that height stays inside the canopy and measures skyFrac=0. Filter the LOD child names, or walk tree.transform children.
