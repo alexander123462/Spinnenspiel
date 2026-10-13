@@ -35,6 +35,18 @@ namespace Spinnenspiel
         public Mesh[] groundCover;
         public Material[] groundCoverMats;
 
+        /// <summary>U4: Farn-Scatter-Patch (Blender scatter.py, determinist Poisson-Disc).
+        /// fernScatterMeshes = 245 Instance-Meshes (2 Submeshes je: 0 = Stem, 1 = Leaf),
+        /// fernScatterXZ = XZ-Positions per Instance (y=0, Y comes from SampleHeight at runtime),
+        /// fernScatterCount = Anzahl Instances im Patch.</summary>
+        public Mesh[] fernScatterMeshes;
+        public Vector3[] fernScatterXZ;
+        public int fernScatterCount;
+        public Material fernScatterLeafMat;
+        public Material fernScatterStemMat;
+        /// <summary>U4: Index of the Leaf-Submesh within each Instance-Mesh (measured, 0 or 1).</summary>
+        public int fernScatterLeafSubmesh;
+
         /// <summary>Poly-Haven-Baumes. Index 0..4 = Baumart (Jacaranda, island_tree_01..03, tree_small_02).
         /// phTreeLod0/1[i]=LOD-Mesh, phTreeWoodMats[i]/phTreeLeafMats[i]=Holz/Blätter-Material.
         /// phTreeScales[i] = Worldscale so das Jacaranda ca. 25-35 m high. (Nested arrays not serialized by Unity!)</summary>

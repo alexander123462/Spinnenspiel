@@ -68,6 +68,9 @@ namespace Spinnenspiel.EditorTools
             lib.treeFernLeafMat = baumfarnMats[0];
             lib.treeFernStemMat = baumfarnMats[1];
 
+            // U4: Farn-Scatter-Patch (Blender scatter.py, 245 Instances per 8x8 m Patch).
+            LoadFernScatter(lib);
+
             // Bodendecker (Scan-Gras/Kraut): nur Optik, keine Collider; um die Spinne herum.
             LoadGroundCover(lib);
 
@@ -374,6 +377,129 @@ namespace Spinnenspiel.EditorTools
             EditorUtility.SetDirty(stem);
             AssetDatabase.SaveAssets();
             return new[] { leaf, stem };
+        }
+
+        /// <summary>
+        /// U4: Loads the Blender fern-scatter patch (ArtSource/UrwaldTest/fern/scatter.py ->
+        /// Assets/_Project/Art/Plants/UrwaldTestFern/fern_scatter.fbx). Copies the FBX if missing,
+        /// imports it, measures the per-instance meshes (2 Submeshes: stem + leaf, order measured
+        /// via GetSubMesh(i).bounds) and builds two opaque HDRP materials with the Blender tints.
+        /// Fern-Form ist echte Geometrie -> Opaque, KEIN Alpha-Cutout (Blender-Materials Alpha ignorieren).
+        /// Fills the library fields: meshes, XZ-offsets (from mesh bounds), count, leaf-submesh index, mats.
+        /// </summary>
+        private static void LoadFernScatter(JungleAssetLibrary lib)
+        {
+            const string artFolder = "Assets/_Project/Art/Plants/UrwaldTestFern/";
+            const string fbxAsset = artFolder + "fern_scatter.fbx";
+
+            // Copy the FBX from ArtSource into the Unity-Asset-Tree (only if missing).
+            if (!System.IO.File.Exists(fbxAsset))
+            {
+                string srcFbx = "ArtSource/UrwaldTest/fern/fern_scatter.fbx";
+                if (!System.IO.File.Exists(srcFbx))
+                {
+                    Debug.LogWarning("[Urwald] Fern-Scatter-FBX missing: " + srcFbx);
+                    return;
+                }
+                AssetUtil.EnsureFolder("Assets/_Project/Art/Plants/UrwaldTestFern");
+                System.IO.File.Copy(srcFbx, fbxAsset, true);
+                AssetDatabase.ImportAsset(fbxAsset, ImportAssetOptions.ForceUpdate);
+            }
+
+            // The HDRP materials are built here; FBX material slots are ignored.
+            ModelImporter modelImporter = AssetImporter.GetAtPath(fbxAsset) as ModelImporter;
+            if (modelImporter == null)
+            {
+                Debug.LogWarning("[Urwald] Kein ModelImporter für: " + fbxAsset);
+                return;
+            }
+            modelImporter.materialImportMode = ModelImporterMaterialImportMode.None;
+            modelImporter.SaveAndReimport();
+
+            // Collect the joined instance meshes (2 Submeshes each, transforms baked).
+            var collected = new System.Collections.Generic.List<Mesh>();
+            foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(fbxAsset))
+            {
+                if (obj is Mesh mesh && mesh.subMeshCount > 0)
+                {
+                    collected.Add(mesh);
+                }
+            }
+            if (collected.Count == 0)
+            {
+                Debug.LogWarning("[Urwald] Kein Mesh im Fern-Scatter-FBX: " + fbxAsset);
+                return;
+            }
+
+            // Measure the submesh order on the first mesh: leaf = wider crown (XZ-extents),
+            // stem = schmal. Never assume the FBX material order (known Blender pitfall).
+            Mesh probe = collected[0];
+            if (probe.subMeshCount < 2)
+            {
+                Debug.LogWarning("[Urwald] Fern-Scatter-Mesh has < 2 Submeshes: " + fbxAsset);
+                return;
+            }
+            // Leaf-crown has far more triangles than the schmal stem-cylinder -> measure by index count.
+            int idx0 = probe.GetSubMesh(0).indexCount;
+            int idx1 = probe.GetSubMesh(1).indexCount;
+            lib.fernScatterLeafSubmesh = idx1 > idx0 ? 1 : 0;
+
+            // XZ-Positions: mesh bounds centre (transforms baked into the vertices).
+            var xz = new System.Collections.Generic.List<Vector3>();
+            foreach (Mesh m in collected)
+            {
+                var b = m.bounds;
+                xz.Add(new Vector3(b.center.x, 0f, b.center.z));
+            }
+
+            lib.fernScatterMeshes = collected.ToArray();
+            lib.fernScatterXZ = xz.ToArray();
+            lib.fernScatterCount = collected.Count;
+
+            // Opaque HDRP materials with the Blender tints (leaf green, stem brown).
+            Shader hdrpLit = Shader.Find("HDRP/Lit");
+            if (hdrpLit == null)
+                throw new System.InvalidOperationException("[Urwald] Shader nicht gefunden: HDRP/Lit");
+
+            Material leaf = GetOrCreateMat("MAT_FernScatter_Leaf", hdrpLit, new Color(0.10f, 0.27f, 0.06f));
+            leaf.SetFloat("_SurfaceType", 0f);      // Opaque: Form is real geometry, no Cutout
+            leaf.SetFloat("_AlphaCutoffEnable", 0f);
+            leaf.SetFloat("_Smoothness", 0.15f);
+            leaf.SetFloat("_DoubleSidedEnable", 1f);
+            leaf.SetFloat("_DoubleSidedNormalMode", 2f); // Flip: backfaces visible
+            leaf.enableInstancing = true;
+
+            Material stem = GetOrCreateMat("MAT_FernScatter_Stem", hdrpLit, new Color(0.13f, 0.11f, 0.05f));
+            stem.SetFloat("_SurfaceType", 0f);
+            stem.SetFloat("_AlphaCutoffEnable", 0f);
+            stem.SetFloat("_Smoothness", 0.2f);
+            stem.enableInstancing = true;
+
+            HDMaterial.ValidateMaterial(leaf);
+            HDMaterial.ValidateMaterial(stem);
+            EditorUtility.SetDirty(leaf);
+            EditorUtility.SetDirty(stem);
+            AssetDatabase.SaveAssets();
+
+            lib.fernScatterLeafMat = leaf;
+            lib.fernScatterStemMat = stem;
+
+            Debug.Log("[Urwald] Fern-Scatter: " + lib.fernScatterCount + " Instances, leaf-submesh "
+                + lib.fernScatterLeafSubmesh + " (idx0 " + idx0 + ", idx1 " + idx1 + ")");
+        }
+
+        /// <summary>U4: load or create an HDRP/Lit material asset in MatFolder with a base color.</summary>
+        private static Material GetOrCreateMat(string name, Shader shader, Color color)
+        {
+            string path = MatFolder + name + ".mat";
+            Material mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                mat = new Material(shader) { name = name };
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            mat.color = color;
+            return mat;
         }
 
         private static Material CreateBaumfarnMat(string name, Shader shader, string albedo, string mask, string normal)
