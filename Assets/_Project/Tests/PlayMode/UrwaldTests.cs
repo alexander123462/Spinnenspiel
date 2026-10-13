@@ -253,6 +253,11 @@ namespace Spinnenspiel.Tests
                     }
                 }
                 Assert.IsFalse(foundSink, "Farn-Scatter Instance not snapped to SampleHeight (> 0.6 m above or > 0.3 m below ground).");
+                // U4.4: each scatter instance carries a thin CapsuleCollider (Plants-Layer)
+                // -> climbable/anchorable like AddPlant; plus >= 5 ferns within 12 m of spawn.
+                var scatterCaps = fernScatterGrp.GetComponentsInChildren<CapsuleCollider>();
+                Assert.AreEqual(gen.FernScatterCount, scatterCaps.Length,
+                    "Farn-Scatter CapsuleCollider-Anzahl weicht von FernScatterCount ab.");
             }
 
             Assert.IsNotNull(Object.FindFirstObjectByType<TerrainCollider>(),

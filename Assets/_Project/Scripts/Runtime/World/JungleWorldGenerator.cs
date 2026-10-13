@@ -297,6 +297,17 @@ namespace Spinnenspiel
                                 leafIdx == 0 ? library.fernScatterLeafMat : library.fernScatterStemMat,
                                 leafIdx == 0 ? library.fernScatterStemMat : library.fernScatterLeafMat,
                             };
+                            // U4.4: thin CapsuleCollider like AddPlant -> climbable/anchorable,
+                            // Plants-Layer. Scale is Vector3.one here so no capsule distortion.
+                            Bounds fb = fm.bounds;
+                            GameObject capGo = new GameObject("PflanzenCollider");
+                            capGo.transform.SetParent(g.transform, false);
+                            capGo.layer = GameLayers.Plants;
+                            var capCol = capGo.AddComponent<CapsuleCollider>();
+                            capCol.direction = 1; // Y-Axis
+                            capCol.height = fb.size.y;
+                            capCol.radius = Mathf.Clamp(0.25f * Mathf.Min(fb.size.x, fb.size.z), 0.015f, 0.12f);
+                            capGo.transform.position = g.transform.TransformPoint(fb.center);
                             scatterN++;
                         }
                     }
