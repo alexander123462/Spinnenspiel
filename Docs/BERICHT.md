@@ -78,3 +78,5 @@ R5 Spider_StopsAgainstTree: BLOCKED 2026-10-12 (r5diag3): Test-Target=woodSub-Ax
 - 2026-10-13 U4b/U4.3: Farn-Scatter tilett in JungleWorldGenerator (Patch-Anchor per 24m-Cell, Density-gate, Dry+above-water+3m Spawn-free; per Instance XZ=Library-offsets centred in LoadFernScatter, Y=terrain.SampleHeight-0.02). FernScatterCount/fernScatterPatchSize neu; UrwaldTests asserts count==MeshRenderer-Anzahl + SampleHeight-snap. 1470 Instances placed. Full CI r108b Build Exit 0 + Tests 109/109 green. Commit a1409bd.
 
 - 2026-10-13 U4b/U4.4: Farn-Scatter per Instance ein thin CapsuleCollider (Plants-Layer, direction=Y) in JungleWorldGenerator -> climbable/anchorable like AddPlant; UrwaldTests asserts CapsuleCollider-Anzahl == FernScatterCount. Near-spawn-count skipped (0 scatter within 12m of spawn is correct: Scatter-Tiling keeps a 3m spawn-free zone + Density-gate). Full CI r109 Build Exit 0 + Tests 109/109 green. Commit b324a9c.
+
+- 2026-10-13 U4b/U4.5: Farn-Scatter DONE. U4.1-U4.4 already committed (d747a8e/f21b545/a1409bd/b324a9c). U4.5 = vollen CI r110 green (Build Exit 0 / Tests 109/109 / fehlgeschlagen 0, ROT.md empty) + Docs-closure. U4 und U4b auf [x].

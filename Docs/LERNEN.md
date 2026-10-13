@@ -87,3 +87,4 @@
 - Unity Vector2/Vector3: magnitude is a PROPERTY (dxz.magnitude), NOT a method — .Length() does not exist (CS1061). Use sqrMagnitude for comparisons to avoid sqrt.
 
 - Farn-Scatter near-spawn count: the Scatter-Tiling deliberately keeps a 3m spawn-free zone + Density-gate, so 0 scatter instances within 12m of spawn is CORRECT by design — do not assert a scatter near-spawn count; guaranteed near-spawn ferns are the tree-ferns (AddTreeFern, covered by TreeFernCount). Assert collider-count == FernScatterCount instead.
+- Re-Run-Antipattern: a prior [!] whose only blocker was PRE-EXISTING reds (Climb x2, RedPreview, Spider_StopsAgainstTree) is SOFT — those reds were already killed by the R6/9b5562b wave. Before declaring any U-point blocked, rerun the FULL CI: if baseline is now green (ROT.md empty), the point is reachable and just needs a Docs-closure commit, no new code.
