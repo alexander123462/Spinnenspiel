@@ -852,5 +852,80 @@ namespace Spinnenspiel.Tests
             Assert.GreaterOrEqual(stdev, 30.0,
                 "Nahaufnahme kontrast (Luma-StDev) " + stdev.ToString("F1") + " < 30 – Nebel/VolumetricFog dies Dunnelesiert?");
         }
+
+        /// <summary>
+        /// W1 Schritt 3: same Seed -> identical placement-hash; different Seed ->
+        /// different hash; Density(Wald)/Density(Lichtung) >= 2.0; creek present
+        /// (path spans the world, bed under WaterLevel, banks dry above it).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator W1_SeedsDeterministicAndCreekPresent()
+        {
+            uint h1 = PlacementHash(31337);
+            uint h2 = PlacementHash(31337);
+            Assert.AreEqual(h1, h2, "Seed 31337: placement-hash differs across runs.");
+            uint h3 = PlacementHash(31338);
+            Assert.AreNotEqual(h1, h3, "Seed 31338: placement identical to 31337.");
+
+            JungleWorldGenerator.NextSeed = 31337;
+            SceneManager.LoadScene("Urwald");
+            yield return null;
+            yield return WaitReady();
+            Assert.IsNotNull(readyGen, "Welt (Seed 31337) not ready.");
+            JungleWorld world = readyGen.World;
+
+            var pts = world.CreekPath;
+            Assert.GreaterOrEqual(pts.Length, 5, "Creek path too short.");
+            Assert.LessOrEqual(pts[0].x, 1f, "Creek does not start at the world edge.");
+            Assert.GreaterOrEqual(pts[pts.Length - 1].x, world.Size - 1f, "Creek does not reach the far edge.");
+            bool bedWet = false, bankDry = false;
+            for (int i = 0; i + 1 < pts.Length; i++)
+            {
+                Vector2 mid = (pts[i] + pts[i + 1]) * 0.5f;
+                if (world.IsUnderWater(mid.x, mid.y)) bedWet = true;
+                if (!world.IsUnderWater(mid.x, mid.y + JungleWorld.CreekCore + 1.2f)) bankDry = true;
+            }
+            Assert.IsTrue(bedWet, "Creek bed nowhere under WaterLevel.");
+            Assert.IsTrue(bankDry, "Creek banks nowhere dry.");
+
+            float half = world.Size * 0.5f;
+            double sumForest = 0.0, sumClear = 0.0;
+            int nForest = 0, nClear = 0;
+            for (int x = -46; x <= 46; x += 2)
+            {
+                for (int z = -46; z <= 46; z += 2)
+                {
+                    float fx = half + x, fz = half + z;
+                    float d = world.Density(fx, fz);
+                    if (world.IsClearing(fx, fz)) { sumClear += d; nClear++; }
+                    else if (!world.IsUnderWater(fx, fz)) { sumForest += d; nForest++; }
+                }
+            }
+            Assert.Greater(nClear, 100, "Too few clearing-samples (< 100).");
+            Assert.Greater(nForest, 500, "Too few forest-samples (< 500).");
+            float ratio = (float)(sumForest / nForest) / (float)(sumClear / nClear);
+            Debug.Log("[W1] Dichte Wald/Lichtung: " + ratio.ToString("F2"));
+            Assert.GreaterOrEqual(ratio, 2.0f, "Density forest/clearing " + ratio.ToString("F2") + " < 2.0.");
+        }
+
+        /// <summary>Hash of the seed-driven placement basis (height + density grid, 4 m steps, FNV-1a over quantised values).</summary>
+        private static uint PlacementHash(int seed)
+        {
+            var w = new JungleWorld(seed);
+            const uint prime = 16777619u;
+            uint h = 2166136261u;
+            for (int x = -48; x <= 48; x += 4)
+            {
+                for (int z = -48; z <= 48; z += 4)
+                {
+                    float fx = w.Size * 0.5f + x, fz = w.Size * 0.5f + z;
+                    int qh = (int)(w.Height(fx, fz) * 100f);
+                    int qd = (int)(w.Density(fx, fz) * 1000f);
+                    h = (h ^ (uint)qh) * prime;
+                    h = (h ^ (uint)qd) * prime;
+                }
+            }
+            return h;
+        }
     }
 }

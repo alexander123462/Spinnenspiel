@@ -143,3 +143,9 @@
 - G5-CLOSURE (2026-10-14): a [-] "abgeloest durch G6" entry whose own blocker was the foreign SharpFraction/SkyFraction regression is SOFT once G6 (e417086) turned Urwald_GeneratesWorldFromSeed green. Full CI r116 118/118 fehlgeschlagen 0 + ROT.md empty -> Docs-closure commit only, no new code. The sun-Lux/exposure levers themselves never needed to pass on their own — G6's HDR-RT path is what closed the gate.
 
 - Soft-[!]-closure: a [!] entry can be STALE — a LATER commit (here 9ebf04d) already fixed it, so the [!] is not a live blocker. Before flipping [!] to [x]: git log --oneline for the fix-hash + re-run full CI and confirm the named test green in the summary + ROT.md empty. Then Docs-commit only, no new code. Distinguish a HARD [!] (real unresolved blocker) from a SOFT one (fix already shipped) by checking whether the fix commit exists and its test is now green.
+
+- W1 Creek: carve the Bach LAST but NOT within the outer EdgeWidth border band (use TRUE distBorder=min(x,z,Size-x,Size-z), world spans [0,Size], NOT Mathf.Abs which breaks interior points). Carving the rim floats liana/tree anchors -> Lianen_HangFromCrowns red.
+
+- W1 M7 invariant World_HasSwampsAndClearings: a dry point (SwampFactor<0.01) must NOT be below WaterLevel+0.3. A carved creek bed IS wetland -> fold creek into public SwampFactor (Max with creekWet ramp), so creek points are not counted as dry-violations. HeightAt keeps its own private SwampFactorAt, unaffected.
+
+- W1 Creek present-test: assert bed under WaterLevel by sampling segment MIDPOINTS (IsUnderWater(mid)) and banks dry at mid+perp offset; path must span x=0..Size. Determinism via PlacementHash(seed) FNV over quantised Height/Density grid, same seed -> equal, diff seed -> unequal.

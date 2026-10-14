@@ -175,3 +175,24 @@
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': mittlere Grashoehe mindestens das 1.5-fache der Spinnenkoerperhoehe; Kameraabstand zur Spinne hoechstens 1.2 m; Kamerahoehe ueber Boden hoechstens 0.5 m.
   - Schritt 3: Ein Beweisbild aus der Spielperspektive aufnehmen (Logs/ci/urwald_groesse.png), dabei die Lehren aus G6 beachten: erst aufnehmen, dann messen, dann asserten; MotionBlur und DepthOfField fuer den Screenshot aus; erst nach Physik-Ruhe ausloesen.
   - Schritt 4: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
+
+- [x] W1 Zufallswelt per Seed: jede Partie neue Welt mit Suempfen, Lichtungen, Bachlaeufen, Huegeln; Vegetation dichter im Wald, lichter auf Lichtungen. (DONE r148c: JungleWorld.cs per-Seed Bach-Meander-Polyline carved into Terrain; SwampFactor includes creek (Feuchtland); rim-band guard keeps Liana anchors stable; UrwaldTests W1_SeedsDeterministicAndCreekPresent green. Full CI r148c METHOD Exit 0 / Tests 119/119 / fehlgeschlagen 0.)
+  - Schritt 1: Weltgenerator mit int-Seed (gleicher Seed -> identische Welt), Zonen Wald/Lichtung/Sumpf/Bach/Huegel per Noise; Seed pro Spielstart zufaellig, im Log ausgeben.
+  - Schritt 2: Vegetationsdichte je Zone (Wald dicht, Lichtung licht) nach Docs/hdrp-vegetation-regeln.md.
+  - Schritt 3: Test: 2 gleiche Seeds -> Hash der Platzierungen identisch -> OK/NOK; 2 verschiedene Seeds -> Hash verschieden -> OK/NOK; Dichte Wald / Dichte Lichtung >= 2.0 -> OK/NOK.
+  - Schritt 4: Voller CI-Lauf, Commit nach dem Gate in Docs/ROT.md. Bei Abbruch eigene Dateien im Arbeitsbaum LASSEN und hier auflisten.
+
+- [ ] N1 Netze spinnen: Spinne kann fast ueberall Netzfaeden befestigen (Raycast auf Flaechen, Fadenanker, einfache Seilphysik).
+  - Schritt 1: Taste -> Raycast auf Flaechen (Boden, Staemme, Steine, Blaetter), Anker setzen, Faden als Seil (Verlet/LineRenderer) zwischen Spinne und Anker.
+  - Schritt 2: Test: Anker auf Baumstamm in 5 m Entfernung, Fadenlaenge -> Abstand +-0.1 m -> OK/NOK; Faden-Durchhang bei Ruhe <= 0.3 m -> OK/NOK; Anteil getesteter Oberflaechentypen mit gueltigem Anker >= 90 % -> OK/NOK.
+  - Schritt 3: Voller CI-Lauf, Commit nach dem Gate in Docs/ROT.md. Bei Abbruch eigene Dateien im Arbeitsbaum LASSEN und hier auflisten.
+
+- [ ] E1 Wasser und Bach realistisch, Sumpf mit flachem Wasser.
+  - Schritt 1: HDRP-Wasser (Water System oder Shader-Graph) fuer Bachlauf und flache Sumpfflaechen; Spinne kann flach durchwaten, Tiefe begrenzt.
+  - Schritt 2: Test: Wassertiefe im Sumpf <= 0.15 m -> OK/NOK; Spinne in Sumpf bewegt sich mit Geschwindigkeit >= 50 % der Bodengeschwindigkeit -> OK/NOK; Beweisbild Logs/ci/wasser.png SharpFrac >= 0.10 -> OK/NOK.
+  - Schritt 3: Voller CI-Lauf, Commit nach dem Gate in Docs/ROT.md. Bei Abbruch eigene Dateien im Arbeitsbaum LASSEN und hier auflisten.
+
+- [ ] P1 Polishing: Beleuchtung, Himmel, Nebel, Schatten, LOD und Culling, Konsolenfehler abarbeiten.
+  - Schritt 1: LODGroups fuer Baeume/Buesche, Culling-Distanzen, Schattendistanz sinnvoll setzen.
+  - Schritt 2: Test: Konsolenfehler im Playmode-Durchlauf = 0 -> OK/NOK; Mittlere Frametime <= Budget aus Performance-Test -> OK/NOK; Anzahl Objekte ohne LOD bei Vegetation = 0 -> OK/NOK.
+  - Schritt 3: Voller CI-Lauf, Commit nach dem Gate in Docs/ROT.md. Bei Abbruch eigene Dateien im Arbeitsbaum LASSEN und hier auflisten.

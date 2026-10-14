@@ -115,3 +115,5 @@ G4 Beweisbild urwald_spinne.png CLOSED 2026-10-14 (Docs-closure): full CI r115 B
 G5 Sonne-Lux/Exposure CLOSED 2026-10-14 (Docs-closure): abgeloest durch G6 (e417086) — Sun 100000 Lux + HDR-RT ScreenshotTool path already shipped; full CI r116 Build Exit 0 / Tests 118/118 / fehlgeschlagen 0, ROT.md empty -> gate met, no new code. Docs-commit only.
 
 T1 Baeume schweben CLOSED 2026-10-14 (Docs-closure): the [!] soft-block (r105, 3 attempts) was already resolved by commit 9ebf04d. Re-Roll full CI r128 METHOD Build Exit 0 / Tests 118/118 / fehlgeschlagen 0, ROT.md empty -> gate met; Trees_TrunksSitInGround + Lianen_HangFromCrownsAndAreClimbable green. No new code, Docs-commit only.
+
+W1 Zufallswelt per Seed GRUEN 2026-10-14: JungleWorld.cs per-Seed Bach-Meander carved into Terrain (rim-band guard + SwampFactor=Creek); UrwaldTests W1_SeedsDeterministicAndCreekPresent. Full CI r148c METHOD Exit 0 / Tests 119/119 / fehlgeschlagen 0.
