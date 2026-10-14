@@ -432,13 +432,10 @@ namespace Spinnenspiel.Tests
             if (spiderGo != null)
             {
                 Vector3 s = spiderGo.transform.position;
-                // G2 Schritt 0: an Closeup-Kamera freestanding, ~2 m ueber dem Terrain an der
-                // Spinnenposition, Blick waagrecht mit ca. 10 Grad nach oben, Near-Plane 0.3.
-                // BUT die Bewurld-Canopa dicht und niedrig -> 2 m still in Belaep. So Measure
-                // the highest nearby tree top (renderer bounds.max.y) and place the cam ABOVE
-                // the canopy so it sees sky (per [!] diagnosis).
+                // G2 Schritt 0: Closeup-Kamera ~1.5-3 m vor der Spinne, Blick auf ihr,
+                // nichts naeher als 0.5 m vor der Linse. Measure highest nearby tree top
+                // so we can place the himmel-cam ABOVE the canopy (see sky).
                 float canopyTop = 0f;
-                // Renderers live on the child nodes "TreeLOD0"/"TreeLOD1" of each "PH-Tree".
                 foreach (var tr in GameObject.FindObjectsOfType<UnityEngine.MeshRenderer>())
                 {
                     var tn = tr.gameObject.name;
@@ -447,29 +444,44 @@ namespace Spinnenspiel.Tests
                     if ((new Vector3(b.center.x - s.x, 0f, b.center.z - s.z)).sqrMagnitude < 12f * 12f)
                         canopyTop = Mathf.Max(canopyTop, b.max.y);
                 }
-                float camY = (canopyTop > 0f) ? canopyTop + 0.8f : s.y + 2f;
-                main.transform.position = new Vector3(s.x, camY, s.z);
-                main.nearClipPlane = 0.3f;
-                var fwd = (new Vector3(0.6f, 0f, -0.9f)).normalized;
-                fwd = Vector3.RotateTowards(fwd, Vector3.up, 0.1745f, 0f); // ~10 Grad nach oben
-                main.transform.rotation = Quaternion.LookRotation(fwd);
 
-                float skyFrac = SkyFractionUpperHalf(main, 8f);
-
-                var rt2 = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32);
-                rt2.antiAliasing = 4;
-                rt2.Create();
-                main.targetTexture = rt2;
+                // --- urwald_spinne.png: Nahaufnahme, HDR-Pfad (MotionBlur/DoF off via no post pipeline). ---
+                main.transform.position = s + new Vector3(0.6f, 0.18f, -0.9f);
+                main.nearClipPlane = 0.5f;
+                main.transform.LookAt(s + new Vector3(0f, 0.05f, 0f));
                 if (veg != null) veg.RenderForCamera(main);
-                SaveFrame(main, rt2, 1280, 720, "Logs/ci/urwald_spinne.png");
-                main.targetTexture = null;
-                Object.DestroyImmediate(rt2);
+                Vector4 spinne = SaveFrameHdr(main, 1280, 720, "Logs/ci/urwald_spinne.png");
 
-                Debug.Log("[G2-Sky] Himmelanteil obere Haelfte: " + skyFrac.ToString("P1")
-                    + " -> Kriterium >= 15% -> " + (skyFrac >= 0.15f ? "OK" : "NOK"));
-                Assert.GreaterOrEqual(skyFrac, 0.15f,
-                    "G2 Schritt 0: Kamera sieht kein Himmel (Himmelanteil obere Haelfte "
-                    + skyFrac.ToString("P1") + " < 0.15) -> Messung wertlos.");
+                // --- urwald_himmel.png: Kamera ueber dem Kronendach, Blick waagrecht. ---
+                float camY = (canopyTop > 0f) ? canopyTop + 6f : s.y + 40f;
+                main.transform.position = new Vector3(s.x, camY, s.z);
+                main.nearClipPlane = 0.5f;
+                var fwd = (new Vector3(0.6f, 0f, -0.9f)).normalized;
+                main.transform.rotation = Quaternion.LookRotation(fwd);
+                float skyFrac = SkyFractionUpperHalf(main, 30f);
+                if (veg != null) veg.RenderForCamera(main);
+                Vector4 himmel = SaveFrameHdr(main, 1280, 720, "Logs/ci/urwald_himmel.png");
+
+                // DANN messen + asserten (ERST aufnehmen war oben -> G6-Lehre).
+                Debug.Log("[G6-Spinne] Mittel " + spinne.x.ToString("F1") + " -> >=25 -> "
+                    + (spinne.x >= 25f ? "OK" : "NOK")
+                    + " | Magenta " + ((int)spinne.z).ToString() + " -> =0 -> " + (spinne.z == 0f ? "OK" : "NOK")
+                    + " | SharpFrac " + spinne.w.ToString("P2") + " -> >=0.10 -> " + (spinne.w >= 0.10f ? "OK" : "NOK"));
+                Debug.Log("[G6-Himmel] SkyFrac " + skyFrac.ToString("P2") + " -> >=0.5 -> "
+                    + (skyFrac >= 0.5f ? "OK" : "NOK")
+                    + " | Mittel " + himmel.x.ToString("F1") + " -> 60..200 -> "
+                    + ((himmel.x >= 60f && himmel.x <= 200f) ? "OK" : "NOK")
+                    + " | Max " + ((int)himmel.y).ToString() + " -> >200 -> " + (himmel.y > 200f ? "OK" : "NOK")
+                    + " | Magenta " + ((int)himmel.z).ToString() + " -> =0 -> " + (himmel.z == 0f ? "OK" : "NOK"));
+
+                Assert.GreaterOrEqual(spinne.x, 25f, "G6 spinne Mittel < 25.");
+                Assert.LessOrEqual(spinne.z, 0f, "G6 spinne Magenta > 0.");
+                Assert.GreaterOrEqual(spinne.w, 0.10f, "G6 spinne SharpFrac < 0.10.");
+                Assert.GreaterOrEqual(skyFrac, 0.5f, "G6 himmel SkyFraction < 0.5.");
+                Assert.GreaterOrEqual(himmel.x, 60f, "G6 himmel Mittel < 60.");
+                Assert.LessOrEqual(himmel.x, 200f, "G6 himmel Mittel > 200 (blendout).");
+                Assert.Greater(himmel.y, 200f, "G6 himmel Max <= 200.");
+                Assert.LessOrEqual(himmel.z, 0f, "G6 himmel Magenta > 0.");
             }
         }
 
@@ -641,6 +653,94 @@ namespace Spinnenspiel.Tests
             Object.DestroyImmediate(tex);
             RenderTexture.active = null;
             System.IO.File.WriteAllBytes(file, png);
+        }
+
+        // G6: offscreen cam.Render() SKIPS the HDRP post-processing pipeline. A plain ARGB32
+        // readback clamps to [0,1] and thus renders dark/soft (Max ~172). The proven ScreenshotTool
+        // path fixes this with an HDR RT (ARGBHalf) + geometric-mean auto-exposure + ACES tonemap.
+        // Returns (Mittel 0..255, Max 0..255, Magenta count, SharpFraction 0..1).
+        private static Vector4 SaveFrameHdr(Camera cam, int w, int h, string file)
+        {
+            var rt = new RenderTexture(w, h, 0, RenderTextureFormat.ARGBHalf);
+            rt.antiAliasing = 4;
+            rt.Create();
+            cam.targetTexture = rt;
+            cam.Render();
+            RenderTexture.active = rt;
+            var hdr = new Texture2D(w, h, TextureFormat.RGBAHalf, false);
+            hdr.ReadPixels(new Rect(0, 0, w, h), 0, 0);
+            hdr.Apply(false);
+            RenderTexture.active = null;
+            cam.targetTexture = null;
+
+            Color[] px = hdr.GetPixels();
+            int n = px.Length;
+            float sumLog = 0f;
+            for (int i = 0; i < n; i++)
+            {
+                Color c = px[i];
+                float lum = 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
+                sumLog += Mathf.Log(Mathf.Max(lum, 1e-5f));
+            }
+            float exposure = 0.55f / Mathf.Exp(sumLog / n);
+            exposure = Mathf.Clamp(exposure, 0.0005f, 50f);
+
+            Color[] outPx = new Color[n];
+            for (int i = 0; i < n; i++)
+            {
+                Color c = px[i];
+                float r = Mathf.Max(c.r * exposure, 0f);
+                float g = Mathf.Max(c.g * exposure, 0f);
+                float b = Mathf.Max(c.b * exposure, 0f);
+                outPx[i] = new Color(AcesTone(r), AcesTone(g), AcesTone(b), 1f);
+            }
+
+            double sum = 0.0;
+            int maxv = 0;
+            long magenta = 0;
+            for (int i = 0; i < n; i++)
+            {
+                Color c = outPx[i];
+                float luma = 0.299f * c.r + 0.587f * c.g + 0.114f * c.b;
+                sum += luma * 255.0;
+                int ri = (int)(Mathf.Max(c.r, Mathf.Max(c.g, c.b)) * 255f);
+                if (ri > maxv) maxv = ri;
+                float R = c.r * 255f, G = c.g * 255f, B = c.b * 255f;
+                if (R > 200f && G < 80f && B > 200f) magenta++;
+            }
+            long sharpHits = 0, sharpTotal = 0;
+            for (int y = 0; y < h; y++)
+            {
+                int rowBase = y * w;
+                for (int x = 0; x + 1 < w; x++)
+                {
+                    Color a = outPx[rowBase + x];
+                    Color b2 = outPx[rowBase + x + 1];
+                    float la = 0.299f * a.r + 0.587f * a.g + 0.114f * a.b;
+                    float lb = 0.299f * b2.r + 0.587f * b2.g + 0.114f * b2.b;
+                    if (Mathf.Abs(la - lb) * 255f > 8f) sharpHits++;
+                    sharpTotal++;
+                }
+            }
+
+            var ldr = new Texture2D(w, h, TextureFormat.RGB24, false);
+            ldr.SetPixels(outPx);
+            ldr.Apply(false);
+            byte[] png = ldr.EncodeToPNG();
+            System.IO.File.WriteAllBytes(file, png);
+            Object.DestroyImmediate(hdr);
+            Object.DestroyImmediate(ldr);
+            Object.DestroyImmediate(rt);
+
+            float mean = (float)(sum / n);
+            float sharpFrac = sharpTotal > 0 ? (float)sharpHits / sharpTotal : 0f;
+            return new Vector4(mean, (float)maxv, (float)magenta, sharpFrac);
+        }
+
+        private static float AcesTone(float x)
+        {
+            x = Mathf.Max(x - 0.003f, 0f);
+            return (x * (2.51f * x + 0.03f)) / ((x * (2.43f * x + 0.59f) + 0.14f));
         }
 
         [UnityTest]
