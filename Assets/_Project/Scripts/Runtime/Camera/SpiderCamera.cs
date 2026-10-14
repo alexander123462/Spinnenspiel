@@ -15,7 +15,7 @@ namespace Spinnenspiel
     {
         [Header("Referenzen")]
         [SerializeField] private Transform target;
-        [SerializeField] private Vector3 targetOffset = new Vector3(0f, 0.09f, 0f); // C1: näher/tiefer für Referenzlook
+        [SerializeField] private Vector3 targetOffset = new Vector3(0f, 0.05f, 0f); // A2 Groessengefuehl: niedrig/nah
         [SerializeField] private SpiderInput input;
 
         [Header("Orbit")]

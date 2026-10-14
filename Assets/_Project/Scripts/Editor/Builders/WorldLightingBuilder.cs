@@ -66,7 +66,7 @@ namespace Spinnenspiel.EditorTools
 
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogDensity = 0.022f;
+            RenderSettings.fogDensity = 0.012f; // A2: dezent Nebel, nicht flaechendeckend
             RenderSettings.fogColor = new Color(0.68f, 0.74f, 0.78f);
 
             CreateVolume();
@@ -93,7 +93,7 @@ namespace Spinnenspiel.EditorTools
             var cs = profile.Add<ContactShadows>(true); cs.enable.Override(true);
             var ao = profile.Add<ScreenSpaceAmbientOcclusion>(true); ao.intensity.Override(1f);
             // G4: leichte Makro-Tiefenunschärfe (manueller Fokus, nicht Physikalische-Kamera-Modus).
-            var dof = profile.Add<DepthOfField>(true); dof.focusMode.Override(DepthOfFieldMode.Manual); dof.nearFocusStart.Override(0f); dof.nearFocusEnd.Override(0.15f); dof.farFocusStart.Override(2.5f); dof.farFocusEnd.Override(12f);
+            var dof = profile.Add<DepthOfField>(true); dof.focusMode.Override(DepthOfFieldMode.Manual); dof.nearFocusStart.Override(0f); dof.nearFocusEnd.Override(0.15f); dof.farFocusStart.Override(6f); dof.farFocusEnd.Override(20f); // A2: dezent DoF, nicht flaechendeckend
 
             foreach (VolumeComponent component in profile.components)
             {
