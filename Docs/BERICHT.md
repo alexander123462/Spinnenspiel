@@ -113,3 +113,5 @@ G3 Himmel soft-block CLOSED 2026-10-14: full CI r114 Build Exit 0 / Tests 118/11
 G4 Beweisbild urwald_spinne.png CLOSED 2026-10-14 (Docs-closure): full CI r115 Build Exit 0 / Tests 118/118 / fehlgeschlagen 0, ROT.md empty -> gate met. Fresh urwald_spinne.png (r115) now scharf: SharpFrac 0.554>=0.10 OK, Mittel 146. Closed via G6 HDR-RT path (ARGBHalf+AutoHist+ACES), no new code. Docs-commit only.
 
 G5 Sonne-Lux/Exposure CLOSED 2026-10-14 (Docs-closure): abgeloest durch G6 (e417086) — Sun 100000 Lux + HDR-RT ScreenshotTool path already shipped; full CI r116 Build Exit 0 / Tests 118/118 / fehlgeschlagen 0, ROT.md empty -> gate met, no new code. Docs-commit only.
+
+T1 Baeume schweben CLOSED 2026-10-14 (Docs-closure): the [!] soft-block (r105, 3 attempts) was already resolved by commit 9ebf04d. Re-Roll full CI r128 METHOD Build Exit 0 / Tests 118/118 / fehlgeschlagen 0, ROT.md empty -> gate met; Trees_TrunksSitInGround + Lianen_HangFromCrownsAndAreClimbable green. No new code, Docs-commit only.
