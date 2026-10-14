@@ -908,6 +908,134 @@ namespace Spinnenspiel.Tests
             Assert.GreaterOrEqual(ratio, 2.0f, "Density forest/clearing " + ratio.ToString("F2") + " < 2.0.");
         }
 
+        // E1 Schritt 2a: Sumpfflaechen are shallow — the bed of every flooded area (Sumpf
+        // and creek) must never go deeper than MaxSwampDepth (0.15 m) under the waterline.
+        [UnityTest]
+        public IEnumerator E1_SwampWaterIsShallow()
+        {
+            JungleWorldGenerator.NextSeed = 4242;
+            SceneManager.LoadScene("Urwald");
+            yield return null;
+            yield return WaitReady();
+            Assert.IsNotNull(readyGen, "Welt (Seed 4242) not ready.");
+            JungleWorld world = readyGen.World;
+            float half = world.Size / 2f;
+
+            int wet = 0;
+            float maxDepth = 0f;
+            for (int dx = -30; dx <= 30; dx++)
+            {
+                for (int dz = -30; dz <= 30; dz++)
+                {
+                    float x = half + dx, z = half + dz;
+                    if (!world.IsUnderWater(x, z)) continue;
+                    wet++;
+                    float depth = JungleWorld.WaterLevel - world.Height(x, z);
+                    if (depth > maxDepth) maxDepth = depth;
+                }
+            }
+            Debug.Log("[E1] wet=" + wet + " maxDepth=" + maxDepth.ToString("F3"));
+            Assert.Greater(wet, 0, "Keinen Sumpfflaechen found.");
+            Assert.LessOrEqual(maxDepth, JungleWorld.MaxSwampDepth + 0.001f,
+                "Sumpfflaechen deeper than " + JungleWorld.MaxSwampDepth.ToString("F2") + " m (" + maxDepth.ToString("F3") + ").");
+        }
+
+        // E1 Schritt 2b: Spinne in Sumpfflaechen moves at >= 50 % of the ground walk speed.
+        [UnityTest]
+        public IEnumerator E1_SpiderWadesThroughSwamp()
+        {
+            JungleWorldGenerator.NextSeed = 4242;
+            SceneManager.LoadScene("Urwald");
+            yield return null;
+            yield return WaitReady();
+            Assert.IsNotNull(readyGen, "Welt (Seed 4242) not ready.");
+            JungleWorld world = readyGen.World;
+            float half = world.Size / 2f;
+
+            // A wet spot with shallow-but-real depth to wade in.
+            Vector3 spot = Vector3.zero;
+            bool found = false;
+            for (int dx = -20; dx <= 20 && !found; dx++)
+            {
+                for (int dz = -20; dz <= 20 && !found; dz++)
+                {
+                    float x = half + dx, z = half + dz;
+                    if (!world.IsUnderWater(x, z)) continue;
+                    float depth = JungleWorld.WaterLevel - world.Height(x, z);
+                    if (depth < 0.02f || depth > 0.14f) continue;
+                    spot = new Vector3(x, JungleWorld.WaterLevel + 0.03f, z);
+                    found = true;
+                }
+            }
+            Assert.IsTrue(found, "Keinen wadeable swamp spot (depth 0.02-0.14 m) found.");
+
+            SpiderMovement spider = Object.FindFirstObjectByType<SpiderMovement>();
+            Assert.IsNotNull(spider, "Spinne not found.");
+            spider.Teleport(spot, Quaternion.identity);
+            float start = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - start < 1f) yield return null;
+
+            // Drive forward for ~2 s and track the peak speed reached.
+            float maxSpeed = 0f;
+            spider.SetExternalMoveLocal(new Vector2(0f, 1f));
+            spider.SetExternalSprint(false);
+            start = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - start < 2f)
+            {
+                yield return null;
+                maxSpeed = Mathf.Max(maxSpeed, spider.Speed);
+            }
+            float groundSpeed = spider.WalkSpeed;
+            Debug.Log("[E1] wadeMax=" + maxSpeed.ToString("F3") + " walk=" + groundSpeed.ToString("F3"));
+            Assert.GreaterOrEqual(maxSpeed, groundSpeed * 0.5f,
+                "Wading speed " + maxSpeed.ToString("F3") + " < 50 % of walk speed " + groundSpeed.ToString("F3") + ".");
+        }
+
+        // E1 Schritt 2c: Beweisbild Logs/ci/wasser.png must be sharp (SharpFrac >= 0.10).
+        [UnityTest]
+        public IEnumerator E1_WaterProofImageIsSharp()
+        {
+            JungleWorldGenerator.NextSeed = 4242;
+            SceneManager.LoadScene("Urwald");
+            yield return null;
+            yield return WaitReady();
+            Assert.IsNotNull(readyGen, "Welt (Seed 4242) not ready.");
+            JungleWorld world = readyGen.World;
+            float half = world.Size / 2f;
+
+            // Find a wet spot near a dry shore so the frame shows water + shoreline.
+            Vector3 wetSpot = Vector3.zero;
+            bool found = false;
+            for (int dx = -20; dx <= 20 && !found; dx++)
+            {
+                for (int dz = -20; dz <= 20 && !found; dz++)
+                {
+                    float x = half + dx, z = half + dz;
+                    if (!world.IsUnderWater(x, z)) continue;
+                    if (world.IsUnderWater(x + 3f, z) || world.IsUnderWater(x - 3f, z)) continue;
+                    wetSpot = new Vector3(x, JungleWorld.WaterLevel, z);
+                    found = true;
+                }
+            }
+            Assert.IsTrue(found, "Keinen water-with-shore spot found for the proof shot.");
+
+            var cycle = Object.FindFirstObjectByType<DayNightCycle>();
+            if (cycle != null) cycle.SetDayProgress(0.45f);
+            yield return null; // one frame so DayNightCycle rotates the sun to morning
+
+            Camera main = Camera.main;
+            Assert.IsNotNull(main, "Hauptkamera not found.");
+            VegetationSystem veg = Object.FindFirstObjectByType<VegetationSystem>();
+            main.transform.position = wetSpot + new Vector3(0f, 1.6f, -2.4f);
+            main.nearClipPlane = 0.5f;
+            main.transform.LookAt(wetSpot + new Vector3(0f, JungleWorld.WaterLevel - 0.05f, 1.5f));
+            if (veg != null) veg.RenderForCamera(main);
+            Vector4 wasser = SaveFrameHdr(main, 1280, 720, "Logs/ci/wasser.png");
+            Debug.Log("[E1-Wasser] SharpFrac " + wasser.w.ToString("P2") + " -> >=0.10 -> " + (wasser.w >= 0.10f ? "OK" : "NOK"));
+            Assert.GreaterOrEqual(wasser.w, 0.10f,
+                "Wasser-Beweisbild SharpFrac " + wasser.w.ToString("P2") + " < 0.10.");
+        }
+
         /// <summary>Hash of the seed-driven placement basis (height + density grid, 4 m steps, FNV-1a over quantised values).</summary>
         private static uint PlacementHash(int seed)
         {

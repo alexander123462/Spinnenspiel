@@ -94,16 +94,17 @@ namespace Spinnenspiel
             t.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Ground;
             Terrain terrain = t.GetComponent<Terrain>();
 
-            // 3) Sumpfwasser (als Wasser erkennbar: dünner BoxCollider + SurfaceTag Water + WaterBody)
-            GameObject water = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            UnityEngine.Object.Destroy(water.GetComponent<Collider>());
-            var wbox = water.AddComponent<BoxCollider>();
-            wbox.size = new Vector3(1f, 1f, 0.02f); // im lokalen Quad-Raum dünn (Z)
+            // 3) Wasser (E1: Sumpf + Bach per Seed — nur ueber Grundfeucht Areas,
+            //    realistic Shoreline; thin MeshCollider so Spinne can wade on it)
+            var waterMesh = BuildWaterMesh(World, size);
+            GameObject water = new GameObject("Sumpfwasser");
             water.name = "Sumpfwasser";
-            water.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
-            water.transform.position = new Vector3(size / 2f, JungleWorld.WaterLevel, size / 2f);
-            water.transform.localScale = new Vector3(size, size, 1f);
-            water.GetComponent<MeshRenderer>().sharedMaterial = library.water;
+            MeshFilter waterMf = water.AddComponent<MeshFilter>();
+            waterMf.sharedMesh = waterMesh;
+            MeshRenderer renderer = water.AddComponent<MeshRenderer>();
+            renderer.sharedMaterial = library.water;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            water.AddComponent<MeshCollider>().sharedMesh = waterMesh;
             water.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Water;
             water.AddComponent<WaterBody>();
 
@@ -1226,6 +1227,53 @@ namespace Spinnenspiel
                 NextSeed = 1 + (System.Environment.TickCount & 0x7fffffff) % 999999;
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             }
+        }
+
+        /// <summary>
+        /// E1: Builds the water surface as a flat mesh at WaterLevel over WET ground only
+        /// (Sumpfe + creek per Seed). 1-m grid cells: a quad wherever Height < WaterLevel.
+        /// The patchwork gives a realistic, irregular Shoreline (instead of one big Quad)
+        /// and lets the MeshCollider mark exactly the flooded area for the Spinne.
+        /// </summary>
+        private static Mesh BuildWaterMesh(JungleWorld world, float size)
+        {
+            const float cell = 1f;
+            int n = (int)(size / cell);
+            var verts = new System.Collections.Generic.List<Vector3>();
+            var uvs = new System.Collections.Generic.List<Vector2>();
+            var tris = new System.Collections.Generic.List<int>();
+            Vector2 center = new Vector2(size * 0.5f, size * 0.5f);
+
+            for (int gx = 0; gx < n; gx++)
+            {
+                for (int gz = 0; gz < n; gz++)
+                {
+                    float x0 = gx * cell, z0 = gz * cell;
+                    // Cell wet when its center below WaterLevel.
+                    if (world.Height(x0 + cell * 0.5f, z0 + cell * 0.5f) >= JungleWorld.WaterLevel) continue;
+
+                    int baseIdx = verts.Count;
+                    for (int c = 0; c < 4; c++)
+                    {
+                        float cx = x0 + ((c & 1) ^ ((c >> 1) & 1)) * cell; // 0,1,1,0 order below
+                        float cz = z0 + ((c >> 1) & 1) * cell;
+                        verts.Add(new Vector3(cx, JungleWorld.WaterLevel, cz));
+                        uvs.Add(new Vector2(cx - center.x, cz - center.y));
+                    }
+                    tris.Add(baseIdx); tris.Add(baseIdx + 2); tris.Add(baseIdx + 1);
+                    tris.Add(baseIdx); tris.Add(baseIdx + 3); tris.Add(baseIdx + 2);
+                }
+            }
+
+            var mesh = new Mesh();
+            mesh.name = "Sumpfwasser";
+            if (verts.Count == 0) return mesh;
+            mesh.SetVertices(verts);
+            mesh.SetUVs(0, uvs);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
+            return mesh;
         }
 
         private void OnGUI()

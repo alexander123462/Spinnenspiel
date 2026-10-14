@@ -26,6 +26,9 @@ namespace Spinnenspiel
         private const float CreekRamp = 1.6f;            // Rampen-Breite zum Ufer (m)
         private const float CreekBedDepth = 0.35f;       // Bachgrund unter WaterLevel (m)
 
+        // E1: Sumpfflaechen are shallow, flat water — max depth below the waterline.
+        public const float MaxSwampDepth = 0.15f;
+
         public int Seed { get; }
         public float Size { get; }
 
@@ -115,7 +118,10 @@ namespace Spinnenspiel
             float distBorder = Mathf.Min(Mathf.Min(x, z), Mathf.Min(Size - x, Size - z));
             if (distBorder > EdgeWidth)
                 h = CreekModulate(h, CreekDist(x, z));
-            return h;
+
+            // E1: shallow flat water — the bed of every flooded area (Sumpf and
+            // Bach) never goes deeper than MaxSwampDepth under the waterline.
+            return Mathf.Max(h, WaterLevel - MaxSwampDepth);
         }
 
         /// <summary>Sumpffaktor 0..1 (eigenes Perlin, ~1/30 m, weiche Schwelle).</summary>
