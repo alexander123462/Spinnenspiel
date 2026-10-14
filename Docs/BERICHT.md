@@ -98,3 +98,9 @@ R5 Spider_StopsAgainstTree: BLOCKED 2026-10-12 (r5diag3): Test-Target=woodSub-Ax
 S1 Spinne-Spawn: Test Spider_StartsStandingOnGround gruen 5 Seeds (gap 0,030 m), CI r102d 109/110, RedPreview -> ROT.md-Baseline, commit e835d4e pushed.
 
 2026-10-13 | R7 RedPreview deterministisch | GRUEN: NetbuildComfortTests builds own Wood trunk pair (2 CapsuleCollider+SurfaceTag.Wood, 2.5 m) in code instead of hunting random Testwelt layout; assertion unchanged. CI r104 Build Exit 0 / Tests 110/110 / fehlgeschlagen 0, RedPreview green; removed from ROT.md baseline. Commit 6086aaf pushed origin hdrp.
+
+2026-10-13 | T1 Baeume schweben | GRUEN: planting in CreateTree now anchors TRUE mesh bottom via MeshCollider world-bounds (mc.bounds.min.y), root contract SampleHeight+0.15 kept, visual+collider children shifted 0.03 m into ground. CI r107c Build Exit 0 / Tests 111/111 / fehlgeschlagen 0 (Trees_TrunksSitInGround count=382 max=-0,030 above+0.10=0; Lianen green). Commit 9ebf04d pushed origin hdrp.
+
+2026-10-14 | S2 Abseil-Landing im Terrain | GRUEN: shared helper SpiderMovement.SettleOnTerrain raises center so body-collider bottom rests on Terrain.SampleHeight surface; applied at UpdateRope hit.point landing + both thread-end anchors (anchorB/anchorA). New PlayMode test Spider_LandsOnGroundAfterAbseil (thread with anchorB AT terrain height, abseil to end B, gap>=-0.05 m). CI r101 Build Exit 0 / Tests 112/112 / fehlgeschlagen 0. Commit 6392527 pushed origin hdrp.
+
+2026-10-14 | F1 Urwald trist/ausgewaschen | GRUEN: per-instance MaterialPropertyBlock _BaseColor near-white HSV jitter (hue spread, sat blend 0..20%, brightness +/-0.10) deterministisch via World.Hash01 at all plant sites (AddPlant/AddGroundFern/AddTreeFern/fern-scatter/CreateTree LOD0+LOD1); NO new material instances -> Static Batching/Draw Calls stay. New PlayMode unit InstanceTintTests. CI r102c METHOD Exit 0 / Tests 115/115 / fehlgeschlagen 0. Commit c1d1a21 pushed origin hdrp.

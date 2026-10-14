@@ -111,3 +111,14 @@
 - Deterministic precondition over random layout: a PlayMode test that needs specific geometry (e.g. two Wood colliders 1.5-4 m apart) must build that geometry IN the test (new GameObject + CapsuleCollider + SurfaceTag.Wood, base snapped to terrain via vertical RaycastAll skipping Wood), not hunt it in a randomly generated world. Otherwise regenerating the world flips the test red without any real regression. MakeWoodTrunk pattern in NetbuildComfortTests.cs.
 
 - Unity has NO CylinderCollider component — use CapsuleCollider (height/radius) for a trunk-like primitive collider.
+
+- Mesh-Vertices are NOT runtime-readable for PH-FBX trees (isReadable=false): lod0.vertices spams errors. For the TRUE visual bottom use the MeshCollider world-space AABB mc.bounds.min.y — always valid, unlike MeshRenderer.bounds which is STALE at creation time inside a builder (measured floats +2.5 m unmeasured).
+
+- Raycast-foot tree anchoring fails on slopes/map edges: SampleHeight clamps off-terrain (sank -14.9 m) and crown columns on slopes grab branches; anchor at the root XZ with mc.bounds.min.y instead, and shift CHILDREN (visual+collider localPosition), never the root (VegetationContactTest pins root at SampleHeight+0.15).
+
+- End-of-abseil/thread landings set transform.position = hit.point or anchorB/anchorA WITHOUT a terrain-height check, so the collider bottom (center - halfExtent) ends BELOW Terrain.SampleHeight and the spider sinks in. Fix once with a shared helper SettleOnTerrain(landing): halfToBottom = center.y - collider.bounds.min.y; targetCenterY = SampleHeight+terrainOriginY+halfToBottom+clearance; only RAISE (never lower). Apply at every landing site, not per-site copies.
+
+- Cache the body Collider in Awake as GetComponent<Collider>() (field _bodyCollider); collider.bounds is world-space AABB valid after any transform move. Do NOT recompute halfExtent from local extents — bounds.min.y already accounts for current rotation/scale, so halfToBottom = position.y - bounds.min.y is robust.
+
+- Per-instance color variation WITHOUT new material instances: one MaterialPropertyBlock per MeshRenderer via r.SetPropertyBlock(mp) with mp.SetColor("_BaseColor", c) (Unity-6/HDRP API is SetPropertyBlock, NOT SetShaderProperties which fails CS1061). Keeps Static Batching / Draw Calls in den Grueben. A MaterialPropertyBlock does NOT break batching the way cloned per-object materials do.
+- Near-white MULTIPLICATIVE tint (all channels ~0.72..1.10) preserves Albedo texture AND overall saturation; an ABSOLUTE HSV anchor darkens/washes non-green plants (flowers, bark). To raise hue SPREAD without washing: jitter hue per instance, blend toward chroma only ~0..20%, brightness +/-0.10. Test the math as a public static ComputeTint(hRaw,sRaw,vRaw) pure function in EditMode/PlayMode without the scene.
