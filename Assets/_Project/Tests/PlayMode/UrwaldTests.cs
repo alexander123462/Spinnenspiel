@@ -142,6 +142,64 @@ namespace Spinnenspiel.Tests
             }
         }
 
+        // S2: After abseiling down a net/silk thread to its lower anchor, the spider must NOT
+        // sink into the terrain. The end-of-thread landing sets position = anchorB without a
+        // terrain-height check; SettleOnTerrain raises the center so the collider bottom rests
+        // on the surface. Mirrors S1's gap criterion (bottom - terrainY must not be very negative).
+        [UnityTest]
+        public IEnumerator Spider_LandsOnGroundAfterAbseil()
+        {
+            int seed = 4242;
+            JungleWorldGenerator.NextSeed = seed;
+            SceneManager.LoadScene("Urwald");
+            yield return WaitReady();
+
+            var mv = Object.FindFirstObjectByType<SpiderMovement>();
+            Assert.IsNotNull(mv, $"Seed {seed}: SpiderMovement missing after load.");
+            Collider bodyCollider = mv.GetComponent<Collider>();
+            Assert.IsNotNull(bodyCollider, $"Seed {seed}: Spider body collider missing.");
+            Terrain terr = Terrain.activeTerrain;
+            Assert.IsNotNull(terr, $"Seed {seed}: no Terrain loaded.");
+
+            // Horizontal thread ~2 m; lower anchorB sits AT terrain height so the raw
+            // landing (position = anchorB) would leave the collider bottom BELOW ground.
+            float x = mv.transform.position.x;
+            float z = mv.transform.position.z;
+            float yA = terr.SampleHeight(new Vector3(x, 0f, z)) + terr.transform.position.y + 1.2f;
+            Vector3 anchorA = new Vector3(x - 1f, yA, z);
+            Vector3 anchorB = new Vector3(x + 1f, terr.SampleHeight(new Vector3(x + 1f, 0f, z)) + terr.transform.position.y, z);
+
+            GameObject threadGo = new GameObject("S2Thread");
+            SilkThread faden = threadGo.AddComponent<SilkThread>();
+            faden.Init(anchorA, anchorB, 0.02f);
+
+            mv.AttachToThread(faden, 0.9f);
+            Vector3 tan = faden.TangentAt(0.9f);
+            mv.transform.rotation = Quaternion.LookRotation(tan, Vector3.up);
+
+            // Walk toward end B: forward input along the tangent until the landing fires.
+            mv.SetExternalMoveLocal(new Vector2(0f, 1f));
+            bool landed = false;
+            for (int i = 0; i < 240 && !landed; i++)
+            {
+                yield return null;
+                if (mv.CurrentThread == null)
+                {
+                    landed = true;
+                }
+            }
+            mv.SetExternalMoveLocal(null);
+            Assert.IsTrue(landed, "Spider never reached end B of the thread.");
+
+            Vector3 pos = mv.transform.position;
+            float terrainY = terr.SampleHeight(pos) + terr.transform.position.y;
+            float bottomY = bodyCollider.bounds.min.y;
+            float gap = bottomY - terrainY;
+            Debug.Log($"[S2] seed={seed} spiderY={pos.y:F3} terrainY={terrainY:F3} colliderBottomY={bottomY:F3} gap={gap:F3}");
+
+            Assert.GreaterOrEqual(gap, -0.05f, $"Seed {seed}: spider sunk {-gap:F3} m into the terrain after abseil.");
+        }
+
         [UnityTest]
         public IEnumerator Performance_MeanFrameTimeUnderBudget()
         {

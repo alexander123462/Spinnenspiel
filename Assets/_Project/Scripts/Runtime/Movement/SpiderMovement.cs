@@ -74,6 +74,7 @@ namespace Spinnenspiel
         private float _boardCooldownUntil;
         private bool _warnedNoCamera;
         private SpiderSurfaceDetector _surface;
+        private Collider _bodyCollider;
 
         /// <summary>Letzte Gesamtbewegungsgeschwindigkeit in m/s (Positionsdifferenz pro Sekunde).</summary>
         public Vector3 Velocity => _lastVelocity;
@@ -180,6 +181,38 @@ namespace Spinnenspiel
                 dl.ResetAnchor(position, rotation * Vector3.up);
             }
             IsOnRope = false;
+        }
+
+        /// <summary>
+        /// Shared: Set a landing position so that the body collider bottom rests ON the terrain
+        /// surface instead of inside it. A SphereCast-landing hands back the contact point, which
+        /// sits at the surface, but the collider bottom (center - halfExtent) would then be BELOW
+        /// the terrain -> the spider sinks in (S2). Raises the center so the bottom equals terrain
+        /// height plus a small clearance. Root cause shared with S1 spawn grounding.
+        /// </summary>
+        private Vector3 SettleOnTerrain(Vector3 landing)
+        {
+            if (_bodyCollider == null)
+            {
+                return landing;
+            }
+
+            Terrain terr = Terrain.activeTerrain;
+            if (terr == null)
+            {
+                return landing;
+            }
+
+            float terrainY = terr.SampleHeight(landing) + terr.transform.position.y;
+            // Half extent from body center to collider bottom (current collider, pre-move).
+            float halfToBottom = transform.position.y - _bodyCollider.bounds.min.y;
+            float targetCenterY = terrainY + halfToBottom + 0.03f;
+            if (landing.y < targetCenterY)
+            {
+                landing.y = targetCenterY;
+            }
+
+            return landing;
         }
 
         /// <summary>
@@ -335,7 +368,7 @@ namespace Spinnenspiel
             {
                 IsOnRope = false;
                 _attached = true;
-                transform.position = hit.point;
+                transform.position = SettleOnTerrain(hit.point);
                 transform.rotation = Quaternion.FromToRotation(transform.up, hit.normal) * transform.rotation;
                 _lastSurfaceTime = Time.time;
                 _vel = Vector3.zero;
@@ -370,6 +403,7 @@ namespace Spinnenspiel
         private void Awake()
         {
             _surface = GetComponent<SpiderSurfaceDetector>();
+            _bodyCollider = GetComponent<Collider>();
 
             if (input == null)
             {
@@ -672,7 +706,7 @@ namespace Spinnenspiel
             {
                 Vector3 curUp = transform.up;
                 DetachFromThread();
-                transform.position = thread.anchorB;
+                transform.position = SettleOnTerrain(thread.anchorB);
                 transform.rotation = Quaternion.FromToRotation(curUp, -tan.normalized) * transform.rotation;
                 _vel = Vector3.zero;
                 _attached = true;
@@ -685,7 +719,7 @@ namespace Spinnenspiel
             {
                 Vector3 curUp = transform.up;
                 DetachFromThread();
-                transform.position = thread.anchorA;
+                transform.position = SettleOnTerrain(thread.anchorA);
                 transform.rotation = Quaternion.FromToRotation(curUp, tan.normalized) * transform.rotation;
                 _vel = Vector3.zero;
                 _attached = true;
