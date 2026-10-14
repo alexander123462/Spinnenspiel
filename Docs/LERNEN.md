@@ -122,3 +122,18 @@
 
 - Per-instance color variation WITHOUT new material instances: one MaterialPropertyBlock per MeshRenderer via r.SetPropertyBlock(mp) with mp.SetColor("_BaseColor", c) (Unity-6/HDRP API is SetPropertyBlock, NOT SetShaderProperties which fails CS1061). Keeps Static Batching / Draw Calls in den Grueben. A MaterialPropertyBlock does NOT break batching the way cloned per-object materials do.
 - Near-white MULTIPLICATIVE tint (all channels ~0.72..1.10) preserves Albedo texture AND overall saturation; an ABSOLUTE HSV anchor darkens/washes non-green plants (flowers, bark). To raise hue SPREAD without washing: jitter hue per instance, blend toward chroma only ~0..20%, brightness +/-0.10. Test the math as a public static ComputeTint(hRaw,sRaw,vRaw) pure function in EditMode/PlayMode without the scene.
+
+## Lehren (A1, r108)
+- PlayMode-Ko routine: SceneManager.LoadScene(...) defert das Szenen-Switch zum NAechsten Frame. Ist der Generator spawned in Awake, muss 'yield return null;' RIGHT after LoadScene befoer FindFirstObjectByType im WaitReady-Loop — ohne geht die Loop erstem Frame still old scene, FindFirst null und Timeout. Passing UrwaldTests do this; kopie pattern.
+- Vegetation-Varianten: pro gepflanzter Instanz Zufall-Scale+Rotation deterministisch from JungleWorldGenerator.NextSeed (hash of world pos), KEINE new Material-Instanzen per Object (Draw Calls explode) — MaterialPropertyBlock for tint, shared material for geometry.
+- New scan IDs (nettle/periwinkle/shrub_03/04) need matching ScanModels.IsAvailable+LoadMeshes entries AND generated HDRP .mat (MAT_<id>) committed; check ls AssetSource/polyhaven + Art/Scans/Models before referencing an ID in the generator, else Null-Return at runtime.
+
+## Lehren (A2, r109)
+- Spider-Spawn is ~9 m above ground and falls during walking: a proof-shot camera placed at spawn.transform.position films SKY (all-white PNG, mean 255). Take the screenshot only AFTER the walk / physics-rest, from the in-game near-camera.
+- Web_WalkInWeb_StaysOnWeb is FLAKY (sometimes 'Nur 4 von 8 Beinen geerdet'): it passed in all prior runs; on a single failure rerun the CI once before calling it a regression.
+- Verify proof-shots by pixel stats (PIL convert('L') mean/stdev), NOT the local vision model: white-out = mean ~255 / stdev <1; good scene shot ~ mean 57 / stdev 30. Vision model called both 'white' ambiguously.
+
+## Lehren (G6, r108)
+- Offscreen cam.Render() SKIPS the HDRP post-processing pipeline: a plain ARGB32 ReadPixels clamps to [0,1] and renders dark/soft (Max ~172). For bright/sharp proofshots use an ARGBHalf HDR RT + manual auto-exposure (geometric-mean, target ~0.55) + ACES tonemap — the proven ScreenshotTool path. ACES rolls off highlights, so raise the exposure TARGET to push Max past 200 while keeping Mittel <200.
+- SkyFractionUpperHalf needs the proofshot camera ABOVE the canopy (canopyTop + ~6m) AND a short sky-ray maxDist (~30m); at ground or canopyTop+1.5 the upper-half rays all hit tree crowns -> 0.0 and the assert aborts before any capture.
+- Capture ALL frames first, THEN measure/assert AFTER (a SharpFraction/SkyFraction assert that fires BEFORE SaveFrame leaves a STALE png and makes later measurements worthless).
