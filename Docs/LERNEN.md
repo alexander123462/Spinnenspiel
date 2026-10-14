@@ -149,3 +149,18 @@
 - W1 M7 invariant World_HasSwampsAndClearings: a dry point (SwampFactor<0.01) must NOT be below WaterLevel+0.3. A carved creek bed IS wetland -> fold creek into public SwampFactor (Max with creekWet ramp), so creek points are not counted as dry-violations. HeightAt keeps its own private SwampFactorAt, unaffected.
 
 - W1 Creek present-test: assert bed under WaterLevel by sampling segment MIDPOINTS (IsUnderWater(mid)) and banks dry at mid+perp offset; path must span x=0..Size. Determinism via PlacementHash(seed) FNV over quantised Height/Density grid, same seed -> equal, diff seed -> unequal.
+
+- N1 Silk: ShootThread already does Raycast+CanAnchor; a PlayMode test for anchor-geometry must respect CanAnchor thresholds (minThreadLength=0.5, rule b dot(dir,ownNormal)<-0.1, rule c coplanar within samePlaneTolerance=0.15). Shoot the Ueberhang underside from the GROUND (dist>0.5), never 0.4m straight up -> rejected.
+
+- N1 Silk: SilkThread.Length is exactly Vector3.Distance(anchorA,anchorB) so the +-0.1m length-check holds trivially; the real sag-check is droop=max over t of chord.y-PointAt(t).y with PointAt parabola down sag*4*t*(1-t), max at t=0.5 = sag. Set sag=0.02*dist (0.1 at 5m) -> droop<=sag<=0.3 OK.
+
+- N1 Silk test: set silk.autoAttach=false before shooting so the spider does not climb the thread; shoot aim from silk.spinnerets.position (not transform.position) since that is the raycast origin. For a Block side-face anchor keep vantage near the face mid-height so dot(dir,up)>-0.1 (rule b).
+- Unity/VBA: 'base' ist a reserved keyword in Unity — a local named 'base' compiles in plain C# but Unity batchmode fails CS1001 at the line. Never use 'base', 'mf' etc. as locals; prefix them (baseIdx, waterMf).
+- Full-world water Quad replaced by Flood-Fill-Mesh: iterate a 1-m grid, emit a quad where Height < WaterLevel, build verts/tris. Gives realistic shorelines for Sumpf+Bach and lets MeshCollider exactly mark the flooded area for wading.
+- Depth clamp for flat swamp water: return Mathf.Max(h, WaterLevel - MaxSwampDepth) in the flooded-area height function so no area is deeper than MaxSwampDepth under the waterline; testable via world.IsUnderWater + WaterLevel-Height.
+
+- Unity: Application.logMessageReceived is an EVENT, not a method -> register with 'Application.logMessageReceived += Handler' and unregister '-=' (handler signature void(string,string,LogType)). .Add()/.Remove() do NOT compile (CS0079/CS7036). Count LogType.Error + LogType.Exception for Konsolenfehler=0 tests.
+
+- LODGroup.GetRenderers has NO C# accessor (CS1061). To check a renderer is under LOD, walk up the transform chain: a renderer is covered if it or any ancestor carries an LODGroup component. Trees put LODGroup on root, renderers on children; plants/lianas put it on the same node -> ancestor-walk covers both.
+
+- Transform.GetChild(i) returns Transform (NOT GameObject); iterate children via childCount+GetChild (Transform->Transform), there is no Transform.GetChildren(). GetComponent<LODGroup>() works on a Transform.

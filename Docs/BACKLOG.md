@@ -182,17 +182,19 @@
   - Schritt 3: Test: 2 gleiche Seeds -> Hash der Platzierungen identisch -> OK/NOK; 2 verschiedene Seeds -> Hash verschieden -> OK/NOK; Dichte Wald / Dichte Lichtung >= 2.0 -> OK/NOK.
   - Schritt 4: Voller CI-Lauf, Commit nach dem Gate in Docs/ROT.md. Bei Abbruch eigene Dateien im Arbeitsbaum LASSEN und hier auflisten.
 
-- [ ] N1 Netze spinnen: Spinne kann fast ueberall Netzfaeden befestigen (Raycast auf Flaechen, Fadenanker, einfache Seilphysik).
+- [x] N1 Netze spinnen: Spinne kann fast ueberall Netzfaeden befestigen (Raycast auf Flaechen, Fadenanker, einfache Seilphysik). [e2c5b40]
   - Schritt 1: Taste -> Raycast auf Flaechen (Boden, Staemme, Steine, Blaetter), Anker setzen, Faden als Seil (Verlet/LineRenderer) zwischen Spinne und Anker.
   - Schritt 2: Test: Anker auf Baumstamm in 5 m Entfernung, Fadenlaenge -> Abstand +-0.1 m -> OK/NOK; Faden-Durchhang bei Ruhe <= 0.3 m -> OK/NOK; Anteil getesteter Oberflaechentypen mit gueltigem Anker >= 90 % -> OK/NOK.
   - Schritt 3: Voller CI-Lauf, Commit nach dem Gate in Docs/ROT.md. Bei Abbruch eigene Dateien im Arbeitsbaum LASSEN und hier auflisten.
 
-- [ ] E1 Wasser und Bach realistisch, Sumpf mit flachem Wasser.
+- [x] E1 Wasser und Bach realistisch, Sumpf mit flachem Wasser. [9012945]
+  - Geaenderte Dateien: Assets/_Project/Scripts/Runtime/World/JungleWorld.cs (MaxSwampDepth=0.15 m, Sumpfboden clamped), Assets/_Project/Scripts/Runtime/World/JungleWorldGenerator.cs (BuildWaterMesh: Flood-Fill-Mesh nur ueber feucht Grund, realistic Shore, MeshCollider), Assets/_Project/Tests/PlayMode/UrwaldTests.cs (E1_SwampWaterIsShallow, E1_SpiderWadesThroughSwamp, E1_WaterProofImageIsSharp).
   - Schritt 1: HDRP-Wasser (Water System oder Shader-Graph) fuer Bachlauf und flache Sumpfflaechen; Spinne kann flach durchwaten, Tiefe begrenzt.
   - Schritt 2: Test: Wassertiefe im Sumpf <= 0.15 m -> OK/NOK; Spinne in Sumpf bewegt sich mit Geschwindigkeit >= 50 % der Bodengeschwindigkeit -> OK/NOK; Beweisbild Logs/ci/wasser.png SharpFrac >= 0.10 -> OK/NOK.
   - Schritt 3: Voller CI-Lauf, Commit nach dem Gate in Docs/ROT.md. Bei Abbruch eigene Dateien im Arbeitsbaum LASSEN und hier auflisten.
 
-- [ ] P1 Polishing: Beleuchtung, Himmel, Nebel, Schatten, LOD und Culling, Konsolenfehler abarbeiten.
+- [x] P1 Polishing: Beleuchtung, Himmel, Nebel, Schatten, LOD und Culling, Konsolenfehler abarbeiten. [b53d713]
+  - Geaenderte Dateien: Assets/_Project/Scripts/Runtime/World/JungleWorldGenerator.cs (AddPlantLod + AddPlantLod(vis) for Lianen; LODGroup screen-threshold 0.03), Assets/_Project/Tests/PlayMode/UrwaldTests.cs (P1_LodsAndNoConsoleErrors). Beleuchtung/Himmel/Nebel/Schatten already green via G6+G3 closures (maxShadowDistance 80 m in LightingBuilder/WorldLightingBuilder); Frametime-Budget already green via Performance_MeanFrameTimeUnderBudget.
   - Schritt 1: LODGroups fuer Baeume/Buesche, Culling-Distanzen, Schattendistanz sinnvoll setzen.
   - Schritt 2: Test: Konsolenfehler im Playmode-Durchlauf = 0 -> OK/NOK; Mittlere Frametime <= Budget aus Performance-Test -> OK/NOK; Anzahl Objekte ohne LOD bei Vegetation = 0 -> OK/NOK.
   - Schritt 3: Voller CI-Lauf, Commit nach dem Gate in Docs/ROT.md. Bei Abbruch eigene Dateien im Arbeitsbaum LASSEN und hier auflisten.
