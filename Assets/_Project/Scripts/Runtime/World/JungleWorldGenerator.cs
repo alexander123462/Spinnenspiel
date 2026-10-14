@@ -314,6 +314,7 @@ namespace Spinnenspiel
                             capCol.height = fb.size.y;
                             capCol.radius = Mathf.Clamp(0.25f * Mathf.Min(fb.size.x, fb.size.z), 0.015f, 0.12f);
                             capGo.transform.position = g.transform.TransformPoint(fb.center);
+                            AddPlantLod(g);
                             scatterN++;
                         }
                     }
@@ -840,8 +841,28 @@ namespace Spinnenspiel
             cc.height = b.size.y * s.y;
             cc.radius = Mathf.Clamp(0.25f * Mathf.Min(b.size.x * s.x, b.size.z * s.z), 0.015f, 0.12f);
             c.transform.position = g.transform.TransformPoint(b.center);
+            AddPlantLod(g);
             return g;
         }
+
+        /// <summary>
+        /// P1: LODGroup (single Level-0 + RecalculateBounds). Below the screen-size Threshold
+        /// the group renders nothing -> distant plants get culled (Culling-Distanz). No reduced
+        /// meshes exist for these variants, so Level 0 is the full mesh and the LODGroup acts as a
+        /// distance-cull. Colliders stay active regardless of LOD (LOD only affects rendering).
+        /// </summary>
+        private void AddPlantLod(GameObject instance)
+        {
+            var r = instance.GetComponent<MeshRenderer>();
+            if (r == null) return;
+            var lod = instance.AddComponent<LODGroup>();
+            lod.SetLODs(new LOD[] { new LOD(VegetationLodScreenThreshold, new MeshRenderer[] { r }) });
+            lod.fadeMode = LODFadeMode.CrossFade;
+            lod.RecalculateBounds();
+        }
+
+        /// <summary>Screen-Sizes-Threshold (0..1) at which a plant LODGroup stops rendering.</summary>
+        private const float VegetationLodScreenThreshold = 0.03f;
 
         /// <summary>Kann ein Objekt an (x,z) stehen: trocken und Steigung < 20°?</summary>
         private static bool IsDryFlat(JungleWorld world, float x, float z)
@@ -879,7 +900,9 @@ namespace Spinnenspiel
             vis.transform.localPosition = new Vector3(0f, -sy * lb.max.y, 0f);
             vis.transform.localScale = new Vector3(1f, sy, 1f);
             vis.AddComponent<MeshFilter>().sharedMesh = mesh;
-            vis.AddComponent<MeshRenderer>().sharedMaterial = mat;
+            var lianaRenderer = vis.AddComponent<MeshRenderer>();
+            lianaRenderer.sharedMaterial = mat;
+            AddPlantLod(vis);
 
             // Collider chain: Kapsels of ~2.4 m in root space (root scale = 1).
             int segs = Mathf.Max(2, Mathf.CeilToInt(len / 2.4f));
@@ -937,6 +960,7 @@ namespace Spinnenspiel
             cc.height = b.size.y * scale;
             cc.radius = Mathf.Clamp(0.25f * Mathf.Min(b.size.x, b.size.z) * scale, 0.02f, 0.14f);
             c.transform.position = g.transform.TransformPoint(b.center);
+            AddPlantLod(g);
         }
 
         /// <summary>
@@ -967,6 +991,7 @@ namespace Spinnenspiel
             cc.radius = 0.16f;
             cc.height = b.size.y * 0.75f * scale;
             c.transform.localPosition = new Vector3(0f, 0.375f * b.size.y, 0f);
+            AddPlantLod(g);
         }
 
         /// <summary>Stamm/Stein mit Convex-Collider und SurfaceTag erzeugen.</summary>

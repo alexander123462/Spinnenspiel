@@ -1036,6 +1036,81 @@ namespace Spinnenspiel.Tests
                 "Wasser-Beweisbild SharpFrac " + wasser.w.ToString("P2") + " < 0.10.");
         }
 
+        /// <summary>
+        /// P1: Konsolenfehler im Playmode-Durchlauf = 0 AND Anzahl Objekte ohne LOD bei Vegetation = 0.
+        /// A console error/exception is any log of LogType.Error or LogType.Exception that the world
+        /// generation raises after the scene loads. Vegetation = every MeshRenderer under the named
+        /// vegetation roots (Bäume, Unterholz, Baumfarne, Farn-Scatter, Grundfarne, Lianen); each must
+        /// sit in some LODGroup (LOD/Culling). Mittlere Frametime <= Budget ist der sibling green-Test
+        /// Performance_MeanFrameTimeUnderBudget.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator P1_LodsAndNoConsoleErrors()
+        {
+            JungleWorldGenerator.NextSeed = 4242;
+            _p1ConsoleErrors = 0;
+            Application.logMessageReceived += OnP1Log;
+
+            SceneManager.LoadScene("Urwald");
+            yield return WaitReady();
+            Assert.IsNotNull(readyGen, "Welt (Seed 4242) nicht fertig.");
+            for (int i = 0; i < 5; i++) yield return null; // let die Generation (und späte Logs) finish
+            Application.logMessageReceived -= OnP1Log;
+
+            Assert.AreEqual(_p1ConsoleErrors, 0, "Konsolenfehler im Playmode-Durchlauf != 0.");
+
+            // Walk the named vegetation roots; every MeshRenderer descendant must be inside a LODGroup.
+            // A renderer is covered if it or any ancestor carries an LODGroup component (trees: group on
+            // root, renderers on children; plants/lianas: group on the same node as the renderer).
+            var roots = new System.Collections.Generic.List<GameObject>();
+            string[] names = { "Bäume", "Unterholz", "Baumfarne", "Farn-Scatter", "Grundfarne", "Lianen" };
+            foreach (var go in Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None))
+                for (int n = 0; n < names.Length; n++)
+                    if (go.name == names[n]) { roots.Add(go); break; }
+
+            _p1VegRenderers = 0;
+            _p1MissingLod = 0;
+            foreach (var root in roots)
+                CountVegetationRenderers(root.transform, null);
+            Assert.Greater(_p1VegRenderers, 200, "Vegetation-Wurzels ohne MeshRenderer -> nicht gelauf.");
+            Assert.AreEqual(_p1MissingLod, 0, "Objekte ohne LOD bei Vegetation != 0 (" + _p1MissingLod + ").");
+        }
+
+        /// <summary>Counts one console error/exception per Error- or Exception-log while the hook is active.</summary>
+        private int _p1ConsoleErrors;
+        private int _p1VegRenderers;
+        private int _p1MissingLod;
+
+        private void OnP1Log(string msg, string stack, LogType type)
+        {
+            if (type == LogType.Error || type == LogType.Exception) _p1ConsoleErrors++;
+        }
+
+        /// <summary>Recursively count MeshRenderers under t; a renderer without an LODGroup on itself or any ancestor counts as missing.</summary>
+        private void CountVegetationRenderers(Transform t, Transform parent)
+        {
+            var r = t.GetComponent<MeshRenderer>();
+            if (r != null)
+            {
+                _p1VegRenderers++;
+                if (!IsUnderLod(t)) _p1MissingLod++;
+            }
+            for (int c = 0; c < t.childCount; c++)
+                CountVegetationRenderers(t.GetChild(c), t);
+        }
+
+        /// <summary>True if t or any ancestor of t carries an LODGroup component.</summary>
+        private bool IsUnderLod(Transform t)
+        {
+            Transform cur = t;
+            while (cur != null)
+            {
+                if (cur.GetComponent<LODGroup>() != null) return true;
+                cur = cur.parent;
+            }
+            return false;
+        }
+
         /// <summary>Hash of the seed-driven placement basis (height + density grid, 4 m steps, FNV-1a over quantised values).</summary>
         private static uint PlacementHash(int seed)
         {
