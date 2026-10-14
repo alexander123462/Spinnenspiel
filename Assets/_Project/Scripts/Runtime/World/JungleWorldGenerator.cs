@@ -298,6 +298,7 @@ namespace Spinnenspiel
                                 leafIdx == 0 ? library.fernScatterLeafMat : library.fernScatterStemMat,
                                 leafIdx == 0 ? library.fernScatterStemMat : library.fernScatterLeafMat,
                             };
+                            ApplyInstanceTint(r, new Vector3(px, fy, pz), 74);
                             // U4.4: thin CapsuleCollider like AddPlant -> climbable/anchorable,
                             // Plants-Layer. Scale is Vector3.one here so no capsule distortion.
                             Bounds fb = fm.bounds;
@@ -694,8 +695,70 @@ namespace Spinnenspiel
         /// <summary>Rastergröße auf Salzpaar abbilden: 1.5 → 11, 1.0 → 21, 0.7 → 31.</summary>
         private static int SaltA(float step) => step >= 1.4f ? 11 : step >= 0.9f ? 21 : 31;
 
+        /// <summary>
+        /// Per-Instance-Farbvariation (F1: Urwald wirkt ausgewaschen und eintoenig).
+        /// Deterministisch aus dem Seed (World.Hash01) und der Instance-Position. KEINE
+        /// neuen Materialinstanzen per Objekt: ein MaterialPropertyBlock per Renderer tints
+        /// HDRP-Lit _BaseColor, so Static Batching / Draw Calls stay in den Grueben.
+        /// Jitter: Farbton +/- 0.03, Saettigung +/- 0.10, Helligkeit +/- 0.10 (HSV).
+        /// </summary>
+        private void ApplyInstanceTint(MeshRenderer r, Vector3 worldPos, int salt)
+        {
+            if (r == null) return;
+            int gx = Mathf.FloorToInt(worldPos.x);
+            int gz = Mathf.FloorToInt(worldPos.z);
+            float hRaw = World.Hash01(gx, gz, salt);
+            float sRaw = World.Hash01(gx, gz, salt + 1);
+            float vRaw = World.Hash01(gx, gz, salt + 2);
+            Color c = ComputeTint(hRaw, sRaw, vRaw);
+            MaterialPropertyBlock mp = new MaterialPropertyBlock();
+            mp.SetColor("_BaseColor", c);
+            r.SetPropertyBlock(mp);
+        }
+
+        /// <summary>
+        /// Deterministic per-instance tint as a MULTIPLICATIVE near-white factor.
+        /// Pure math, testable without the scene: hRaw drives hue (spread), sRaw a small
+        /// saturation blend (0..20%), vRaw a brightness factor (+/- 0.10). Result always
+        /// in [0..1] and never darker than ~0.8 so the Albedo texture stays legible.
+        /// </summary>
+        public static Color ComputeTint(float hRaw, float sRaw, float vRaw)
+        {
+            float hue = hRaw;
+            float satBlend = Mathf.Clamp(0.10f + sRaw * 0.10f, 0f, 0.2f);
+            float valFactor = 1.0f + (vRaw - 0.5f) * 2f * 0.10f;
+            Color chroma = HsvToColor(hue, 1f, 1f);
+            Color c = new Color(
+                (1f + (chroma.r - 1f) * satBlend) * valFactor,
+                (1f + (chroma.g - 1f) * satBlend) * valFactor,
+                (1f + (chroma.b - 1f) * satBlend) * valFactor,
+                1f);
+            c.r = Mathf.Clamp01(c.r); c.g = Mathf.Clamp01(c.g); c.b = Mathf.Clamp01(c.b);
+            return c;
+        }
+
+        /// <summary>HSV (h in [0..1]) to RGB-Color. Simple, no external deps.</summary>
+        private static Color HsvToColor(float h, float s, float v)
+        {
+            h = h - Mathf.Floor(h);
+            int i = Mathf.FloorToInt(h * 6f);
+            float f = h * 6f - i;
+            float p = v * (1f - s);
+            float q = v * (1f - s * f);
+            float t = v * (1f - s * (1f - f));
+            switch (i % 6)
+            {
+                case 0: return new Color(v, t, p, 1f);
+                case 1: return new Color(q, v, p, 1f);
+                case 2: return new Color(p, v, t, 1f);
+                case 3: return new Color(p, q, v, 1f);
+                case 4: return new Color(t, p, v, 1f);
+                default: return new Color(v, p, q, 1f);
+            }
+        }
+
         /// <summary>Mesh-Objekt mit Kind „PflanzenCollider“ erzeugen (Spinne/Netze können andocken).</summary>
-        private static GameObject AddPlant(Transform parent, Mesh mesh, Material mat, Vector3 pos, float rotY, float scale)
+        private GameObject AddPlant(Transform parent, Mesh mesh, Material mat, Vector3 pos, float rotY, float scale)
         {
             GameObject g = new GameObject();
             g.transform.SetParent(parent, false);
@@ -703,7 +766,9 @@ namespace Spinnenspiel
             g.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
             g.transform.localScale = Vector3.one * scale;
             g.AddComponent<MeshFilter>().sharedMesh = mesh;
-            g.AddComponent<MeshRenderer>().sharedMaterial = mat;
+            var plantRenderer = g.AddComponent<MeshRenderer>();
+            plantRenderer.sharedMaterial = mat;
+            ApplyInstanceTint(plantRenderer, pos, 71);
 
             // Dünnkapsel in der Mesh-Mitte: klein genug, dass die Spinne nicht feststeckt,
             // groß genug, dass Netz-Anker und Beine andocken können.
@@ -803,6 +868,7 @@ namespace Spinnenspiel
             g.AddComponent<MeshFilter>().sharedMesh = mesh;
             var r = g.AddComponent<MeshRenderer>();
             r.sharedMaterials = new Material[] { library.groundFernLeafMat };
+            ApplyInstanceTint(r, pos, 72);
 
             Bounds b = mesh.bounds;
             GameObject c = new GameObject("GrundfarnCollider");
@@ -830,6 +896,7 @@ namespace Spinnenspiel
             g.AddComponent<MeshFilter>().sharedMesh = mesh;
             var r = g.AddComponent<MeshRenderer>();
             r.sharedMaterials = new[] { library.treeFernStemMat, library.treeFernLeafMat };
+            ApplyInstanceTint(r, pos, 73);
 
             // Kletter-Stamm: dünne Kapsel an der Basis (Radius 0.16, Höhe = bounds.y * 0.75 * scale).
             // Die Wedel (oberes Viertel) bleiben kollisionsfrei.
@@ -927,6 +994,7 @@ namespace Spinnenspiel
             lod0Node.AddComponent<MeshFilter>().sharedMesh = lod0;
             r0 = lod0Node.AddComponent<MeshRenderer>();
             r0.sharedMaterials = AssignMaterialsPerSubmesh(lod0, woodSub, woodMat, leafMat, phSlotNames);
+            ApplyInstanceTint(r0, new Vector3(pos.x, pos.y, pos.z), 75);
 
             GameObject lod1Node = null;
             if (lod1 != lod0)
@@ -937,6 +1005,7 @@ namespace Spinnenspiel
                 lod1Node.AddComponent<MeshFilter>().sharedMesh = lod1;
                 r1 = lod1Node.AddComponent<MeshRenderer>();
                 r1.sharedMaterials = AssignMaterialsPerSubmesh(lod1, PickWoodSubmesh(lod1, variant, scale), woodMat, leafMat, phSlotNames);
+                ApplyInstanceTint(r1, new Vector3(pos.x, pos.y, pos.z), 75);
             }
 
             // Collider on the LOD0-Mesh: LOD1 lacks lower-trunk triangles (measured in TreesTests),
