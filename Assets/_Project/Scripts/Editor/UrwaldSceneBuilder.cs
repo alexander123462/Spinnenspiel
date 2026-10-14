@@ -57,6 +57,9 @@ namespace Spinnenspiel.EditorTools
             lib.fernMat = TropischMaterial(ScanMaterial("Assets/_Project/Art/Scans/Materials/M_fern_02.mat", LoadMaterial("MAT_Fern")), "MAT_FernTropisch");
             lib.bush = ScanMesh("Assets/_Project/Art/Scans/Models/shrub_02/shrub_02_2k.fbx", LoadMesh("VM_Bush"));
             lib.bushMat = TropischMaterial(ScanMaterial("Assets/_Project/Art/Scans/Materials/M_shrub_02.mat", LoadMaterial("MAT_Grass")), "MAT_BushTropisch");
+            // A1: extra Busche-Varianten (shrub_03/04) with matching tropische Materials.
+            lib.bushVariants = LoadBushVariantMeshes();
+            lib.bushVariantMats = CreateBushVariantMats();
 
             // Riesenbläter (Blender, 3 Varianten): tropische Pflanze mit Blattschnitt-Mask und Normal.
             lib.giantLeaves = LoadRiesenblattMeshes();
@@ -75,6 +78,7 @@ namespace Spinnenspiel.EditorTools
             LoadGroundFerns(lib);
 
             // Bodendecker (Scan-Gras/Kraut): nur Optik, keine Collider; um die Spinne herum.
+            // A1: more species (nettle, periwinkle) -> variant per Instance via Hash01 below.
             LoadGroundCover(lib);
 
             // Poly-Haven-Baume (B3): FBX-Meshes (LOD0/1) + HDRP-Materials + Scales in die Library.
@@ -787,7 +791,9 @@ namespace Spinnenspiel.EditorTools
         /// <summary>Lädt Scan-Bodendecker (Gras/Kraut) als Mesh-/Material-Paare in die Asset-Bibliothek.</summary>
         private static void LoadGroundCover(JungleAssetLibrary lib)
         {
-            string[] ids = { "grass_medium_01", "grass_medium_02", "weed_plant_02" };
+            // A1: more species (nettle, periwinkle) -> the variant-per-Instance Hash01 pick
+            // below spreads them; groundCover[0] stays grass_medium_01 so older code keeps working.
+            string[] ids = { "grass_medium_01", "grass_medium_02", "weed_plant_02", "nettle_plant", "periwinkle_plant" };
             var meshes = new System.Collections.Generic.List<Mesh>();
             var mats = new System.Collections.Generic.List<Material>();
 
@@ -829,6 +835,46 @@ namespace Spinnenspiel.EditorTools
 
             lib.groundCover = meshes.ToArray();
             lib.groundCoverMats = mats.ToArray();
+        }
+
+        /// <summary>A1: extra Busche-Meshes (shrub_03/shrub_04) via ScanModels; missing ones skipped.</summary>
+        private static Mesh[] LoadBushVariantMeshes()
+        {
+            var meshes = new System.Collections.Generic.List<Mesh>();
+            foreach (string id in new[] { "shrub_03", "shrub_04" })
+            {
+                if (!ScanModels.IsAvailable(id))
+                {
+                    Debug.LogWarning("[Urwald] Busche-Variante nicht verfügbar: " + id);
+                    continue;
+                }
+                ScanModels.EnsureImported(id);
+                Mesh[] loaded = ScanModels.LoadMeshes(id);
+                if (loaded.Length == 0)
+                {
+                    Debug.LogWarning("[Urwald] Busche-Variante ohne Mesh: " + id);
+                    continue;
+                }
+                meshes.Add(loaded[0]);
+            }
+            return meshes.ToArray();
+        }
+
+        /// <summary>A1: tropische Materials for the extra Busche (same green tint as shrub_02).</summary>
+        private static Material[] CreateBushVariantMats()
+        {
+            var mats = new System.Collections.Generic.List<Material>();
+            foreach (string id in new[] { "shrub_03", "shrub_04" })
+            {
+                Material src = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_" + id + ".mat", null);
+                if (src == null)
+                {
+                    Debug.LogWarning("[Urwald] Busche-Variante ohne Scan-Material: " + id);
+                    continue;
+                }
+                mats.Add(TropischMaterial(src, "MAT_" + id + "Tropisch"));
+            }
+            return mats.ToArray();
         }
 
         private static Material TropischMaterial(Material src, string name)

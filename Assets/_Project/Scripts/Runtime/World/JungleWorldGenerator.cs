@@ -161,7 +161,10 @@ namespace Spinnenspiel
             // 5) Unterholz: Büsche, Farne, Schilf (nur Mesh, keine Collider, statisch gebatcht)
             GameObject unterholz = new GameObject("Unterholz");
             // G4: dichtereres Unterholz (Schritt 1.5→1.0 bzw. 1.0→0.6); Zufallsrotation/-skalierung kommen aus PlaceGrid.
-            BushCount = PlaceGrid(unterholz.transform, size, 1.0f, library.bush, library.bushMat,
+            // A1: Busche/Farne in VARIANTS (shrub_02/03/04, fern+nettle). Variant per Cell
+            // determinist from Seed (Hash01), Zufalls-Rot/Scale as before.
+            BushCount = PlaceGridVariants(unterholz.transform, size, 1.0f,
+                VariantMeshes(library.bush, library.bushVariants), VariantMats(library.bushMat, library.bushVariantMats),
                 (i, j, x, z) => World.Height(x, z) >= JungleWorld.WaterLevel + 0.2f
                     && World.Hash01(i, j, 13) < World.Density(x, z) * 0.6f,
                 (i, j) => 0.7f + World.Hash01(i, j, 14) * 0.7f, 1500);
@@ -427,7 +430,10 @@ namespace Spinnenspiel
                         if (!IsDryFlat(World, x, z)) continue;
                         if (World.Height(x, z) < JungleWorld.WaterLevel + 0.1f) continue;
 
-                        int variant = Mathf.FloorToInt(World.Hash01(hi, hj, 84) * (float)library.groundCover.Length);
+                        // A1: dense meadow pass uses only the grass/kraut species (first 3),
+                        // not the nettle/periwinkle bushes.
+                        int coverN = Mathf.Min(3, library.groundCover.Length);
+                        int variant = Mathf.FloorToInt(World.Hash01(hi, hj, 84) * (float)coverN);
                         if (variant < 0 || variant >= library.groundCover.Length || variant >= library.groundCoverMats.Length) continue;
                         Mesh mesh = library.groundCover[variant];
                         Material mat = library.groundCoverMats[variant];
@@ -694,6 +700,57 @@ namespace Spinnenspiel
 
         /// <summary>Rastergröße auf Salzpaar abbilden: 1.5 → 11, 1.0 → 21, 0.7 → 31.</summary>
         private static int SaltA(float step) => step >= 1.4f ? 11 : step >= 0.9f ? 21 : 31;
+
+        /// <summary>A1: Mesh-/Material-Arrays (primary + optional variant arrays) combine, nulls dropped.</summary>
+        private static Mesh[] VariantMeshes(Mesh primary, Mesh[] extra)
+        {
+            var list = new System.Collections.Generic.List<Mesh>();
+            if (primary != null) list.Add(primary);
+            if (extra != null)
+                foreach (var m in extra)
+                    if (m != null) list.Add(m);
+            return list.ToArray();
+        }
+
+        private static Material[] VariantMats(Material primary, Material[] extra)
+        {
+            var list = new System.Collections.Generic.List<Material>();
+            if (primary != null) list.Add(primary);
+            if (extra != null)
+                foreach (var m in extra)
+                    if (m != null) list.Add(m);
+            return list.ToArray();
+        }
+
+        /// <summary>A1: PlaceGrid but variant per Cell, determinist from Seed (Hash01 salt +5).</summary>
+        private int PlaceGridVariants(Transform parent, float size, float step, Mesh[] meshes, Material[] mats,
+            PlantPredicate ok, PlantScale scale, int maxCount)
+        {
+            int n = 0;
+            int variants = Mathf.Min(meshes.Length, mats.Length);
+            if (variants == 0) return 0;
+            int cells = Mathf.FloorToInt(size / step);
+            for (int i = 0; i < cells && n < maxCount; i++)
+            {
+                for (int j = 0; j < cells && n < maxCount; j++)
+                {
+                    float off = 0.5f;
+                    float x = step / 2f + i * step + (World.Hash01(i, j, SaltA(step)) - 0.5f) * (2f * off);
+                    float z = step / 2f + j * step + (World.Hash01(i, j, SaltA(step) + 1) - 0.5f) * (2f * off);
+                    if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
+                    if (NearSpawn(x, z, 1.0f)) continue; // Unterholz: 1 m um den Spawnplatz frei
+                    if (!ok(i, j, x, z)) continue;
+                    int v = Mathf.FloorToInt(World.Hash01(i, j, SaltA(step) + 5) * (float)variants);
+                    if (v < 0) v = 0;
+                    if (v >= variants) v = variants - 1;
+                    float rot = World.Hash01(i, j, SaltA(step) + 4) * 360f;
+                    AddPlant(parent, meshes[v], mats[v], new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale(i, j));
+                    PlantColliderCount++;
+                    n++;
+                }
+            }
+            return n;
+        }
 
         /// <summary>
         /// Per-Instance-Farbvariation (F1: Urwald wirkt ausgewaschen und eintoenig).

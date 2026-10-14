@@ -22,6 +22,11 @@ namespace Spinnenspiel
         public Material fernMat;
         public Material reedMat;
 
+        /// <summary>A1: Busche-Varianten (Scan shrub_02/03/04), same length/order as the materials.
+        /// bush/bushMat stay the first variant so older code keeps working.</summary>
+        public Mesh[] bushVariants;
+        public Material[] bushVariantMats;
+
         /// <summary>Blender-Riesenbläter, 3 Varianten (index 0..2), mit passendem Material auf demselben Index.</summary>
         public Mesh[] giantLeaves;
         public Material[] giantLeafMats;
