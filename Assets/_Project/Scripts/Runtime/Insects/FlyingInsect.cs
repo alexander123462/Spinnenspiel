@@ -25,8 +25,9 @@ namespace Spinnenspiel
         [Tooltip("Heimpunkt, um den das Insekt herumwandert.")]
         public Vector3 home;
 
+        // J1: Beute haengen bleibt 20..40 s, falls die Spinne nicht frisst (30 s Default).
         [Tooltip("Wie lange (s) sich das Insekt im Netz zappelt, bevor es sich befreit.")]
-        public float escapeTime = 10f;
+        public float escapeTime = 30f;
 
         /// <summary>Wahrscheinlichkeit (0..1) pro Neu-Zielen, ein fertiges Netz anzufliegen (simulierte Flugschneise).</summary>
         public float webAttraction = 0.35f;

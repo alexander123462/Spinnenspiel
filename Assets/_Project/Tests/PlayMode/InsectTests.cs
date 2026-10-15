@@ -521,6 +521,107 @@ namespace Spinnenspiel.Tests
             yield return null;
         }
 
+        /// <summary>J1: ein fertige Netz faengt Beute – ueber 60 s Spielzeit und 6 Insekten
+        /// (Netz >= 2 m Breite) faengt das Netz mindestens 2 Mal; einer Gefangenen Insekt
+        /// bleibt mindestens 15 s haengen und ist wieder frei spaetestest 40 s afterm Fang.</summary>
+        [UnityTest]
+        public IEnumerator J1_NetsCatchPrey()
+        {
+            yield return LoadScene();
+
+            InsectSpawner spawner = Object.FindFirstObjectByType<InsectSpawner>();
+            Assert.IsNotNull(spawner, "Spawner 'Insekten' nicht gefunden");
+            FlyingInsect templateInsect = spawner.template.GetComponent<FlyingInsect>();
+            Assert.IsNotNull(templateInsect, "Template ohne FlyingInsect");
+
+            // escapeTime in the scene serialized (10) overwrites the code default -> set explicitly.
+            foreach (FlyingInsect f in Object.FindObjectsByType<FlyingInsect>(
+                    FindObjectsInactive.Include, FindObjectsSortMode.None))
+            {
+                f.escapeTime = 30f;
+                f.webAttraction = 1f; // simulated flight lane: random targets lead through the net
+            }
+
+            spawner.count = 6;
+
+            SpiderMovement spider = Object.FindFirstObjectByType<SpiderMovement>();
+            Assert.IsNotNull(spider, "SpiderMovement missing");
+            Vector3 hub = spider.transform.position + new Vector3(1.2f, 0.8f, 0f);
+            Vector3[] anchors =
+            {
+                hub + new Vector3(0f, 1.1f, -1.1f),
+                hub + new Vector3(0f, 1.1f, 1.1f),
+                hub + new Vector3(0f, -1.1f, 1.1f),
+                hub + new Vector3(0f, -1.1f, -1.1f),
+            };
+
+            OrbWeb web = WebBuildDemo.CreateWebAt(anchors, null, "J1Netz");
+            Assert.IsNotNull(web, "CreateWebAt() lieferte kein Netz");
+            web.SetProgress(OrbWeb.WebStage.Done, 1f);
+
+            float width = 2f * web.CaptureRadius;
+            Debug.Log("[J1] net-width " + width.ToString("F2") + " m -> >= 2 m -> " +
+                      (width >= 2f ? "OK" : "NOK"));
+            Assert.GreaterOrEqual(width, 2f, "Net schm < 2 m: " + width);
+
+            int caught = 0;
+            FlyingInsect firstCaught = null;
+            float caughtAt = -1f;
+            System.Action<FlyingInsect, OrbWeb> onCaught = (f, w) =>
+            {
+                if (w != web || firstCaught != null)
+                {
+                    if (w == web)
+                    {
+                        caught++;
+                    }
+
+                    return;
+                }
+
+                caught++;
+                firstCaught = f;
+                caughtAt = Time.time;
+            };
+            FlyingInsect.AnyCaught += onCaught;
+
+            // 60 s Flight: without spider intervention the net should catch >= 2x.
+            // During the flight the first caught insect is tracked: how long it stays
+            // stuck and when it becomes free again (escapeTime set to 30 s above).
+            float stuckMax = 0f;
+            float escapedAt = -1f;
+            float deadline = Time.time + 60f;
+            while (Time.time < deadline)
+            {
+                if (firstCaught != null)
+                {
+                    if (firstCaught.State == FlyingInsect.InsectState.Caught)
+                    {
+                        stuckMax = Mathf.Max(stuckMax, Time.time - caughtAt);
+                    }
+                    else if (escapedAt < 0f)
+                    {
+                        escapedAt = Time.time - caughtAt;
+                    }
+                }
+
+                yield return null;
+            }
+
+            FlyingInsect.AnyCaught -= onCaught;
+            Debug.Log("[J1] catches in 60 s: " + caught + " -> >= 2 -> " + (caught >= 2 ? "OK" : "NOK"));
+            Assert.GreaterOrEqual(caught, 2, "The net did not catch any prey in 60 s");
+
+            Debug.Log("[J1] stuck for " + stuckMax.ToString("F1") + " s -> >= 15 s -> " +
+                      (stuckMax >= 15f ? "OK" : "NOK"));
+            Assert.GreaterOrEqual(stuckMax, 15f, "Freed too early: " + stuckMax);
+
+            Debug.Log("[J1] free after " + escapedAt.ToString("F1") + " s -> <= 40 s -> " +
+                      (escapedAt >= 0f && escapedAt <= 40f ? "OK" : "NOK"));
+            Assert.GreaterOrEqual(escapedAt, 0f, "Still stuck even after 60 s");
+            Assert.LessOrEqual(escapedAt, 40f, "Not freed even after 40 s");
+        }
+
         private static IEnumerator LoadScene()
         {
             SceneManager.LoadScene(SceneName);
