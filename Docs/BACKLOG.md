@@ -198,3 +198,35 @@
   - Schritt 1: LODGroups fuer Baeume/Buesche, Culling-Distanzen, Schattendistanz sinnvoll setzen.
   - Schritt 2: Test: Konsolenfehler im Playmode-Durchlauf = 0 -> OK/NOK; Mittlere Frametime <= Budget aus Performance-Test -> OK/NOK; Anzahl Objekte ohne LOD bei Vegetation = 0 -> OK/NOK.
   - Schritt 3: Voller CI-Lauf, Commit nach dem Gate in Docs/ROT.md. Bei Abbruch eigene Dateien im Arbeitsbaum LASSEN und hier auflisten.
+
+## Spielschleife (von Claude zusammengestellt 2026-10-15). Reihenfolge einhalten, je ein Punkt pro Runde.
+- [x] cf2c4a4 J1 Das Netz soll Beute fangen. Netze bauen geht bereits (N1), aber ein Netz ohne Wirkung ist Dekoration. Fliegen und Motten sollen in gebauten Netzen haengenbleiben, zappeln und sich nach einiger Zeit befreien, wenn die Spinne nicht kommt.
+  - Schritt 1: Zuerst messen und melden, was es schon gibt: wie viele Insekten gleichzeitig in der Szene leben, wie ihre Flugbahn bestimmt wird, und ob ein gebautes Netz ueberhaupt einen Collider oder Trigger hat. Drei Werte als Zeilen.
+  - Schritt 2: Treffer erkennen (Trigger am Netzfeld), Insekt am Fadenkreuzungspunkt festsetzen, Zappel-Animation oder zumindest eine sichtbare Bewegung, Befreiung nach 20 bis 40 Sekunden, falls die Spinne nicht frisst.
+  - Schritt 3: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': in einem PlayMode-Test ueber 60 Sekunden Spielzeit mit einem Netz von mindestens 2 m Breite und 6 Insekten faengt das Netz mindestens 2; ein gefangenes Insekt bleibt mindestens 15 Sekunden haengen; nach spaetestens 40 Sekunden ist es wieder frei.
+  - Schritt 4: Voller CI-Lauf, Commit nach dem Gate in Docs/ROT.md, danach git push origin hdrp. Bei Abbruch eigene Dateien im Arbeitsbaum LASSEN und hier auflisten.
+- [ ] J2 Hunger und Energie geben dem Spielen ein Ziel. Die Spinne hat eine Energieanzeige, die langsam faellt. Fressen fuellt sie auf. Bei null wird die Spinne langsam und stirbt schliesslich.
+  - Schritt 1: Werte festlegen und im Code als benannte Konstanten ablegen, nicht als nackte Zahlen verstreut: Startenergie 100, Verlust 1 pro Sekunde bei normalem Gehen, 2.5 beim Klettern und Netzbauen, 0.3 im Stillstand. Eine Fliege gibt 25, eine Motte 40.
+  - Schritt 2: Schlichte Anzeige am Bildschirmrand, die sich an den vorhandenen HUD-Stil haelt. Unter 25 Energie wird die Spinne sichtbar langsamer (Tempo auf 60 Prozent), bei null stirbt sie und die Partie beginnt neu.
+  - Schritt 3: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': ohne Fressen ueberlebt die Spinne zwischen 90 und 120 Sekunden reinem Gehen; eine gefressene Fliege hebt die Energie um 25 plus/minus 1; unter 25 Energie ist das gemessene Tempo 0.55 bis 0.65 des normalen.
+  - Schritt 4: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
+- [ ] J3 Beute fliehen lassen, damit Jagen sich nach Jagen anfuehlt. Fliegen und Motten sollen die Spinne bemerken und wegfliegen, statt sich einsammeln zu lassen. Direkt packen soll nur aus kurzer Distanz und mit etwas Glueck klappen - das Netz bleibt der verlaessliche Weg.
+  - Schritt 1: Fluchtverhalten: Insekt bemerkt die Spinne ab 2.5 m Abstand und fliegt vom ihr weg, mit etwas Traegheit, nicht ruckartig.
+  - Schritt 2: Direkter Zugriff nur unter 0.4 m Abstand, Erfolgswahrscheinlichkeit 35 Prozent, danach 3 Sekunden Abklingzeit. Diese drei Zahlen als benannte Konstanten.
+  - Schritt 3: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': in 20 Testversuchen aus 2 m Entfernung entkommt das Insekt mindestens 15 mal; in 20 Versuchen aus 0.3 m gelingt der Zugriff zwischen 4 und 10 mal.
+  - Schritt 4: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
+- [ ] J4 Eine Gefahr, vor der man sich verstecken muss. Ein Vogel greift die Spinne an, wenn sie laengere Zeit im Freien unter offenem Himmel sitzt. Unter Blaettern, im Dickicht oder im eigenen Netz ist sie sicher.
+  - Schritt 1: "Im Freien" messbar machen: ein Strahl senkrecht nach oben trifft kein Geometrie-Objekt. Diesen Zustand pro Sekunde pruefen und melden, wie hoch der Anteil offener Flaeche in der Testwelt ueberhaupt ist - ist er unter 10 Prozent, ist die Gefahr wirkungslos, dann das zuerst melden statt weiterzubauen.
+  - Schritt 2: Nach 8 Sekunden im Freien eine Vorwarnung, die man nicht uebersehen kann: Schatten am Boden und ein Ruf. 3 Sekunden spaeter der Angriff. Erreicht die Spinne vorher Deckung, zieht der Vogel ab.
+  - Schritt 3: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': Vorwarnung kommt zwischen 7.5 und 8.5 Sekunden; Deckung innerhalb der 3 Sekunden rettet in 10 von 10 Testfaellen; unter Blaettern wird der Angriff in 10 von 10 Faellen gar nicht ausgeloest.
+  - Schritt 4: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
+- [ ] J5 Tag und Nacht. Ein Zyklus veraendert Licht und Stimmung, und nachts sind andere Insekten unterwegs als tagsueber. Beachte die Lehre aus G6: die Exposure steht auf einem festen Wert, damit Messungen reproduzierbar sind - wenn du daran drehst, begruende es und miss beide Beweisbilder neu.
+  - Schritt 1: Zykluslaenge 20 Minuten Echtzeit, davon 14 hell und 6 dunkel. Sonnenstand und Himmelsfarbe folgen dem Zyklus.
+  - Schritt 2: Motten nur nachts, Fliegen nur tagsueber, Uebergang nicht schlagartig sondern ueber zwei Minuten.
+  - Schritt 3: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': Beweisbild bei Tag Mittel 60..200, bei Nacht Mittel 10..45, beide Magenta 0; Mottenanzahl nachts mindestens dreimal so hoch wie tagsueber.
+  - Schritt 4: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
+- [ ] J6 Speichern und Fortsetzen. Wer eine Partie verlaesst, soll zurueckkommen koennen: Position der Spinne, Energie, Welt-Seed und die gebauten Netze.
+  - Schritt 1: Speicherstand als JSON-Datei in Application.persistentDataPath, mit Versionsnummer im Dateikopf, damit spaetere Aenderungen nicht alte Staende zerschiessen.
+  - Schritt 2: Im Menue "Fortsetzen" neben "Neue Partie". Ist kein Stand vorhanden, ist der Knopf ausgegraut statt zu stuerzen.
+  - Schritt 3: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': nach Speichern und Laden stimmen Spinnenposition auf 0.05 m, Energie exakt, Welt-Seed exakt und die Anzahl gebauter Netze exakt ueberein; Laden eines Standes mit unbekannter Versionsnummer fuehrt zu einer Meldung und nicht zum Absturz.
+  - Schritt 4: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
