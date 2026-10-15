@@ -107,6 +107,9 @@ namespace Spinnenspiel.EditorTools
             root.AddComponent<SpiderWebBuilder>();
             root.AddComponent<SpiderWebPlacer>();
 
+            // J4: Vogel-Predator — greift laenge Zeit im Freien unter offenem Himmel.
+            root.AddComponent<Spinnenspiel.BirdThreat>();
+
             // Hunger (t73a1): steigt langsam, sinkt beim Fressen.
             root.AddComponent<SpiderHunger>();
 
