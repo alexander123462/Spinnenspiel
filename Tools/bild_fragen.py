@@ -9,7 +9,7 @@ import base64, json, os, subprocess, sys, time, urllib.error, urllib.request
 
 PORT = 8082
 BASE = "http://127.0.0.1:%d/v1" % PORT
-BAT = r"C:\Users\vorau\Desktop\Vision-2070.bat"
+BAT = r"C:\AI\HermesVision\Start-HermesVision.bat"
 STANDARDFRAGE = "Beschreibe sachlich, was auf dem Bild zu sehen ist. Nenne Auffaelligkeiten wie fehlende Teile, Luecken, schwarze Flaechen oder Fehler."
 
 
