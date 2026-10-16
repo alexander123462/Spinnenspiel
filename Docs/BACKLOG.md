@@ -265,7 +265,7 @@
   - Schritt 1: Beim Aendern im Menue sofort speichern, beim Start laden; fehlende oder defekte Datei fuehrt zu Standardwerten, nicht zum Absturz.
   - Schritt 2: Kriterien: gesetzte Werte nach Neuladen exakt gleich -> OK/NOK; defekte Datei (Muell-Inhalt) -> Standardwerte und eine Logzeile, kein Fehler in der Konsole -> OK/NOK.
   - Schritt 3: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] K8 Performance-Sicherung nach den Spielschleifen-Punkten: Frametime-Budget muss mit 6 Insekten, 3 Netzen, Tag/Nacht und Regen gleichzeitig noch halten.
+- [x] K8 Performance-Sicherung nach den Spielschleifen-Punkten: Frametime-Budget muss mit 6 Insekten, 3 Netzen, Tag/Nacht und Regen gleichzeitig noch halten. [7c00299]
   - Schritt 1: Den vorhandenen Test Performance_MeanFrameTimeUnderBudget um dieses Szenario erweitern (neuer Test, alter bleibt).
   - Schritt 2: Kriterium: mittlere Frametime des Szenarios <= Budget des bestehenden Tests * 1.15 -> OK/NOK. Bei NOK die teuerste Systemgruppe mit Performance_Z9CostBreakdownPerSystem melden und die billigste wirksame Gegenmassnahme umsetzen.
   - Schritt 3: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.

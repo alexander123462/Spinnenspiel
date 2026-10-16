@@ -202,3 +202,9 @@
 - Persistence that must not break an existing test: add a SEPARATE MonoBehaviour (GameSettings) instead of extending GameMenu, so the old PlayerPrefs test stays green while new file-based persistence is tested independently.
 
 - 'Survives between partien' PlayMode test without scene reload: comp A sets values (writes file), DestroyImmediate(A), create comp B (Awake loads), expose public LoadSettingsFromDisk() so the test forces a fresh read; assert values roundtrip. Corrupt-file test: WriteRawJson helper with unknown version -> assert defaults kept, no console error.
+
+
+## Lehren (K8, r121)
+- 'Simultan' PlayMode-Perf-Test: must PROVE the conditions hold during measurement, not just set them at t0. WeatherController.Rain01 is time-based (dry90/rain30); at WaitReady Time.time is low -> rain01=0. Fix: fast-forward loop `while Rain01<0.8 && Time.time<deadline yield 0.5s` THEN measure, and Assert.GreaterOrEqual(rainNow,0.8) so a dry-window run fails instead of silently passing.
+- Tag+Regen together is impossible at default dayLengthMinutes=20 (noon drifts to night during the ~105s rain window -> day-species count drops). Fix: raise cycle.dayLengthMinutes (e.g. 200) + SetDayProgress(0.5) so dayFactor stays 1.00 through the rain window; day-spawner.count=6, night-spawner.count=0 gives exactly 6 flying while raining.
+- CS1002 '; expected' on `Vector3 base = ...`: Unity compiler choked on the identifier/ternary combo. Fix: rename local (spiderPos) and replace ternary with if/else block. Cheap, no logic change.
