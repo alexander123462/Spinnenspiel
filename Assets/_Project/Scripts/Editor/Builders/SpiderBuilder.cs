@@ -135,6 +135,9 @@ namespace Spinnenspiel.EditorTools
             // Menu (B8): Startscreen, Esc-Pause, Sensitivity in PlayerPrefs.
             root.AddComponent<GameMenu>();
 
+            // K7 Einstellungen merken: Lautstaerke/Empfindlichkeit/Sichtweite in own versioned file.
+            root.AddComponent<GameSettings>();
+
             return root;
         }
 
