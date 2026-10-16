@@ -17,6 +17,7 @@ namespace Spinnenspiel
         private InputAction _zoomAction;
         private InputAction _silkAction;
         private InputAction _releaseAction;
+        private InputAction _jumpAction;
 
         /// <summary>Aktuelle Bewegungsrichtung (x = rechts, y = vor), typischerweise -1..1.</summary>
         public Vector2 Move => _moveAction != null ? _moveAction.ReadValue<Vector2>() : Vector2.zero;
@@ -32,6 +33,9 @@ namespace Spinnenspiel
 
         /// <summary>True, in dem Frame in dem die Loslassen-Taste gedrückt wurde (Faden verlassen).</summary>
         public bool ReleasePressed => _releaseAction != null && _releaseAction.WasPressedThisFrame();
+
+        /// <summary>True, in dem Frame in dem die Leertaste/Jump gedrückt wurde (Sprung; im Netz ignored).</summary>
+        public bool JumpPressed => _jumpAction != null && _jumpAction.WasPressedThisFrame();
 
         /// <summary>Zoom-Eingabe (Mausrad, positiv = heranzoomen), normiert auf ca. -1..1 pro Rastung.</summary>
         public float Zoom
@@ -70,6 +74,7 @@ namespace Spinnenspiel
             _zoomAction = null;
             _silkAction = null;
             _releaseAction = null;
+            _jumpAction = null;
         }
 
         private void Update()
@@ -117,6 +122,11 @@ namespace Spinnenspiel
             _releaseAction.AddBinding("<Keyboard>/space");
             _releaseAction.AddBinding("<Gamepad>/buttonSouth");
 
+            // Jump: Sprung (Leertaste / A). Im Netz ignoriert — dort bleibt Leertaste "fallen lassen".
+            _jumpAction = new InputAction("Jump", InputActionType.Button);
+            _jumpAction.AddBinding("<Keyboard>/space");
+            _jumpAction.AddBinding("<Gamepad>/buttonSouth");
+
             _moveAction.Enable();
             _lookAction.Enable();
             _sprintAction.Enable();
@@ -127,6 +137,11 @@ namespace Spinnenspiel
 
         private void DisableActions()
         {
+            if (_jumpAction != null)
+            {
+                _jumpAction.Disable();
+            }
+
             if (_moveAction != null)
             {
                 _moveAction.Disable();

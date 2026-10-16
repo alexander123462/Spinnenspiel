@@ -31,6 +31,11 @@ namespace Spinnenspiel
         [Header("Schwerkraft")]
         [SerializeField] private float gravityScale = 1f;
 
+        [Header("Sprung")]
+        [SerializeField, Tooltip("Hubhöhe der Sprung (m)")] private float jumpHeight = 0.5f;
+        [SerializeField, Tooltip("Weitsch des Sprung (m)")] private float jumpDistance = 1.2f;
+        [SerializeField, Tooltip("Abklingzeit vor dem naechste Sprung (s)")] private float jumpCooldown = 0.6f;
+
         [Header("Oberflächen-Haftung")]
         [SerializeField] private SpiderSurfaceSensor sensor = new SpiderSurfaceSensor();
         [SerializeField] private float adhesionRate = 20f; // wie schnell (1/s) die Spinne zur Fläche gezogen wird
@@ -75,6 +80,10 @@ namespace Spinnenspiel
         private bool _warnedNoCamera;
         private SpiderSurfaceDetector _surface;
         private Collider _bodyCollider;
+        private float _jumpCooldownUntil = float.NegativeInfinity;
+        private Vector3 _jumpVel;
+        private bool _inJump;
+        private bool _jumpRequest;
 
         /// <summary>Letzte Gesamtbewegungsgeschwindigkeit in m/s (Positionsdifferenz pro Sekunde).</summary>
         public Vector3 Velocity => _lastVelocity;
@@ -87,6 +96,12 @@ namespace Spinnenspiel
 
         /// <summary>Normale der zuletzt erkannten Oberfläche (Weltkoordinaten).</summary>
         public Vector3 SurfaceNormal => _surfaceNormal;
+
+        /// <summary>L2: Sprung anfordern (z. B. aus Tests); bei true der naechste Frame ein Absprung versuche.</summary>
+        public void RequestJump()
+        {
+            _jumpRequest = true;
+        }
 
         /// <summary>True, wenn die Spinne an einer Unterlage haftet (Boden, Wand, ...), am Faden hängt oder im Netz läuft.</summary>
         public bool IsGrounded => IsAttached || CurrentThread != null || CurrentWeb != null;
@@ -483,7 +498,15 @@ namespace Spinnenspiel
                 return;
             }
 
-            if (_attached)
+            // L2: Sprung (Leertaste am Boden/Ast/Stamm; im Netz/Faden bleibt Leertaste "fallen lassen").
+            TryTriggerJump(dir);
+
+            if (_inJump)
+            {
+                UpdateJump(dt);
+                _lastVelocity = (transform.position - oldPos) / dt;
+            }
+            else if (_attached)
             {
                 UpdateAttached(dt, dir, up);
             }
@@ -516,6 +539,77 @@ namespace Spinnenspiel
         private bool IsOverheadHitOnGround(Vector3 hitNormal, Vector3 groundNormal)
         {
             return hitNormal.y < -0.1f && GroundBelow();
+        }
+
+        /// <summary>L2: Am Boden/Ast/Stamm (hafter, nie am Faden/Netz/Seil) die Leertaste-Absprung versuche.</summary>
+        private void TryTriggerJump(Vector3 dir)
+        {
+            if (input != null && input.JumpPressed)
+            {
+                _jumpRequest = true;
+            }
+
+            if (!_jumpRequest)
+            {
+                return;
+            }
+
+            _jumpRequest = false;
+            // Im Netz oder am Faden/Seil bleibt Leertaste "fallen lassen" (SpiderSilk/SpiderWebBuilder).
+            if (!_attached || CurrentThread != null || CurrentWeb != null || IsOnRope)
+            {
+                return;
+            }
+
+            if (Time.time < _jumpCooldownUntil)
+            {
+                return;
+            }
+
+            // Absprung: entlang der Flaechennormale plus Blick-/Laufrichtung.
+            Vector3 n = SafeNormalize(_surfaceNormal, transform.up);
+            Vector3 fwd = dir.sqrMagnitude > 0.01f ? SafeNormalize(dir, transform.forward) : transform.forward;
+
+            // Flight-Parameter: y-Scheitel der Parabola = jumpHeight (m), Horizontaler = jumpDistance (m).
+            float g = Physics.gravity.magnitude * gravityScale;
+            float vNormal = Mathf.Sqrt(2f * g * jumpHeight);          // Abstoss entlang der Flaechennormale
+            float airTime = 2f * vNormal / g;                          // Rueck an Hoehe-Difference 0
+            Vector3 horiz = SafeNormalize(Vector3.ProjectOnPlane(fwd, n), Vector3.ProjectOnPlane(fwd, transform.up));
+            _jumpVel = horiz * (jumpDistance / airTime) + n * vNormal;
+            _inJump = true;
+            _jumpCooldownUntil = Time.time + jumpCooldown;
+        }
+
+        /// <summary>L2: Sprung-Parabola; Landeg per Sphärenwurf wieder an der Fläche haftet (UpdateFalling-Logik).</summary>
+        private void UpdateJump(float dt)
+        {
+            Vector3 up = transform.up;
+
+            // In der Air soft richts the spider back to world-up.
+            Vector3 newUp = Vector3.RotateTowards(up, Vector3.up, 3f * dt, 0f).normalized;
+            transform.rotation = Quaternion.FromToRotation(up, newUp) * transform.rotation;
+
+            _jumpVel += Physics.gravity * gravityScale * dt;
+
+            Vector3 step = _jumpVel * dt;
+            if (step.sqrMagnitude > 1e-8f &&
+                Physics.SphereCast(transform.position + newUp * bodyRadius, bodyRadius, step.normalized,
+                    out RaycastHit hit, step.magnitude + 0.01f, sensor.mask, QueryTriggerInteraction.Ignore))
+            {
+                // Surface hit during flight: land and re-adhere.
+                Vector3 n = hit.normal;
+                transform.rotation = Quaternion.FromToRotation(transform.up, n) * transform.rotation;
+                _vel = Vector3.ProjectOnPlane(_jumpVel, n) * 0.3f;
+                _surfaceNormal = n;
+                _attached = true;
+                _lastSurfaceTime = Time.time;
+                transform.position = SettleOnTerrain(hit.point);
+                _inJump = false;
+            }
+            else
+            {
+                transform.position += step;
+            }
         }
 
         /// <summary>b) Haftend: tangent laufen, up-Achse ausrichten, Kollision begrenzen, an die Fläche haften.</summary>
