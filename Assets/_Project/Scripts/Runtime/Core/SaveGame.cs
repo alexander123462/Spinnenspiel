@@ -19,6 +19,11 @@ namespace Spinnenspiel
         private int _worldSeedOverride;
         public void SetWorldSeed(int seed) { _worldSeedOverride = seed; }
 
+        /// <summary>K6: Best values over earlier partien, persisted together with J6 in this file.</summary>
+        public float BestSurvivalTime;
+        public int BestEaten;
+        public int BestWebs;
+
         private GameMenu menu;
 
         private void Start()
@@ -56,6 +61,20 @@ namespace Spinnenspiel
             payload.energy = Energy;
             var hunger = GetComponent<SpiderHunger>();
             payload.hunger = hunger != null ? hunger.Hunger : 0f;
+            // K6: best values over earlier partien travel with this save file.
+            var deathStats = transform.GetComponent<DeathStats>();
+            if (deathStats != null)
+            {
+                payload.bestTime = deathStats.Stats.BestSurvivalTime;
+                payload.bestEaten = deathStats.Stats.BestEaten;
+                payload.bestWebs = deathStats.Stats.BestWebs;
+            }
+            else
+            {
+                payload.bestTime = BestSurvivalTime;
+                payload.bestEaten = BestEaten;
+                payload.bestWebs = BestWebs;
+            }
             foreach (OrbWeb web in OrbWeb.All)
             {
                 if (web == null || !web.IsBuilt)
@@ -118,6 +137,10 @@ namespace Spinnenspiel
             }
             transform.position = payload.position;
             Energy = payload.energy;
+            // K6: restore the best values from earlier partien.
+            BestSurvivalTime = payload.bestTime;
+            BestEaten = payload.bestEaten;
+            BestWebs = payload.bestWebs;
             var hunger = GetComponent<SpiderHunger>();
             if (hunger != null)
             {
@@ -158,6 +181,10 @@ namespace Spinnenspiel
         public float hunger;
         public float energy;
         public List<Vector3> anchorPoints = new List<Vector3>();
+        /// <summary>K6: Best values from earlier partien (0 = none yet).</summary>
+        public float bestTime;
+        public int bestEaten;
+        public int bestWebs;
         public List<int> webAnchorCounts = new List<int>();
         public List<int> radiusCounts = new List<int>();
         public List<float> spiralSpacings = new List<float>();

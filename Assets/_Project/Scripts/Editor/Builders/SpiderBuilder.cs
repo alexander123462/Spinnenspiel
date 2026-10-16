@@ -129,6 +129,9 @@ namespace Spinnenspiel.EditorTools
             // Before GameMenu: its Start() must register the hooks before StartGame fires.
             root.AddComponent<SaveGame>();
 
+            // K6 Statistik beim Tod: Ueberlebenszeit/Fressen/Netzes + Hoechstwert (J6-File).
+            root.AddComponent<DeathStats>();
+
             // Menu (B8): Startscreen, Esc-Pause, Sensitivity in PlayerPrefs.
             root.AddComponent<GameMenu>();
 
