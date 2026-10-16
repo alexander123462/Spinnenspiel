@@ -261,7 +261,7 @@
   - Schritt 1: Zaehler fuer die drei Werte, am Ende der Partie anzeigen, danach "Neue Partie" und "Menue".
   - Schritt 2: Kriterien: nach 3 gefressenen Insekten und 2 gebauten Netzen zeigt die Anzeige genau 3 und 2 -> OK/NOK; Hoechstwert bleibt nach Neustart der Anwendung erhalten -> OK/NOK.
   - Schritt 3: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] K7 Einstellungen merken: Lautstaerke, Maus-Empfindlichkeit und Sichtweite sollen zwischen Partien erhalten bleiben (eigene Datei neben dem Speicherstand aus J6, mit Versionsnummer).
+- [x] K7 Einstellungen merken: Lautstaerke, Maus-Empfindlichkeit und Sichtweite sollen zwischen Partien erhalten bleiben (eigene Datei neben dem Speicherstand aus J6, mit Versionsnummer). [dd3a234]
   - Schritt 1: Beim Aendern im Menue sofort speichern, beim Start laden; fehlende oder defekte Datei fuehrt zu Standardwerten, nicht zum Absturz.
   - Schritt 2: Kriterien: gesetzte Werte nach Neuladen exakt gleich -> OK/NOK; defekte Datei (Muell-Inhalt) -> Standardwerte und eine Logzeile, kein Fehler in der Konsole -> OK/NOK.
   - Schritt 3: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.

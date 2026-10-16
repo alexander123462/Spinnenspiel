@@ -194,3 +194,11 @@
 - PlayMode-Test: AddComponent in ARBEIT-Order (Hunger-Ausgabe AFTER DeathStats.Awake ran) -> cached _hunger null, Tod never fires. Fix: lazy re-acquire in Update (GetComponent only while ref still missing) OR add components BEFORE first yield.
 - OnGUI does NOT render into a RenderTexture: proofshot must paint panel+ticks manually via PaintRect (GUI y-down -> tex.height-1-y), like K3/K6 pattern. Vision model miscounts small ticks -> verify counts by pixel-run-analysis per row (PIL).
 - Bests persisted via SaveGame fields + payload bestTime/bestEaten/bestWebs; DeathStats.Update mirrors save-bests into model while alive so they survive app restart without new code.
+
+## Lehren (K7, r120)
+
+- File-API: with 'using System.IO;' use bare File.Exists/ReadAllText/WriteAllText and Path.Combine. Writing 'Path.File.x' is CS0117 ('Path' has no member 'File'); fully-qualified 'System.IO.File.x' also compiles. Copy the SaveGame.cs pattern (bare File./Path.) exactly.
+
+- Persistence that must not break an existing test: add a SEPARATE MonoBehaviour (GameSettings) instead of extending GameMenu, so the old PlayerPrefs test stays green while new file-based persistence is tested independently.
+
+- 'Survives between partien' PlayMode test without scene reload: comp A sets values (writes file), DestroyImmediate(A), create comp B (Awake loads), expose public LoadSettingsFromDisk() so the test forces a fresh read; assert values roundtrip. Corrupt-file test: WriteRawJson helper with unknown version -> assert defaults kept, no console error.
