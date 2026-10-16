@@ -20,11 +20,23 @@ namespace Spinnenspiel
         public event System.Action Resumed;
         public event System.Action Quitting;
         public event System.Action Starting;
+        public event System.Action NewPartie;
+
+        /// <summary>J6: True when a savegame exists (SaveGame refreshes it on Start).</summary>
+        public bool HasSave;
 
         private void Awake()
         {
             _state = 1;
             MouseSensitivity = PlayerPrefs.GetFloat(SensitivityKey, 1f);
+            HasSave = SaveExists();
+        }
+
+        /// <summary>J6: True when the sibling SaveGame component has a file on disk.</summary>
+        private bool SaveExists()
+        {
+            SaveGame save = GetComponent<SaveGame>();
+            return save != null && save.SaveFileExists();
         }
 
         private void Update()
@@ -64,6 +76,32 @@ namespace Spinnenspiel
                 return false;
             }
             return builder.IsBuilding || builder.LastCancelFrame == Time.frameCount;
+        }
+
+        /// <summary>J6: Start from the savegame ("Fortsetzen"). Without a save it does nothing (greyed button), never a crash.</summary>
+        public void Fortsetzen()
+        {
+            if (!HasSave)
+            {
+                return;
+            }
+            _state = 1;
+            System.Action starting = Starting;
+            if (starting != null)
+            {
+                starting();
+            }
+        }
+
+        /// <summary>J6: Start a fresh partie ("Neue Partie") — no save gets loaded.</summary>
+        public void NeuePartie()
+        {
+            _state = 1;
+            System.Action handler = NewPartie;
+            if (handler != null)
+            {
+                handler();
+            }
         }
 
         /// <summary>Startscreen -> Playing.</summary>
@@ -116,6 +154,13 @@ namespace Spinnenspiel
                 new GUIContent("Paused — Esc: Fortsetzen | Q: Quit"));
             GUI.Label(new Rect(0f, Screen.height / 3f + 40f, Screen.width, 24f),
                 new GUIContent("Sensitivity: " + MouseSensitivity.ToString("F2")));
+            // J6: Fortsetzen (greyed when no save exists) next to Neue Partie.
+            GUI.Label(new Rect(0f, Screen.height / 3f + 64f, Screen.width, 24f),
+                new GUIContent(HasSave ? "Resume: continue from save" : "Resume: -- (no save yet)"));
+            GUI.color = HasSave ? Color.white : Color.gray;
+            GUI.Label(new Rect(0f, Screen.height / 3f + 88f, Screen.width, 24f),
+                new GUIContent("Neue Partie: Q + Neustart"));
+            GUI.color = Color.white;
         }
     }
 }

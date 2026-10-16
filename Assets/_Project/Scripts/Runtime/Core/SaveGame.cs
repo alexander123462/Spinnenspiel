@@ -9,6 +9,16 @@ namespace Spinnenspiel
     {
         [SerializeField] private string _fileName = "spinspiel_save.json";
 
+        /// <summary>J6: Format-Version in dem Dateikopf; aeltere staende mit unbekannt Version nicht loaden.</summary>
+        private const int SaveVersion = 1;
+
+        /// <summary>J6: Energie der Spinne (100 = volle, 0 = tot). Save/Load must roundtrip exactly.</summary>
+        public float Energy = 100f;
+
+        /// <summary>J6: Seed-Override for CaptureSave when no JungleWorldGenerator is in the scene (Tests).</summary>
+        private int _worldSeedOverride;
+        public void SetWorldSeed(int seed) { _worldSeedOverride = seed; }
+
         private GameMenu menu;
 
         private void Start()
@@ -33,11 +43,17 @@ namespace Spinnenspiel
         /// <summary>Pfad des Save-File under Application.persistentDataPath.</summary>
         private string FilePath => Path.Combine(Application.persistentDataPath, _fileName);
 
-        /// <summary>Write Position, Hunger and all built Netzes into the JSON save file.</summary>
+        /// <summary>Write Position, Hunger, Energie, Seed and all built Netzes into the JSON save file.</summary>
         public void CaptureSave()
         {
             var payload = new SavePayload();
+            payload.version = SaveVersion;
+            var gen = Object.FindFirstObjectByType<JungleWorldGenerator>();
+            payload.worldSeed = _worldSeedOverride != 0
+                ? _worldSeedOverride
+                : (gen != null ? gen.Seed : 0);
             payload.position = transform.position;
+            payload.energy = Energy;
             var hunger = GetComponent<SpiderHunger>();
             payload.hunger = hunger != null ? hunger.Hunger : 0f;
             foreach (OrbWeb web in OrbWeb.All)
@@ -79,7 +95,13 @@ namespace Spinnenspiel
             }
         }
 
-        /// <summary>Load the JSON save and restore Position, Hunger and Netzes.</summary>
+        /// <summary>J6-Test-Helper: write arbitrary JSON as save file (e.g. an unknown version).</summary>
+        public void WriteRawSaveJson(string json)
+        {
+            File.WriteAllText(FilePath, json);
+        }
+
+        /// <summary>Load the JSON save and restore Position, Hunger, Energie, Seed and Netzes.</summary>
         public void ApplySave()
         {
             if (!SaveFileExists())
@@ -87,12 +109,22 @@ namespace Spinnenspiel
                 return;
             }
             var payload = JsonUtility.FromJson<SavePayload>(File.ReadAllText(FilePath));
+            // J6: unknown version in the file head -> warning, but never a crash.
+            if (payload.version != SaveVersion)
+            {
+                Debug.LogWarning("SaveGame: save file has unknown version " + payload.version
+                    + ", expected " + SaveVersion + ". Not loaded.", this);
+                return;
+            }
             transform.position = payload.position;
+            Energy = payload.energy;
             var hunger = GetComponent<SpiderHunger>();
             if (hunger != null)
             {
                 hunger.Hunger = Mathf.Clamp01(payload.hunger);
             }
+            // J6: the loaded world must be built from the saved Seed.
+            JungleWorldGenerator.NextSeed = payload.worldSeed;
             int anchorIndex = 0;
             for (int i = 0; i < payload.webAnchorCounts.Count; i++)
             {
@@ -120,8 +152,11 @@ namespace Spinnenspiel
     /// <summary>JSON-Payload of one savegame (flat: only primitive/Vector3 lists).</summary>
     public class SavePayload
     {
+        public int version;
+        public int worldSeed;
         public Vector3 position;
         public float hunger;
+        public float energy;
         public List<Vector3> anchorPoints = new List<Vector3>();
         public List<int> webAnchorCounts = new List<int>();
         public List<int> radiusCounts = new List<int>();
