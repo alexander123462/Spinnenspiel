@@ -208,3 +208,13 @@
 - 'Simultan' PlayMode-Perf-Test: must PROVE the conditions hold during measurement, not just set them at t0. WeatherController.Rain01 is time-based (dry90/rain30); at WaitReady Time.time is low -> rain01=0. Fix: fast-forward loop `while Rain01<0.8 && Time.time<deadline yield 0.5s` THEN measure, and Assert.GreaterOrEqual(rainNow,0.8) so a dry-window run fails instead of silently passing.
 - Tag+Regen together is impossible at default dayLengthMinutes=20 (noon drifts to night during the ~105s rain window -> day-species count drops). Fix: raise cycle.dayLengthMinutes (e.g. 200) + SetDayProgress(0.5) so dayFactor stays 1.00 through the rain window; day-spawner.count=6, night-spawner.count=0 gives exactly 6 flying while raining.
 - CS1002 '; expected' on `Vector3 base = ...`: Unity compiler choked on the identifier/ternary combo. Fix: rename local (spiderPos) and replace ternary with if/else block. Cheap, no logic change.
+
+
+## Lehren (L2 Springen, r102)
+- Sprung-Physik without magic numbers: from the desired hub h and gravity g compute vNormal=sqrt(2*g*h) and airTime=2*vNormal/g; horizontal speed = distance/airTime. Landing then happens automatically at height difference 0 - no tuned flight-time constant needed.
+- Shared key for two actions (Space = 'fallen lassen' in web AND 'jump' on ground): don't remove the old binding; add a second InputAction with the same binding and gate each consumer by state (web/thread/rope -> old action, attached surface -> jump). The mode check belongs in the movement component, not in the input class.
+- PlayMode test for a ballistic jump: sample peak height inside the flight loop (`while y > startY-0.02`), assert peak-start >= threshold AFTER the loop; asserting only final position misses a failed jump that never left ground.
+## Lehren (M1 Modellfehler sammeln, r104)
+- Identifizier a scene object by type WITHOUT tags/layers: match MeshRenderer.sharedMaterials against material-NAME substrings (MAT_Baumfarn_Leaf / MAT_Riesenblatt / Wood/Bark / MAT_Spider). sharedMaterials is the array; mr.material returns a SINGLE Material and cannot be foreach'd (CS1579).
+- Vector3 has no LengthSquared(); use sqrMagnitude. And in C# a single var line must not declare two comma-separated vars when using 'var' twice (CS0819) - split into separate statements.
+- A PlayMode proofshot test that only ASSERTS a file exists is green even if the image is garbage: the visual Befund is read from the PNG via Tools/bild_fragen.py, NOT from the assertion. The assertion proves the capture ran; the image content is the actual finding.
