@@ -198,7 +198,8 @@ namespace Spinnenspiel
                         if (library.giantLeaves[variant] == null || library.giantLeafMats[variant] == null) continue;
                         float rot = World.Hash01(i, j, 63) * 360f;
                         float scale = 0.7f + World.Hash01(i, j, 64) * 0.7f;
-                        AddPlant(unterholz.transform, library.giantLeaves[variant], library.giantLeafMats[variant],
+                        AddGiantLeaf(unterholz.transform, library.giantLeaves[variant],
+                            library.giantLeafMats[variant], library.giantLeafStemMats != null ? library.giantLeafStemMats[variant] : null,
                             new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale);
                         PlantColliderCount++;
                         giantN++;
@@ -992,6 +993,48 @@ namespace Spinnenspiel
             cc.height = b.size.y * 0.75f * scale;
             c.transform.localPosition = new Vector3(0f, 0.375f * b.size.y, 0f);
             AddPlantLod(g);
+        }
+
+        /// <summary>
+        /// M1b: Riesenblatt with 2 Submeshes (Blatt-Cutout + Stamm-Bark). The FBX has 2 Material-Slots,
+        /// so a single shared material (old AddPlant path) painted the STEM with the leaf texture ->
+        /// "trunk merges into foliage". Here materials are assigned in SUBMESH order: leaf at
+        /// library.giantLeafLeafSubmesh (measured at build), stem on the other. Falls back to a
+        /// single-material AddPlant if stem/leaf-submesh data is missing. Thin capsule collider like AddPlant.
+        /// </summary>
+        private GameObject AddGiantLeaf(Transform parent, Mesh mesh, Material leafMat, Material stemMat, Vector3 pos, float rotY, float scale)
+        {
+            int leafSub = library.giantLeafLeafSubmesh;
+            if (stemMat == null || mesh.subMeshCount < 2)
+                return AddPlant(parent, mesh, leafMat, pos, rotY, scale);
+
+            // sharedMaterials index i = submesh i. Put leaf at leafSub, stem on the remaining slot(s).
+            var mats = new Material[Math.Max(1, mesh.subMeshCount)];
+            for (int slot = 0; slot < mats.Length; slot++)
+                mats[slot] = (slot == leafSub) ? leafMat : stemMat;
+
+            GameObject g = new GameObject();
+            g.transform.SetParent(parent, false);
+            g.transform.position = pos;
+            g.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
+            g.transform.localScale = Vector3.one * scale;
+            g.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var r = g.AddComponent<MeshRenderer>();
+            r.sharedMaterials = mats;
+            ApplyInstanceTint(r, pos, 71);
+
+            GameObject c = new GameObject("PflanzenCollider");
+            c.transform.SetParent(g.transform, false);
+            c.layer = GameLayers.Plants;
+            var cc = c.AddComponent<CapsuleCollider>();
+            Bounds b = mesh.bounds;
+            Vector3 sc = g.transform.localScale;
+            cc.direction = 1; // Y-Achse
+            cc.height = b.size.y * sc.y;
+            cc.radius = Mathf.Clamp(0.25f * Mathf.Min(b.size.x * sc.x, b.size.z * sc.z), 0.015f, 0.12f);
+            c.transform.position = g.transform.TransformPoint(b.center);
+            AddPlantLod(g);
+            return g;
         }
 
         /// <summary>Stamm/Stein mit Convex-Collider und SurfaceTag erzeugen.</summary>

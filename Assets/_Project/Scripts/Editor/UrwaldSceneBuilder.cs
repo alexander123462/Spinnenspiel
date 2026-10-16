@@ -62,8 +62,7 @@ namespace Spinnenspiel.EditorTools
             lib.bushVariantMats = CreateBushVariantMats();
 
             // Riesenbläter (Blender, 3 Varianten): tropische Pflanze mit Blattschnitt-Mask und Normal.
-            lib.giantLeaves = LoadRiesenblattMeshes();
-            lib.giantLeafMats = CreateRiesenblattMats();
+            LoadRiesenblatt(lib);
 
             // Baumfarne (Blender, 3 Varianten): 2 Submeshes pro FBX (0 = Stamm, 1 = Blatt).
             lib.treeFerns = LoadBaumfarnMeshes();
@@ -262,10 +261,21 @@ namespace Spinnenspiel.EditorTools
             return copy;
         }
 
-        private static Mesh[] LoadRiesenblattMeshes()
+        /// <summary>
+        /// Riesenbläter (Blender, 3 Varianten). Je FBX 2 Material-Slots -> 2 Submeshes: Blatt (Cutout)
+        /// + Stamm (opaque Bark). Submesh-Order measured via GetSubMesh(i).bounds (Blatt = broader crown,
+        /// XZ-extents), NOT a Blender contract. Fills lib.giantLeaves / giantLeafMats (Blatt) /
+        /// giantLeafStemMats (Stamm) / giantLeafLeafSubmesh.
+        /// </summary>
+        private static void LoadRiesenblatt(JungleAssetLibrary lib)
         {
             const string folder = "Assets/_Project/Art/Plants/Riesenblatt/";
-            var result = new Mesh[3];
+            const string tex = "Assets/_Project/Art/Plants/Riesenblatt/Textures/";
+            var meshes = new Mesh[3];
+            var leafMats = new Material[3];
+            var stemMats = new Material[3];
+            int measuredLeafSubmesh = 1;
+
             for (int i = 0; i < 3; i++)
             {
                 string path = folder + "Riesenblatt_" + (i + 1) + ".fbx";
@@ -276,16 +286,96 @@ namespace Spinnenspiel.EditorTools
                 }
                 foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(path))
                 {
-                    if (obj is Mesh mesh)
+                    if (obj is Mesh mesh && mesh.subMeshCount > 0)
                     {
-                        result[i] = mesh;
+                        meshes[i] = mesh;
                         break;
                     }
                 }
-                if (result[i] == null)
+                if (meshes[i] == null)
+                {
                     Debug.LogWarning("[Urwald] Kein Mesh im Riesenblatt: " + path);
+                    continue;
+                }
+
+                // Measure submesh order on each variant: Blatt = broader crown (larger XZ-extents),
+                // Stamm = schmal. Log so the CI run shows the measured ground truth.
+                if (meshes[i].subMeshCount >= 2)
+                {
+                    Bounds b0 = meshes[i].GetSubMesh(0).bounds;
+                    Bounds b1 = meshes[i].GetSubMesh(1).bounds;
+                    float ex0 = b0.extents.x * b0.extents.z;
+                    float ex1 = b1.extents.x * b1.extents.z;
+                    int leafIdx = ex1 > ex0 ? 1 : 0;
+                    if (i == 0) measuredLeafSubmesh = leafIdx;
+                    Debug.Log("[Urwald] Riesenblatt " + (i + 1) + ": subMeshCount " + meshes[i].subMeshCount
+                        + ", Blatt-Submesh measured = " + leafIdx + " (XZ " + ex0 + " vs " + ex1 + ")");
+                }
+                else
+                {
+                    Debug.Log("[Urwald] Riesenblatt " + (i + 1) + ": only " + meshes[i].subMeshCount
+                        + " Submesh -> single leaf material, no stem split");
+                }
+
+                // Blatt-Material (Cutout) — re-use/create MAT_Riesenblatt_<n>.
+                {
+                    string matPath = MatFolder + "MAT_Riesenblatt_" + (i + 1) + ".mat";
+                    Material mat = AssetDatabase.LoadAssetAtPath<Material>(matPath);
+                    if (mat == null)
+                    {
+                        Shader hdrpLit = Shader.Find("HDRP/Lit");
+                        if (hdrpLit == null)
+                            throw new System.InvalidOperationException("[Urwald] Shader nicht gefunden: HDRP/Lit");
+                        mat = new Material(hdrpLit);
+                        mat.name = "MAT_Riesenblatt_" + (i + 1);
+                        AssetDatabase.CreateAsset(mat, matPath);
+                    }
+                    mat.SetTexture("_BaseColorMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + "Riesenblatt_Leaf_Albedo.png"));
+                    mat.SetTexture("_MaskMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + "Riesenblatt_Leaf_Mask.png"));
+                    mat.SetTexture("_NormalMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + "Riesenblatt_Leaf_Normal.png"));
+                    mat.SetFloat("_SurfaceType", 1f); // Cutout (Blattschnitt)
+                    mat.SetFloat("_AlphaCutoffEnable", 1f);
+                    mat.SetFloat("_AlphaCutoff", 0.5f);
+                    mat.SetFloat("_DoubleSidedEnable", 1f);
+                    mat.SetFloat("_DoubleSidedNormalMode", 2f); // Mirror
+                    mat.SetFloat("_Smoothness", 0.15f);
+                    mat.SetFloat("_Metallic", 0f);
+                    HDMaterial.ValidateMaterial(mat);
+                    EditorUtility.SetDirty(mat);
+                    leafMats[i] = mat;
+                }
+
+                // Stamm-Material (opaque Bark) — MAT_Riesenblatt_<n>_Stem.
+                {
+                    string stemPath = MatFolder + "MAT_Riesenblatt_" + (i + 1) + "_Stem.mat";
+                    Material stem = AssetDatabase.LoadAssetAtPath<Material>(stemPath);
+                    if (stem == null)
+                    {
+                        Shader hdrpLit = Shader.Find("HDRP/Lit");
+                        if (hdrpLit == null)
+                            throw new System.InvalidOperationException("[Urwald] Shader nicht gefunden: HDRP/Lit");
+                        stem = new Material(hdrpLit);
+                        stem.name = "MAT_Riesenblatt_" + (i + 1) + "_Stem";
+                        AssetDatabase.CreateAsset(stem, stemPath);
+                    }
+                    stem.SetTexture("_BaseColorMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + "Riesenblatt_Stem_Albedo.png"));
+                    stem.SetFloat("_SurfaceType", 0f); // Opaque
+                    stem.SetFloat("_AlphaCutoffEnable", 0f);
+                    stem.SetFloat("_DoubleSidedEnable", 0f);
+                    stem.SetFloat("_Smoothness", 0.2f);
+                    stem.SetFloat("_Metallic", 0f);
+                    HDMaterial.ValidateMaterial(stem);
+                    EditorUtility.SetDirty(stem);
+                    stemMats[i] = stem;
+                }
             }
-            return result;
+
+            lib.giantLeaves = meshes;
+            lib.giantLeafMats = leafMats;
+            lib.giantLeafStemMats = stemMats;
+            lib.giantLeafLeafSubmesh = measuredLeafSubmesh;
+            AssetDatabase.SaveAssets();
+            Debug.Log("[Urwald] Riesenblatt: " + meshes.Length + " Varianten (Blatt-Cutout + Stamm-opaque, 2 Submeshes), Blatt-Submesh=" + measuredLeafSubmesh);
         }
 
         /// <summary>

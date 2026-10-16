@@ -169,7 +169,11 @@ namespace Spinnenspiel.Tests
                 cam.transform.position = camPos;
                 cam.transform.LookAt(target + new Vector3(0f, 0.05f, 0f));
             }
+            // HDRP-Motionblur uses the velocity buffer (previous vs current camera). After a
+            // camera-jump the stale velocity smears the frame radially (m1_farn.png artefact).
+            // Render once at the FIXED pose to settle the velocity buffer, then capture clean.
             cam.targetTexture = rt;
+            cam.Render();
             cam.Render();
             cam.targetTexture = null;
             SaveFrameTo(rt, file);

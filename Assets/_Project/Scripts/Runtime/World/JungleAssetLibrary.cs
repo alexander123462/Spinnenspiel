@@ -27,9 +27,13 @@ namespace Spinnenspiel
         public Mesh[] bushVariants;
         public Material[] bushVariantMats;
 
-        /// <summary>Blender-Riesenbläter, 3 Varianten (index 0..2), mit passendem Material auf demselben Index.</summary>
+        /// <summary>Blender-Riesenbläter, 3 Varianten (index 0..2). Je FBX 2 Material-Slots -> 2 Submeshes:
+        /// Leaf (Cutout, index = giantLeafLeafSubmesh) + Stem (opaque Bark). giantLeafMats = Blatt-Material,
+        /// giantLeafStemMats = Stemm-Material, same length/order. Submesh-Order measured at build (not a Blender contract).</summary>
         public Mesh[] giantLeaves;
         public Material[] giantLeafMats;
+        public Material[] giantLeafStemMats;
+        public int giantLeafLeafSubmesh = 1;
 
         /// <summary>Blender-Baumfarne, 3 Varianten (index 0..2), je 2 Submeshes: 0 = Stamm, 1 = Blatt.</summary>
         public Mesh[] treeFerns;
