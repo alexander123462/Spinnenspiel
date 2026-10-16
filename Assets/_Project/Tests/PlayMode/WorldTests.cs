@@ -491,7 +491,7 @@ namespace Spinnenspiel.Tests
             Assert.IsNotNull(spawner, "InsectSpawner fehlt");
             Assert.IsNotNull(spawner.template, "Spawner-Vorlage fehlt");
             spawner.enabled = false;
-            foreach (FlyingInsect f in Object.FindObjectsOfType<FlyingInsect>())
+            foreach (FlyingInsect f in Object.FindObjectsByType<FlyingInsect>(FindObjectsSortMode.None))
             {
                 f.Remove();
             }

@@ -24,7 +24,7 @@ namespace Spinnenspiel.Tests
             float boden = Terrain.activeTerrain != null
                 ? Terrain.activeTerrain.SampleHeight(pos) + Terrain.activeTerrain.transform.position.y
                 : -999f;
-            int anzahl = Object.FindObjectsOfType<SpiderMovement>().Length;
+            int anzahl = Object.FindObjectsByType<SpiderMovement>(FindObjectsSortMode.None).Length;
 
             RaycastHit[] hits = Physics.RaycastAll(pos + Vector3.up * 2f, Vector3.down, 5f);
             var beste = new System.Collections.Generic.List<RaycastHit>();
@@ -436,7 +436,7 @@ namespace Spinnenspiel.Tests
                 // nichts naeher als 0.5 m vor der Linse. Measure highest nearby tree top
                 // so we can place the himmel-cam ABOVE the canopy (see sky).
                 float canopyTop = 0f;
-                foreach (var tr in GameObject.FindObjectsOfType<UnityEngine.MeshRenderer>())
+                foreach (var tr in GameObject.FindObjectsByType<UnityEngine.MeshRenderer>(FindObjectsSortMode.None))
                 {
                     var tn = tr.gameObject.name;
                     if (tn != "TreeLOD0" && tn != "TreeLOD1") continue;

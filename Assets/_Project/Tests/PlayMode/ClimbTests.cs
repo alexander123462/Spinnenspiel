@@ -285,7 +285,7 @@ namespace Spinnenspiel.Tests
             Vector3 spawn = WorldLayout.SpawnPoint;
             Transform trunk = null;
             float bestDist = float.MaxValue;
-            foreach (GameObject go in Object.FindObjectsOfType<GameObject>())
+            foreach (GameObject go in Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None))
             {
                 if (go.name != "Trunk" || go.GetComponent<MeshCollider>() == null || go.GetComponent<SurfaceTag>() == null)
                 {
@@ -390,7 +390,7 @@ namespace Spinnenspiel.Tests
             Vector3 spawn = WorldLayout.SpawnPoint;
             GameObject trunkGo = null;
             float bestDist = float.MaxValue;
-            foreach (GameObject go in Object.FindObjectsOfType<GameObject>())
+            foreach (GameObject go in Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None))
             {
                 if (go.name != "Trunk" || go.GetComponent<MeshCollider>() == null || go.GetComponent<SurfaceTag>() == null)
                 {

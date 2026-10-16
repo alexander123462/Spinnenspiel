@@ -117,7 +117,7 @@ namespace Spinnenspiel.Tests
             }
 
             // Zuvor gespawnte Fliegen entfernen, damit sie nicht stören.
-            foreach (FlyingInsect f in Object.FindObjectsOfType<FlyingInsect>())
+            foreach (FlyingInsect f in Object.FindObjectsByType<FlyingInsect>(FindObjectsSortMode.None))
             {
                 f.Remove();
             }
@@ -221,7 +221,7 @@ namespace Spinnenspiel.Tests
             spawner.enabled = false;
 
             // Zuvor gespawnte Fliegen entfernen, damit sie nicht stoeren.
-            foreach (FlyingInsect f in Object.FindObjectsOfType<FlyingInsect>())
+            foreach (FlyingInsect f in Object.FindObjectsByType<FlyingInsect>(FindObjectsSortMode.None))
             {
                 f.Remove();
             }
@@ -265,7 +265,7 @@ namespace Spinnenspiel.Tests
             InsectSpawner spawner = Object.FindFirstObjectByType<InsectSpawner>();
             Assert.IsNotNull(spawner, "Spawner 'Insekten' nicht gefunden");
             spawner.enabled = false;
-            foreach (FlyingInsect f in Object.FindObjectsOfType<FlyingInsect>())
+            foreach (FlyingInsect f in Object.FindObjectsByType<FlyingInsect>(FindObjectsSortMode.None))
             {
                 f.Remove();
             }
@@ -354,7 +354,7 @@ namespace Spinnenspiel.Tests
             InsectSpawner spawner = Object.FindFirstObjectByType<InsectSpawner>();
             Assert.IsNotNull(spawner, "Spawner 'Insekten' nicht gefunden");
             spawner.enabled = false;
-            foreach (FlyingInsect f in Object.FindObjectsOfType<FlyingInsect>())
+            foreach (FlyingInsect f in Object.FindObjectsByType<FlyingInsect>(FindObjectsSortMode.None))
             {
                 f.Remove();
             }
