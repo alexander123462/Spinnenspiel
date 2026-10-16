@@ -56,7 +56,11 @@ Such dir KEINEN anderen Punkt aus. Eingerueckte Unterpunkte ("  - [ ]") gehoeren
 
 Vorgehen: in Schritte zerlegen; Code nur in Stuecken (max. ca. 60 Zeilen pro Schreibvorgang); bestehende Dateien nur per Patch aendern und vorher lesen; zu neuer Logik gehoert ein Test; dann voller CI-Lauf:
 powershell -ExecutionPolicy Bypass -File $ROOT/Tools/ci.ps1 -Name r$RUNDE -Method Spinnenspiel.EditorTools.UrwaldSceneBuilder.Build -Tests
-Ergebnis aus Logs/ci/r$RUNDE-summary.txt lesen. Commit-Gate: Lies Docs/ROT.md. Committen, wenn der Test deines Punktes gruen ist und JEDER fehlgeschlagene Test in Docs/ROT.md steht (diese Fehlschlaege zaehlen NICHT als Fehlversuch und sind KEIN Grund, eigene Aenderungen zurueckzunehmen). Steht ein Fehlschlag NICHT in Docs/ROT.md, ist er deine Regression - dann nicht committen. Nur die eigenen Dateien committen (nie git add -A). NEU: nach einem erfolgreichen Commit zusaetzlich "git push origin hdrp" ausfuehren, damit Alex den Fortschritt am Server sieht. Schlaegt der Push fehl, den Punkt trotzdem als [x] stehen lassen, den Fehler in einer Zeile melden und NICHT wiederholen. Danach Punkt in Docs/BACKLOG.md auf [x] setzen (mit Commit-Hash), eine Zeile in Docs/BERICHT.md anhaengen und bis zu 3 Lehren in Docs/LERNEN.md.
+Ergebnis aus Logs/ci/r$RUNDE-summary.txt lesen. Commit-Gate: Lies Docs/ROT.md. Committen, wenn der Test deines Punktes gruen ist und JEDER fehlgeschlagene Test in Docs/ROT.md steht (diese Fehlschlaege zaehlen NICHT als Fehlversuch und sind KEIN Grund, eigene Aenderungen zurueckzunehmen). Steht ein Fehlschlag NICHT in Docs/ROT.md, ist er deine Regression - dann nicht committen. Nur die eigenen Dateien committen (nie git add -A). NEU: nach einem erfolgreichen Commit zusaetzlich "git push origin hdrp" ausfuehren, damit Alex den Fortschritt am Server sieht. Nie nach main pushen. Schlaegt der Push fehl, den Punkt trotzdem als [x] stehen lassen, den Fehler in einer Zeile melden und NICHT wiederholen. Danach Punkt in Docs/BACKLOG.md auf [x] setzen (mit Commit-Hash), eine Zeile in Docs/BERICHT.md anhaengen und bis zu 3 Lehren in Docs/LERNEN.md.
+
+Roter Test deines Punktes: Pruefe ZUERST, ob die Annahme des Tests stimmt (Testaufbau, Vorbedingungen, Zaehler, Zeitfenster; vergleiche mit einem aehnlichen gruenen Test in derselben Datei), bevor du den Spielcode umbaust. Meist liegt der Fehler im Testaufbau. Lies bei jedem Fehlschlag die konkrete Meldung in Logs/ci/r$RUNDE-tests.log.
+
+Beweisbild: Aendert dein Punkt etwas Sichtbares, erzeuge ein Bild (Screenshot-Test legt PNG unter Logs/ci ab), lass es mit python Tools/bild_fragen.py <png> beschreiben, trage die Beschreibung in Docs/BERICHT.md ein und nenne in der Discord-Nachricht den Bildpfad. Ohne Bildkontrolle nicht "fertig" melden bei sichtbaren Aenderungen.
 
 Regeln: Unity muss geschlossen sein (tasklist | grep -i Unity.exe) - laeuft Unity, Punkt als "[!] Unity offen" markieren und aufhoeren. Maximal 3 Versuche; danach Punkt als "[!]" mit Grund markieren und aufhoeren. Eigene Aenderungen dabei NICHT zuruecknehmen, sondern im Arbeitsbaum lassen und im Backlog-Eintrag die geaenderten Dateien namentlich auflisten. Keine Hintergrundprozesse starten, auf deren Ende du wartest. Geaenderte .mat/.asset-Dateien im Arbeitsbaum sind Unity-Rauschen und bleiben unangetastet. Nie mit einer Frage aufhoeren.
 
@@ -65,10 +69,10 @@ Wenn du einen Punkt als [!] markierst, also nicht weiterkommst: schreibe ZUSAETZ
 Wenn der Punkt fertig (committet) oder als [!] markiert ist: sofort aufhoeren und in maximal 5 Zeilen melden: Punkt, Ergebnis, Commit-Hash, naechster offener Punkt.
 AUF
 
-  "$HERMES" chat --query-file "$ROOT/Logs/autopilot_auftrag.txt" -Q --yolo \
-    --provider "$PROVIDER" -m "$MODELL" --in "$ROOT" --source cli --run-budget 3300 \
-    >> Logs/autopilot_runde.out 2>&1
-  echo "-- Runde $RUNDE Ende $(date '+%T') exit=$? HEAD=$(git --no-optional-locks log -1 --format=%h 2>/dev/null)" >> $LOG
+  "$HERMES" chat --query-file "$ROOT/Logs/autopilot_auftrag.txt" --yolo -v \
+    --provider "$PROVIDER" -m "$MODELL" --in "$ROOT" --source cli --run-budget 7200 \
+    2>&1 | tee -a Logs/autopilot_runde.out
+  echo "-- Runde $RUNDE Ende $(date '+%T') exit=${PIPESTATUS[0]} HEAD=$(git --no-optional-locks log -1 --format=%h 2>/dev/null)" >> $LOG
   if grep -q "^- \[!\] $KUERZEL " Docs/BACKLOG.md 2>/dev/null; then
     melde "Spinnenspiel: Hermes kommt bei Punkt $KUERZEL nicht weiter und hat ihn als blockiert markiert ($(date '+%F %T')). Grund steht in Docs/BACKLOG.md. Die Schleife macht mit dem naechsten Punkt weiter."
   fi
