@@ -24,6 +24,27 @@ namespace Spinnenspiel
         [Tooltip("Optional: dann ist home für alle Insekten homeOverride.position.")]
         public Transform homeOverride;
 
+        [Tooltip("J5: Tag/Nacht-Cycle. Without it the spawner is always active (day/night ignored).")]
+        public DayNightCycle cycle;
+
+        [Tooltip("J5: true = this species flies only at night, false = only during the day.")]
+        public bool activeAtNight;
+
+        /// <summary>J5: Share 0..1 of <see cref="count"/> that is out now (day/night ramp).</summary>
+        private float ActiveShare
+        {
+            get
+            {
+                if (cycle == null)
+                {
+                    return 1f;
+                }
+
+                float dayFactor = Mathf.Clamp01(cycle.CurrentDayFactor);
+                return activeAtNight ? 1f - dayFactor : dayFactor;
+            }
+        }
+
         private readonly List<FlyingInsect> insects = new List<FlyingInsect>();
         private readonly System.Random rng = new System.Random();
 
@@ -80,12 +101,37 @@ namespace Spinnenspiel
             insects.Remove(insect);
         }
 
-        /// <summary>Entfernte Insekten ersetzen und auf <see cref="count"/> aufstocken.</summary>
+        /// <summary>Entfernte Insekten ersetzen und auf count aufstocken. J5: only the day/night share is kept.</summary>
         private void Reconcile()
         {
             if (template == null)
             {
                 return;
+            }
+
+            // J5: Target = share of count for this species at the current time (ramp, not abrupt).
+            int target = Mathf.RoundToInt(count * ActiveShare);
+
+            // Insekten beyond the current target get removed (they retreat at dawn/dusk).
+            while (AliveCount > target)
+            {
+                FlyingInsect victim = null;
+                foreach (FlyingInsect candidate in insects)
+                {
+                    if (candidate != null && candidate.State == FlyingInsect.InsectState.Flying)
+                    {
+                        victim = candidate;
+                        break;
+                    }
+                }
+
+                if (victim == null)
+                {
+                    break; // Caught ones stay.
+                }
+
+                victim.Remove();
+                insects.Remove(victim);
             }
 
             // Entfernte Insekten aufräumen und zu weit entfernte ersetzen.
@@ -125,7 +171,7 @@ namespace Spinnenspiel
                 }
             }
 
-            for (int i = alive; i < count; i++)
+            for (int i = alive; i < target; i++)
             {
                 Spawn();
             }

@@ -23,7 +23,7 @@ namespace Spinnenspiel
 
         /// <summary>Brightness during night/moonlight (Lux).</summary>
         [Tooltip("Moon-like brightness at night in Lux")]
-        public float moonLux = 350f;
+        public float moonLux = 16000f;
 
         /// <summary>Interval for updating the dynamic ambient light in seconds.</summary>
         [Tooltip("Interval for DynamicGI.UpdateEnvironment in seconds")]
@@ -31,6 +31,20 @@ namespace Spinnenspiel
 
         /// <summary>Progress of the day 0..1 (0 = midnight, 0.5 = noon). Read-only for Tests.</summary>
         public float DayProgress;
+
+        /// <summary>J5: Brightness factor 0 (night) .. 1 (noon). Drives light AND insect activity.</summary>
+        public float CurrentDayFactor;
+
+        /// <summary>J5: Night factor 1 (deep night) .. 0 (full day). Ramps over transitionMinutes at dawn/dusk.</summary>
+        public float CurrentNightFactor;
+
+        /// <summary>J5: Minutes of the cycle that are dark (night core, ramps excluded).</summary>
+        [Tooltip("Minutes per cycle that are dark (night core, ramps excluded)")]
+        [SerializeField] private float nightMinutes = 6f;
+
+        /// <summary>J5: Width in minutes of each dawn/dusk ramp (transition not abrupt).</summary>
+        [Tooltip("Width in minutes of each dawn/dusk transition ramp")]
+        public float transitionMinutes = 2f;
 
         /// <summary>Day progress at game start (default morning, 0.3 = just after sunrise).</summary>
         [Tooltip("Day progress at game start (0 = midnight, 0.5 = noon)")]
@@ -42,7 +56,7 @@ namespace Spinnenspiel
         // Night color as configuration value (HDRP: Fog-Albedo lives in the Volume,
         // the fog color itself is not changed at runtime).
         [Tooltip("Sun tint at night (moonlight)")]
-        private Color moonTint = new Color(0.55f, 0.62f, 0.85f);
+        private Color moonTint = new Color(0.8f, 0.85f, 1f);
 
         private void Start()
         {
@@ -79,9 +93,25 @@ namespace Spinnenspiel
             float elevDeg = Mathf.Asin(Mathf.Sin(phase)) * Mathf.Rad2Deg;
             float azDeg = phase * Mathf.Rad2Deg + 90f;
 
-            sun.transform.rotation = Quaternion.Euler(elevDeg, azDeg, 0f);
+            // J5: at night the light acts as a MOON above the horizon (a sun below the
+            // horizon lights nothing and would leave the scene pitch black).
+            float elevLight = elevDeg >= 0f ? elevDeg : -elevDeg;
+            float azLight = elevDeg >= 0f ? azDeg : azDeg + 180f;
+            sun.transform.rotation = Quaternion.Euler(elevLight, azLight, 0f);
 
-            float dayFactor = Mathf.Clamp01((elevDeg + 6f) / 12f);
+            // J5: dayFactor from the cycle fraction with explicit dawn/dusk ramps (not abrupt):
+            // night core = nightMinutes centred at midnight, ramps of transitionMinutes on both sides.
+            float rampFrac = Mathf.Max(transitionMinutes, 0.01f) / lengthMinutes;
+            float coreMinutes = Mathf.Min(nightMinutes, Mathf.Max(lengthMinutes - 2f * transitionMinutes, 0f));
+            float coreFrac = coreMinutes / lengthMinutes;
+            float distFromMidnight = Mathf.Min(dayFraction, 1f - dayFraction);
+            float dayFactor = distFromMidnight <= coreFrac * 0.5f ? 0f : 1f;
+            if (distFromMidnight > coreFrac * 0.5f && rampFrac > 0f)
+            {
+                dayFactor = Mathf.Min(1f, (distFromMidnight - coreFrac * 0.5f) / rampFrac);
+            }
+            CurrentDayFactor = dayFactor;
+            CurrentNightFactor = 1f - dayFactor;
             sun.intensity = Mathf.Lerp(moonLux, dayLux, dayFactor);
             sun.color = Color.Lerp(
                 new Color(1f, 0.93f, 0.82f), moonTint, 1f - dayFactor);

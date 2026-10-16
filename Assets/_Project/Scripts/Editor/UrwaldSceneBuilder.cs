@@ -130,6 +130,7 @@ namespace Spinnenspiel.EditorTools
             InsectSpawner insektenSpawner = insekten.AddComponent<InsectSpawner>();
             insektenSpawner.count = 8;
             insektenSpawner.center = spider.transform;
+            insektenSpawner.cycle = dayCycle; // J5: Flies only during the day.
             GameObject vorlage = InsectBuilder.CreateFly();
             vorlage.name = "Vorlage";
             vorlage.transform.SetParent(insekten.transform, false);
@@ -141,6 +142,8 @@ namespace Spinnenspiel.EditorTools
             InsectSpawner motteSpawner = insekten2.AddComponent<InsectSpawner>();
             motteSpawner.count = 4;
             motteSpawner.center = spider.transform;
+            motteSpawner.cycle = dayCycle; // J5: Moths only at night.
+            motteSpawner.activeAtNight = true;
             GameObject motteVorlage = InsectBuilder.CreateMoth();
             if (motteVorlage != null)
             {
