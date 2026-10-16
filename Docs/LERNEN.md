@@ -181,3 +181,11 @@
 
 - JsonUtility roundtrip of flat SavePayload (primitive + Vector3 lists) is exact for float/int/Vector3; keep payload flat, no nested classes. For test-only raw JSON injection give the component a WriteRawSaveJson helper writing to FilePath.
 - CS0618 cleanup: replace FindObjectsOfType<T>() with FindObjectsByType<T>(FindObjectsSortMode.None) in test helpers that only iterate; sort order never mattered there, so None is safe and faster. Count warnings per compile pass doubles (each warning printed twice in method+tests logs).
+
+## Lehren (K3, r113)
+
+- Legacy IMGUI (OnGUI/GUI) has NO transform stack: GUI.PushTransform/Translate/Rotate/PopTransform do not exist (CS0117). Draw HUD markers as axis-aligned rects via GUI.DrawTexture(rect, whiteTexture) tinted with GUI.color; a rotated arrow needs a pre-rendered sprite, not GUI transforms.
+
+- Mathf constant is Mathf.Rad2Deg, NOT RadToDeg (CS0117). And FindObjectsSortMode: the distance value is not named SortByDistanceToCamera; for plain iteration use FindObjectsSortMode.None. Never guess enum members — grep Library/PackageCache or the compile error names them.
+
+- Pure-Math + MonoBehaviour split (PreyHintModel static math vs PreyHint OnGUI) lets an EditMode-style test assert direction/distance without pixels, and a PlayMode proofshot paints the model-projected marker over cam.Render() via ReadPixels->EncodeToPNG (ARGB32 RT, ARGB32/RGB24 tex).

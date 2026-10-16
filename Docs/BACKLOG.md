@@ -239,21 +239,21 @@
   - Schritt 2: Ersetze FindObjectsOfType<T>() durch FindObjectsByType<T>(FindObjectsSortMode.None) (bzw. FindObjectsInactive.Include wo noetig), Verhalten der Tests unveraendert.
   - Schritt 3: Kriterien: Anzahl CS0618-Warnungen = 0 -> OK/NOK; alle bisherigen Tests weiterhin gruen -> OK/NOK.
   - Schritt 4: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] K2 Unity-Rauschen beenden. Nach jedem Szenenbau stehen ueber 20 .mat/.asset/.unity-Dateien als geaendert im Arbeitsbaum, obwohl nichts Inhaltliches neu ist. Bekannte Ursache (Diff MAT_Dust.mat): die fileID des HDRP-Unter-Assets (--- !u!114 &...) wird bei jedem Build zufaellig neu vergeben.
+- [!] K2 Unity-Rauschen beenden. Nach jedem Szenenbau stehen ueber 20 .mat/.asset/.unity-Dateien als geaendert im Arbeitsbaum, obwohl nichts Inhaltliches neu ist. Bekannte Ursache (Diff MAT_Dust.mat): die fileID des HDRP-Unter-Assets (--- !u!114 &...) wird bei jedem Build zufaellig neu vergeben. (r111: AssetUtil.UpdateMaterialAsset in-place statt Delete+Create, alle Builders adapted; CI 130/130 green. Rest: 20 .mat + 3 .unity/.asset = 23 files still dirty — CopyPropertiesFromMaterial reorders property blocks and HDRP still re-stamps AssetVersion fileID. Criterion 'diff leer' NOK, restzahl 23 melden.) Changed files: Assets/_Project/Scripts/Editor/Builders/{AssetUtil,EffectsBuilder,InsectBuilder,ScanModels,VegetationBuilder,WaterBuilder,WorldLightingBuilder}.cs
   - Schritt 1: Messen: Zaehle geaenderte Dateien in Assets/_Project/Art/Generated und der Szene nach zwei Builds hintereinander (git status, Anzahl melden).
   - Schritt 2: Ursache im Editor-Code finden (Material wird neu erzeugt statt wiederverwendet?). Materialien mit AssetDatabase.LoadAssetAtPath laden und aktualisieren statt neu anlegen; Shader-Eigenschaften nur setzen, wenn sie sich unterscheiden.
   - Schritt 3: Kriterium: nach zwei Builds hintereinander ohne Codeaenderung ist git diff --stat fuer Assets/_Project/Art/Generated/Materials leer -> OK/NOK. Wenn es nicht vollstaendig geht, Restzahl melden statt weiter zu basteln.
   - Schritt 4: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] K3 Beute-Hinweis am Bildschirm: ein kleiner Pfeil oder Punkt am Rand zeigt die Richtung und Entfernung zum naechsten Insekt, das im eigenen Netz haengt. Im HUD-Stil der Energieanzeige (J2).
+- [x] K3 Beute-Hinweis am Bildschirm: ein kleiner Pfeil oder Punkt am Rand zeigt die Richtung und Entfernung zum naechsten Insekt, das im eigenen Netz haengt. Im HUD-Stil der Energieanzeige (J2). [a6317b2: PreyHint.cs + PreyHintModel.cs neu, SpiderBuilder.cs + InsectTests.cs changed]
   - Schritt 1: Hinweis nur anzeigen, wenn mindestens ein Insekt im Zustand Caught ist, sonst unsichtbar.
   - Schritt 2: Kriterien: ohne gefangenes Insekt ist der Hinweis aus -> OK/NOK; mit gefangenem Insekt 5 m entfernt zeigt die angezeigte Entfernung 5 m +-0.2 -> OK/NOK; Richtungswinkel weicht hoechstens 5 Grad von der echten Richtung ab -> OK/NOK.
   - Schritt 3: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] K4 Regen und Insekten. Bei Regen fliegen weniger Insekten, und die Netze tropfen sichtbar.
+- [!] K4 Regen und Insekten. Bei Regen fliegen weniger Insekten, und die Netze tropfen sichtbar. — Time-Budget: Code-Changes done but CI r114 not run/verified; NOT committed. Changed files: Assets/_Project/Scripts/Runtime/Silk/WebRainDrips.cs (new), Assets/_Project/Scripts/Runtime/Insects/InsectSpawner.cs, Assets/_Project/Scripts/Runtime/Environment/WeatherController.cs
   - Schritt 1: Wetter-Zustand aus dem vorhandenen Wettersystem lesen (Weather_DryRainCycleIsDeterministic zeigt, wo).
   - Schritt 2: Bei Regen sinkt die Zielzahl der Insekten auf 30 Prozent (benannte Konstante), bei Trockenheit wieder auf normal, ohne dass vorhandene Insekten schlagartig verschwinden (ueber 20 s auslaufen lassen).
   - Schritt 3: Kriterien: Zielzahl bei Regen / Zielzahl trocken = 0.3 +-0.05 -> OK/NOK; nach Regenende ist die normale Zahl innerhalb 60 s wieder erreicht -> OK/NOK.
   - Schritt 4: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] K5 Wachstum durch Fressen. Nach je 10 gefressenen Insekten waechst die Spinne um 8 Prozent, bis maximal 150 Prozent der Startgroesse. Kamera und Beinlaengen folgen.
+- [x] K5 Wachstum durch Fressen. Nach je 10 gefressenen Insekten waechst die Spinne um 8 Prozent, bis maximal 150 Prozent der Startgroesse. Kamera und Beinlaengen folgen. [09552a1]
   - Schritt 1: Skalierung an einer Stelle (benannte Konstanten fuer 10, 0.08, 1.5), Kamerahoehe und Kollisionsmasse mitskalieren.
   - Schritt 2: Kriterien: nach 10 Fressen Skalierung 1.08 +-0.01 -> OK/NOK; nach 100 Fressen Skalierung genau 1.5 (Obergrenze) -> OK/NOK; Spinne bleibt nach dem Wachsen auf dem Boden (Fusshoehe +-0.02 m) -> OK/NOK.
   - Schritt 3: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
