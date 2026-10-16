@@ -303,6 +303,86 @@ namespace Spinnenspiel.Tests
             Assert.Less(baseline, 16.7f, "Base frame time already over budget.");
         }
 
+        // K8: Frametime-Budget muss mit 6 Insekten, 3 Netze, Tag/Nacht und Regen SIMULTANEOUSLY halten.
+        // Der plainen Urwald-Test (Performance_MeanFrameTimeUnderBudget) misst de steady-state OHNE
+        // zusatlich Insekten/Netze. Here push the worst case: Noon (dayFactor=1) so day-species run
+        // full, force 6 flying insects, build 3 fully-grown nets (LineRenderer-Faeden = Rendern-Load),
+        // keep the DayNightCycle + WeatherController running. Criterion: mean CPU-Work <= 16.7*1.15 ms.
+        [UnityTest]
+        public IEnumerator Performance_WorstCaseScenarioUnderBudget()
+        {
+            JungleWorldGenerator.NextSeed = 4242;
+            SceneManager.LoadScene("Urwald");
+            yield return null;
+            yield return WaitReady();
+
+            SpiderMovement spider = Object.FindFirstObjectByType<SpiderMovement>();
+            Assert.IsNotNull(spider, "No SpiderMovement in Urwald.");
+            DayNightCycle cycle = Object.FindFirstObjectByType<DayNightCycle>();
+            Assert.IsNotNull(cycle, "No DayNightCycle in scene (Tag/Nacht must run).");
+
+            // Tag/Nacht ACTIVE: noon -> dayFactor 1, sun-rotation + DynamicGI-Updates keep running.
+            // Long dayLength keeps noon (dayFactor=1) stable through the later rain window, so day-species
+            // stay alive while Regen runs -> genuine simultaneous worst case (Tag + Regen together).
+            cycle.dayLengthMinutes = 200f;
+            cycle.SetDayProgress(0.5f);
+
+            // Regen: the WeatherController keeps cycling; JungleAmbientAudio/Wind react to Rain01.
+            Assert.IsNotNull(WeatherController.Instance, "No active WeatherController (Regen must run).");
+
+            // 6 Insekten simultaneously: day-species full, night-species empty -> exactly 6 flying.
+            foreach (InsectSpawner sp in Object.FindObjectsByType<InsectSpawner>(FindObjectsSortMode.None))
+            {
+                if (sp.activeAtNight)
+                {
+                    sp.count = 0;
+                }
+                else
+                {
+                    sp.count = 6;
+                }
+            }
+
+            // 3 Netze, je vollstaendig gebaut (Frame+Radii+CaptureSpiral+Aux = LineRenderer-Load).
+            Vector3 spiderPos = spider.transform.position;
+            for (int n = 0; n < 3; n++)
+            {
+                Vector3 hub = spiderPos + new Vector3(1.5f + 2.5f * n, 0.9f, 0f);
+                Vector3[] anchors =
+                {
+                    hub + new Vector3(0f, 1.1f, -1.1f),
+                    hub + new Vector3(0f, 1.1f, 1.1f),
+                    hub + new Vector3(0f, -1.1f, 1.1f),
+                    hub + new Vector3(0f, -1.1f, -1.1f),
+                };
+                OrbWeb web = WebBuildDemo.CreateWebAt(anchors, null, "K8Net" + n);
+                Assert.IsNotNull(web, "No net for index " + n);
+                web.SetProgress(OrbWeb.WebStage.Done, 1f);
+            }
+
+            // Live: let the spawners top up to target, then count real flying insects.
+            yield return new WaitForSeconds(1f);
+            int flying = Object.FindObjectsByType<FlyingInsect>(FindObjectsSortMode.None).Length;
+
+            // Regen must be ACTIVE during measurement: fast-forward to a rainy window (Rain01 >= 0.8).
+            float rainDeadline = Time.time + 130f;
+            while (WeatherController.Instance != null && WeatherController.Instance.Rain01 < 0.8f && Time.time < rainDeadline)
+            {
+                yield return new WaitForSeconds(0.5f);
+            }
+            float rainNow = WeatherController.Instance != null ? WeatherController.Instance.Rain01 : 0f;
+            Debug.Log("[K8] scenario: insects=" + flying + " nets=3 dayFactor=" + cycle.CurrentDayFactor.ToString("F2") +
+                " rain01=" + rainNow.ToString("F2"));
+
+            yield return MeasureMeanCpuMs(300);
+            float mean = _lastMeanCpuMs;
+            float budget = 16.7f * 1.15f;
+            Debug.Log("[K8] mittl. CPU-Work-Framezeit " + mean.ToString("F2") + " ms -> Budget " + budget.ToString("F2") +
+                " ms (x1.15) -> " + (mean <= budget ? "OK" : "NOK"));
+            Assert.GreaterOrEqual(rainNow, 0.8f, "Regen not active during scenario: rain01=" + rainNow.ToString("F2") + ".");
+            Assert.LessOrEqual(mean, budget, "Worst-case scenario CPU-Work above 16.7*1.15 ms budget: " + mean.ToString("F2") + " ms.");
+        }
+
         [UnityTest]
         public IEnumerator Urwald_GeneratesWorldFromSeed()
         {
