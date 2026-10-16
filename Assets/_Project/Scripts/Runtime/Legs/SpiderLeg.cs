@@ -36,6 +36,14 @@ namespace Spinnenspiel
         [SerializeField] private float probeDepth = 0.35f;
         [SerializeField] private float maxWalkableAngle = 65f;
 
+        // K5 Wachstum: Base-lengths from Configure, scaled by growth (1 = start size).
+        private float _baseUpperLength = 0.085f;
+        private float _baseLowerLength = 0.095f;
+        private float _baseTarsusLength = 0.028f;
+        private float _baseThickness = 0.015f;
+        private bool _baseRecorded;
+        private float _growth = 1f;
+
         private Vector3 _stepStart;
         private Vector3 _stepEnd;
         private Vector3 _stepEndNormal;
@@ -78,6 +86,11 @@ namespace Spinnenspiel
             lowerLength = lower;
             tarsusLength = tarsus;
             segmentThickness = thickness;
+            _baseUpperLength = upper;
+            _baseLowerLength = lower;
+            _baseTarsusLength = tarsus;
+            _baseThickness = thickness;
+            _baseRecorded = true;
             femurVisual = femur;
             tibiaVisual = tibia;
             tarsusVisual = tarsusVis;
@@ -121,11 +134,41 @@ namespace Spinnenspiel
             }
         }
 
-        /// <summary>Stellt Fuß und Bein-Visuals sofort in Ruhepose (auch außerhalb des Play-Modus, z. B. nach dem Szenenaufbau).</summary>
+        /// <summary>Stellt Ruhepose sofort (auch außerhalb des Play-Modus, z. B. nach dem Szenenaufbau).</summary>
         public void PoseAtRest()
         {
             SnapToGround();
             SolveAndPlaceVisuals();
+        }
+
+        /// <summary>
+        /// K5 Wachstum: Groefficient der Beinlaengen (1 = Startgroeffe). Segment-laengen
+        /// (upper/lower/tarsus) plus Thickness re-scaled from the base lengths saved in
+        /// Configure, so MaxReach and the IK solve follow the spider's growth. The leg
+        /// then snaps to ground again and places its visuals in the new rest-pose.
+        /// </summary>
+        public void SetGrowth(float growth)
+        {
+            // K5: if Configure never ran (Builder sets serialized lengths), snapshot
+            // the current values as base first, so scaling stays relative to start size.
+            if (!_baseRecorded)
+            {
+                _baseUpperLength = upperLength;
+                _baseLowerLength = lowerLength;
+                _baseTarsusLength = tarsusLength;
+                _baseThickness = segmentThickness;
+                _baseRecorded = true;
+            }
+            _growth = Mathf.Max(0.01f, growth);
+            upperLength = _baseUpperLength * _growth;
+            lowerLength = _baseLowerLength * _growth;
+            tarsusLength = _baseTarsusLength * _growth;
+            segmentThickness = _baseThickness * _growth;
+            if (_initialized)
+            {
+                SnapToGround();
+                SolveAndPlaceVisuals();
+            }
         }
 
         /// <summary>
