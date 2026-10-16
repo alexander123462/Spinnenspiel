@@ -119,6 +119,9 @@ namespace Spinnenspiel.EditorTools
             // Steuerungshilfe (t82): Box oben rechts, F1 schaltet um.
             root.AddComponent<ControlsHelp>();
 
+            // K3: Beute-Hinweis (Pfeilchen + Entfernunget to naechsten caught insect).
+            root.AddComponent<PreyHint>();
+
             // Speichersystem (Z5): Position/Hunger/Netze as JSON bei Quit, laden beim Start.
             // Before GameMenu: its Start() must register the hooks before StartGame fires.
             root.AddComponent<SaveGame>();
