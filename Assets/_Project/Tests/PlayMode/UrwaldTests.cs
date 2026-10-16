@@ -142,6 +142,78 @@ namespace Spinnenspiel.Tests
             }
         }
 
+        // B1: Spinne bleibt ohne Eingabe aufrecht auf dem Boden (nicht kopfueber ueber dem Boden).
+        // Pro Seed 8 s warten, dann Neigung gegen Welt-oben und Hoehe ueber dem Terrain pruefen.
+        [UnityTest]
+        public IEnumerator B1_SpiderStaysUprightOnGround()
+        {
+            int[] seeds = { 7, 1234, 4242, 99, 5, 31, 777, 2026, 15, 8080, 123456, 42 };
+            foreach (int seed in seeds)
+            {
+                JungleWorldGenerator.NextSeed = seed;
+                SceneManager.LoadScene("Urwald");
+                yield return WaitReady();
+
+                var mv = Object.FindFirstObjectByType<SpiderMovement>();
+                Assert.IsNotNull(mv, $"Seed {seed}: SpiderMovement missing.");
+                float t = 0f;
+                while (t < 8f)
+                {
+                    t += Time.deltaTime;
+                    yield return null;
+                }
+
+                Terrain terr = Terrain.activeTerrain;
+                float terrainY = terr.SampleHeight(mv.transform.position) + terr.transform.position.y;
+                float height = mv.transform.position.y - terrainY;
+                float tilt = Vector3.Angle(mv.transform.up, Vector3.up);
+                Debug.Log($"[B1] seed={seed} tilt={tilt:F1} height={height:F2} attached={mv.IsAttached} normal={mv.SurfaceNormal}");
+                Assert.Less(tilt, 45f, $"Seed {seed}: Spinne gekippt/kopfueber, Neigung {tilt:F0} Grad.");
+                Assert.Less(height, 0.6f, $"Seed {seed}: Spinne {height:F2} m ueber dem Boden.");
+            }
+        }
+
+        // B2: Beim Geradeauslaufen ueber Gras/Boden bleibt die Spinne aufrecht und am Boden.
+        [UnityTest]
+        public IEnumerator B2_SpiderWalkingForwardStaysUpright()
+        {
+            int[] seeds = { 7, 1234, 4242, 99, 5, 31, 777, 2026 };
+            foreach (int seed in seeds)
+            {
+                JungleWorldGenerator.NextSeed = seed;
+                SceneManager.LoadScene("Urwald");
+                yield return WaitReady();
+                var mv = Object.FindFirstObjectByType<SpiderMovement>();
+                Assert.IsNotNull(mv, $"Seed {seed}: SpiderMovement missing.");
+                Terrain terr = Terrain.activeTerrain;
+                mv.SetExternalMoveLocal(new Vector2(0f, 1f));
+                float t = 0f;
+                float maxTilt = 0f;
+                float maxHeight = -99f;
+                float flipAt = -1f;
+                string where = "";
+                while (t < 25f)
+                {
+                    t += Time.deltaTime;
+                    float h = mv.transform.position.y - (terr.SampleHeight(mv.transform.position) + terr.transform.position.y);
+                    float tilt = Vector3.Angle(mv.transform.up, Vector3.up);
+                    maxTilt = Mathf.Max(maxTilt, tilt);
+                    maxHeight = Mathf.Max(maxHeight, h);
+                    if (flipAt < 0f && (tilt > 100f || h > 1f))
+                    {
+                        flipAt = t;
+                        var hit = new RaycastHit();
+                        Physics.Raycast(mv.transform.position + mv.transform.up * 0.3f, -mv.transform.up, out hit, 1f);
+                        where = hit.collider != null ? hit.collider.name + " layer=" + hit.collider.gameObject.layer + " path=" + hit.collider.transform.parent : "kein Treffer";
+                    }
+                    yield return null;
+                }
+                mv.SetExternalMoveLocal(null);
+                Debug.Log($"[B2] seed={seed} maxTilt={maxTilt:F0} maxHeight={maxHeight:F2} flipAt={flipAt:F1} on={where}");
+                Assert.Less(flipAt, 0f, $"Seed {seed}: Spinne nach {flipAt:F1} s gekippt/abgehoben auf {where}.");
+            }
+        }
+
         // S2: After abseiling down a net/silk thread to its lower anchor, the spider must NOT
         // sink into the terrain. The end-of-thread landing sets position = anchorB without a
         // terrain-height check; SettleOnTerrain raises the center so the collider bottom rests

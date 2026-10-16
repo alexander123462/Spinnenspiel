@@ -504,6 +504,20 @@ namespace Spinnenspiel
             _lastVelocity = (transform.position - oldPos) / dt;
         }
 
+        /// <summary>B2: Liegt innerhalb 1 m unter der Spinne Boden? (Decken-Klettern nur hoch ueber dem Boden.)</summary>
+        private bool GroundBelow()
+        {
+            return Physics.Raycast(transform.position, Vector3.down, out RaycastHit gh, 1.0f, sensor.mask, QueryTriggerInteraction.Ignore)
+                && gh.collider is TerrainCollider;
+        }
+
+        /// <summary>B2: Nahe am Boden ist eine nach unten zeigende Hindernisflaeche (Unterseite von
+        /// Stamm/Wurzel ueber dem Weg) KEINE Kletterflaeche – sonst dreht sich die Spinne kopfueber darunter.</summary>
+        private bool IsOverheadHitOnGround(Vector3 hitNormal, Vector3 groundNormal)
+        {
+            return hitNormal.y < -0.1f && GroundBelow();
+        }
+
         /// <summary>b) Haftend: tangent laufen, up-Achse ausrichten, Kollision begrenzen, an die Fläche haften.</summary>
         private void UpdateAttached(float dt, Vector3 dir, Vector3 up)
         {
@@ -537,6 +551,15 @@ namespace Spinnenspiel
                 return;
             }
 
+            // B2: Aufrecht (< 60 Grad geneigt) darf die Spinne nie auf eine nach unten zeigende Flaeche
+            // (Unterseite von Stamm/Wurzel) umspringen: stehen bleiben statt kopfueber zu drehen.
+            if (normal.y < -0.1f && GroundBelow())
+            {
+                _vel = Vector3.zero;
+                _lastSurfaceTime = Time.time;
+                return;
+            }
+
             _lastSurfaceTime = Time.time;
             _surfaceNormal = normal;
 
@@ -546,6 +569,12 @@ namespace Spinnenspiel
 
             // up-Achse weich zur Oberflächen-Normale ausrichten (during latch: to the wall normal).
             Vector3 alignNormal = groundFightsClimb ? _lastWallNormal : normal;
+            if (alignNormal.y < -0.2f && GroundBelow())
+            {
+                _vel = Vector3.zero;
+                _wallClimbTime = float.NegativeInfinity;
+                return;
+            }
             Vector3 newUp = Vector3.RotateTowards(up, alignNormal, alignRate * dt, 0f).normalized;
             transform.rotation = Quaternion.FromToRotation(up, newUp) * transform.rotation;
 
@@ -564,13 +593,13 @@ namespace Spinnenspiel
                 if (Physics.SphereCast(transform.position + newUp * bodyRadius, bodyRadius * 0.9f, _vel.normalized,
                         out RaycastHit castHit, step + 0.01f, sensor.mask, QueryTriggerInteraction.Ignore))
                 {
-                    if (castHit.distance > 0.0001f && Vector3.Angle(castHit.normal, Vector3.up) > 55f)
+                    if (castHit.distance > 0.0001f && Vector3.Angle(castHit.normal, Vector3.up) > 55f && !IsOverheadHitOnGround(castHit.normal, normal))
                     {
                         castHitSteep = true;
                         steepNormal = castHit.normal;
                         steepPoint = castHit.point;
                     }
-                    else if (castHit.distance > 0.0001f)
+                    else if (castHit.distance > 0.0001f && !IsOverheadHitOnGround(castHit.normal, normal))
                     {
                         // Flaches Hindernis (z. B. Oberseite eines kleinen Steins):
                         // nicht kappen, sondern entlang der getroffenen Fläche weiterlaufen.
@@ -585,7 +614,7 @@ namespace Spinnenspiel
                 else if (Physics.SphereCast(transform.position - _vel.normalized * 0.25f + newUp * (bodyRadius + 0.3f), bodyRadius * 1.4f, _vel.normalized,
                         out RaycastHit castHit2, step + 0.6f, sensor.mask, QueryTriggerInteraction.Ignore))
                 {
-                    if (castHit2.distance > 0.0001f && Vector3.Angle(castHit2.normal, Vector3.up) > 55f)
+                    if (castHit2.distance > 0.0001f && Vector3.Angle(castHit2.normal, Vector3.up) > 55f && !IsOverheadHitOnGround(castHit2.normal, normal))
                 {
                     // Leibhoch-Wurf: Steep Stoeckleib ueber dem Fusspfad (Planting-Absatz).
                     castHitSteep = true;
