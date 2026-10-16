@@ -189,3 +189,8 @@
 - Mathf constant is Mathf.Rad2Deg, NOT RadToDeg (CS0117). And FindObjectsSortMode: the distance value is not named SortByDistanceToCamera; for plain iteration use FindObjectsSortMode.None. Never guess enum members — grep Library/PackageCache or the compile error names them.
 
 - Pure-Math + MonoBehaviour split (PreyHintModel static math vs PreyHint OnGUI) lets an EditMode-style test assert direction/distance without pixels, and a PlayMode proofshot paints the model-projected marker over cam.Render() via ReadPixels->EncodeToPNG (ARGB32 RT, ARGB32/RGB24 tex).
+
+## Lehren (K6, r119)
+- PlayMode-Test: AddComponent in ARBEIT-Order (Hunger-Ausgabe AFTER DeathStats.Awake ran) -> cached _hunger null, Tod never fires. Fix: lazy re-acquire in Update (GetComponent only while ref still missing) OR add components BEFORE first yield.
+- OnGUI does NOT render into a RenderTexture: proofshot must paint panel+ticks manually via PaintRect (GUI y-down -> tex.height-1-y), like K3/K6 pattern. Vision model miscounts small ticks -> verify counts by pixel-run-analysis per row (PIL).
+- Bests persisted via SaveGame fields + payload bestTime/bestEaten/bestWebs; DeathStats.Update mirrors save-bests into model while alive so they survive app restart without new code.

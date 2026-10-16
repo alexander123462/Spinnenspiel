@@ -257,7 +257,7 @@
   - Schritt 1: Skalierung an einer Stelle (benannte Konstanten fuer 10, 0.08, 1.5), Kamerahoehe und Kollisionsmasse mitskalieren.
   - Schritt 2: Kriterien: nach 10 Fressen Skalierung 1.08 +-0.01 -> OK/NOK; nach 100 Fressen Skalierung genau 1.5 (Obergrenze) -> OK/NOK; Spinne bleibt nach dem Wachsen auf dem Boden (Fusshoehe +-0.02 m) -> OK/NOK.
   - Schritt 3: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] K6 Statistik beim Tod: Bildschirm mit Ueberlebenszeit, gefressene Insekten, gebaute Netze und Hoechstwert aus frueheren Partien (zusammen mit J6 im Speicherstand).
+- [x] K6 Statistik beim Tod: Bildschirm mit Ueberlebenszeit, gefressene Insekten, gebaute Netze und Hoechstwert aus frueheren Partien (zusammen mit J6 im Speicherstand). [4e0af78: DeathStats.cs + PartieStatsModel.cs + DeathStatsTests.cs neu; SpiderBuilder.cs + SaveGame.cs changed]
   - Schritt 1: Zaehler fuer die drei Werte, am Ende der Partie anzeigen, danach "Neue Partie" und "Menue".
   - Schritt 2: Kriterien: nach 3 gefressenen Insekten und 2 gebauten Netzen zeigt die Anzeige genau 3 und 2 -> OK/NOK; Hoechstwert bleibt nach Neustart der Anwendung erhalten -> OK/NOK.
   - Schritt 3: Voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
