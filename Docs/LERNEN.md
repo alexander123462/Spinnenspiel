@@ -164,3 +164,20 @@
 - LODGroup.GetRenderers has NO C# accessor (CS1061). To check a renderer is under LOD, walk up the transform chain: a renderer is covered if it or any ancestor carries an LODGroup component. Trees put LODGroup on root, renderers on children; plants/lianas put it on the same node -> ancestor-walk covers both.
 
 - Transform.GetChild(i) returns Transform (NOT GameObject); iterate children via childCount+GetChild (Transform->Transform), there is no Transform.GetChildren(). GetComponent<LODGroup>() works on a Transform.
+
+- Unity C# events: 'public event System.Action X' is NOT valid (CS1061, no .invoke() on a plain type). Use 'public UnityEvent X' (needs 'using UnityEngine.Events;') and call 'X.Invoke()'. Never 'X?.invoke()'.
+
+- Pure-logic state machines: put the timing/state in a plain non-MonoBehaviour class (e.g. BirdThreatModel) with an explicit Tick(bool,dt); the MonoBehaviour only feeds it physics/web state + Time.deltaTime. Tests then drive the model deterministically with fixed dt — no wall-clock/waitFor frames needed.
+
+- Float accumulation in tests: summing N*dt (80*0.1f) can land just under 8.0 so a '>= warnTime' trigger never fires. Drive until the state flips ('while(!model.Warned ...)') instead of hard-coding the exact tick count.
+
+- Directional sun below the horizon lights NOTHING: a night scene with only a down-facing sun stays near-black (night Mittel 4). At night mirror the light above the horizon (elevLight=-elev, azLight=az+180 = a MOON) so ambient+moon gives a measurable brightness floor.
+
+- Proof-image magenta/hole detector: Unity hole colour is exactly (1,0,1); a loose threshold (R>200,G<80,B>200) miscounts real pink flowers in the Urwald. Use near-pure (r>0.96,g<0.06,b>0.96).
+
+- Day/night species: give the spawner a DayNightCycle ref + activeAtNight flag; target=round(count*ActiveShare), remove excess (retreat) then top up. Fixed exposure E for reproducible Mittel across day/night (G6-Lehre).
+
+- Save-versioning: put an int version in the payload head; on load compare and warn+return on mismatch (JsonUtility.FromJson of bad JSON gives defaults version=0, so unknown version never crashes). Queue loaded seed via a static NextSeed so the next generated world matches the save.
+
+- JsonUtility roundtrip of flat SavePayload (primitive + Vector3 lists) is exact for float/int/Vector3; keep payload flat, no nested classes. For test-only raw JSON injection give the component a WriteRawSaveJson helper writing to FilePath.
+- CS0618 cleanup: replace FindObjectsOfType<T>() with FindObjectsByType<T>(FindObjectsSortMode.None) in test helpers that only iterate; sort order never mattered there, so None is safe and faster. Count warnings per compile pass doubles (each warning printed twice in method+tests logs).
