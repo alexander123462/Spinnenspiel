@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -16,6 +17,107 @@ namespace Spinnenspiel.Tests
             GameObject spider = GameObject.Find("Spider");
             Assert.IsNotNull(spider, "Spider nicht gefunden");
             return spider;
+        }
+
+        [UnityTest]
+        public IEnumerator ControlsHelp_AutoHidesAndToggles()
+        {
+            yield return LoadWorld();
+            GameObject spider = LoadedSpider();
+            ControlsHelp help = spider.GetComponent<ControlsHelp>();
+            Assert.IsNotNull(help, "ControlsHelp fehlt");
+            Assert.IsTrue(help.Visible, "ControlsHelp must be visible at start.");
+
+            // After the auto-hide delay it must be gone (AutoHideSeconds = 15).
+            float t = 0f;
+            while (t < 17f)
+            {
+                t += Time.deltaTime;
+                yield return null;
+            }
+            Assert.IsFalse(help.Visible, "ControlsHelp still visible after 17 s.");
+
+            // F1 toggles it back on.
+            help.Toggle();
+            yield return new WaitForSeconds(0.1f);
+            Assert.IsTrue(help.Visible, "Toggle must show ControlsHelp again.");
+        }
+
+        [UnityTest]
+        public IEnumerator GameMenu_StartPauseResumeAndSettings()
+        {
+            yield return LoadWorld();
+            GameObject spider = LoadedSpider();
+            GameMenu menu = spider.GetComponent<GameMenu>();
+            Assert.IsNotNull(menu, "GameMenu fehlt");
+
+            // No start screen any more: game starts directly in Playing.
+            Assert.AreEqual(menu.State, 1, "Start directly in Playing.");
+            menu.StartGame();
+            Assert.AreEqual(menu.State, 1, "StartGame keeps Playing.");
+
+            // Esc-Pause: TogglePause pauses, then resumes (Resumed fires).
+            bool resumed = false;
+            System.Action flag = () => { resumed = true; };
+            menu.Resumed += flag;
+            menu.TogglePause();
+            Assert.IsTrue(menu.IsPaused, "TogglePause must pause.");
+            menu.TogglePause();
+            Assert.IsFalse(menu.IsPaused, "Second TogglePause must resume.");
+            Assert.IsTrue(resumed, "Resuming must fire Resumed.");
+
+            // Settings: Sensivity saved in PlayerPrefs.
+            menu.SetSensitivity(2.5f);
+            yield return null;
+            Assert.AreEqual(PlayerPrefs.GetFloat("MouseSensitivity", 1f), 2.5f, delta: 0.001f,
+                "SetSensitivity must save MouseSensitivity.");
+            menu.SetSensitivity(99f);
+            Assert.AreEqual(menu.MouseSensitivity, 4f, delta: 0.001f, "Sensitivity clamps to 4.");
+
+            PlayerPrefs.DeleteKey("MouseSensitivity");
+        }
+
+        // U2: the parcours/uebersicht control shots need real course structures near the spawn.
+        // Count by GameObject name (EnvironmentBuilder names them Stone/Branch/Log/Boulder/Stump).
+        [UnityTest]
+        public IEnumerator Course_StructuresExistNearSpawn()
+        {
+            yield return LoadWorld();
+            GameObject spider = LoadedSpider();
+            Vector3 s = spider.transform.position;
+
+            int[] counts = new int[5]; // 0 Stone, 1 Branch, 2 Log, 3 Boulder, 4 Stump
+            foreach (GameObject go in SceneManager.GetActiveScene().GetRootGameObjects())
+            {
+                CountCourse(go.transform, s, counts);
+            }
+            Debug.Log($"[Spinnenspiel] Course near spawn: Stone {counts[0]}, Branch {counts[1]}, Log {counts[2]}, Boulder {counts[3]}, Stump {counts[4]}");
+            Assert.GreaterOrEqual(counts[0], 10, "Need >=10 Stone within 6 m of spawn for the parcours shot.");
+            Assert.GreaterOrEqual(counts[1], 2, "Need >=2 Branch within 6 m of spawn.");
+            Assert.GreaterOrEqual(counts[2] + counts[3] + counts[4], 1, "Need at least one Log/Boulder/Stump within 6 m of spawn.");
+        }
+
+        private static void CountCourse(Transform t, Vector3 s, int[] counts)
+        {
+            switch (t.name)
+            {
+                case "Stone":
+                case "Branch":
+                case "Log":
+                case "Boulder":
+                case "Stump":
+                    float dx = t.position.x - s.x;
+                    float dz = t.position.z - s.z;
+                    if (dx * dx + dz * dz <= 36f) // 6 m radius in XZ
+                    {
+                        counts[t.name == "Stone" ? 0 : t.name == "Branch" ? 1 : t.name == "Log" ? 2 : t.name == "Boulder" ? 3 : 4]++;
+                    }
+                    break;
+            }
+            for (int i = 0; i < t.childCount; i++)
+            {
+                CountCourse(t.GetChild(i), s, counts);
+            }
         }
 
         private static IEnumerator LoadWorld()
@@ -128,6 +230,33 @@ namespace Spinnenspiel.Tests
             yield return new WaitForSeconds(1.5f);
             movement.SetExternalMoveInput(Vector2.zero);
             Assert.Greater(steps.StepsPlayed, 4, "Keine Trittgeräusche");
+        }
+
+        [UnityTest]
+        public IEnumerator Audio_FootstepClipsDifferPerSurface()
+        {
+            // Z8: Every SurfaceType must have its own procedural step clips.
+            yield return null;
+            SurfaceType[] surfaces =
+            {
+                SurfaceType.Ground, SurfaceType.Grass, SurfaceType.Rock,
+                SurfaceType.Wood, SurfaceType.Water, SurfaceType.Mud
+            };
+            HashSet<string> names = new HashSet<string>();
+            int expected = 0;
+            foreach (SurfaceType surface in surfaces)
+            {
+                AudioClip[] clips = ProceduralAudio.Footsteps(surface);
+                Assert.IsNotEmpty(clips, "No clips for surface: " + surface);
+                expected += clips.Length;
+                foreach (AudioClip clip in clips)
+                {
+                    Assert.IsNotNull(clip, "Null-Clip under surface: " + surface);
+                    Assert.IsTrue(clip.name.Contains(surface.ToString()), "Clip-name lacks surface: " + clip.name);
+                    names.Add(clip.name);
+                }
+            }
+            Assert.AreEqual(expected, names.Count, "Clip-names not unique per surface+variant");
         }
 
         [UnityTest]
@@ -362,7 +491,7 @@ namespace Spinnenspiel.Tests
             Assert.IsNotNull(spawner, "InsectSpawner fehlt");
             Assert.IsNotNull(spawner.template, "Spawner-Vorlage fehlt");
             spawner.enabled = false;
-            foreach (FlyingInsect f in Object.FindObjectsOfType<FlyingInsect>())
+            foreach (FlyingInsect f in Object.FindObjectsByType<FlyingInsect>(FindObjectsSortMode.None))
             {
                 f.Remove();
             }

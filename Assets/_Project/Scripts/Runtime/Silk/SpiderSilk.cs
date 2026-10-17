@@ -18,6 +18,19 @@ namespace Spinnenspiel
         /// </summary>
         public float maxRange = 8f;
 
+        /// <summary>
+        /// Minimale Fadenlänge (m). Treffer näher als dieser Abstand an den Spinnwarzen
+        /// werden abgelehnt (z. B. Boden direkt vor der Spinne) – die Spinne würde sich
+        /// sonst daran festklammern und umfallen.
+        /// </summary>
+        public float minThreadLength = 0.5f;
+
+        /// <summary>
+        /// Toleranz (m), innerhalb derer ein Treffer als „in der eigenen Ebene" gilt,
+        /// wenn die Flächennormale mit der eigenen Normale fast gleich ist.
+        /// </summary>
+        public float samePlaneTolerance = 0.15f;
+
         private const float ExtendDuration = 0.5f;
         private const float AbdomenLiftDuration = 0.2f;
         private const float AbdomenLiftAngle = -25f;
@@ -48,8 +61,42 @@ namespace Spinnenspiel
         public bool autoAttach = true;
 
         /// <summary>
+        /// Prüft, ob an einem Raycast-Treffer ein Faden-Anker gesetzt werden darf.
+        /// Gibt <c>false</c> zurück, wenn EINE der Bedingungen zutrifft:
+        /// (a) der Treffer ist näher als <see cref="minThreadLength"/> an den Spinnwarzen,
+        /// (b) der Schuss läuft in die eigene Fläche (Richtung entgegengesetzt zur eigenen Normale),
+        /// (c) der Treffer liegt in der eigenen Ebene (Flächennormalen fast gleich UND der
+        ///     Treffer liegt in <see cref="samePlaneTolerance"/>-Abstand in Normalenrichtung)
+        ///     – z. B. der Boden direkt vor der Spinne.
+        /// Sonst <c>true</c>.
+        /// </summary>
+        public bool CanAnchor(Vector3 origin, Vector3 dir, RaycastHit hit, Vector3 ownNormal)
+        {
+            // (a) Faden zu kurz – Spinne würde sich an ihrer eigenen Fläche festklammern.
+            if (hit.distance < minThreadLength)
+            {
+                return false;
+            }
+
+            // (b) Schuss läuft in die eigene Fläche (Richtung entgegengesetzt zur eigenen Normale).
+            if (Vector3.Dot(dir.normalized, ownNormal) < -0.1f)
+            {
+                return false;
+            }
+
+            // (c) Treffer liegt in der eigenen Ebene (z. B. Boden vor der Spinne).
+            if (Vector3.Dot(hit.normal, ownNormal) > 0.9f &&
+                Mathf.Abs(Vector3.Dot(hit.point - origin, ownNormal)) < samePlaneTolerance)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
         /// Schießt einen Faden in Richtung <paramref name="worldDirection"/>.
-        /// Kein Treffer in <see cref="maxRange"/> → null.
+        /// Kein Treffer in <see cref="maxRange"/> oder ungültiger Anker (<see cref="CanAnchor"/>) → null.
         /// </summary>
         public SilkThread ShootThread(Vector3 worldDirection)
         {
@@ -63,11 +110,18 @@ namespace Spinnenspiel
                 return null;
             }
 
+            SpiderMovement movement = GetComponent<SpiderMovement>();
+            Vector3 normalA = movement != null ? movement.SurfaceNormal : Vector3.up;
+
+            // Ungültiger Anker (zu nah, in die eigene Fläche, in der eigenen Ebene) → kein Faden.
+            if (!CanAnchor(origin, dir, hit, normalA))
+            {
+                return null;
+            }
+
             var thread = new GameObject("SilkThread").AddComponent<SilkThread>();
             Vector3 anchorA = transform.position;              // Kontaktpunkt der Spinne auf ihrer Fläche
             Vector3 anchorB = hit.point + hit.normal * 0.002f; // End-Anker an der getroffenen Fläche
-            SpiderMovement movement = GetComponent<SpiderMovement>();
-            Vector3 normalA = movement != null ? movement.SurfaceNormal : Vector3.up;
             thread.Init(anchorA, anchorB, 0.02f * Vector3.Distance(anchorA, anchorB), normalA, hit.normal);
 
             LastThread = thread;

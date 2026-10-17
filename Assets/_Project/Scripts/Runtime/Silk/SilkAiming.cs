@@ -58,8 +58,9 @@ namespace Spinnenspiel
                 silk.ShootThread(dir);
             }
 
-            // Loslassen: Taste + Spinne aktuell am Faden.
-            if (input != null && input.ReleasePressed && movement != null && movement.CurrentThread != null)
+            // Loslassen: Taste + Spinne aktuell am Faden oder im Netz.
+            if (input != null && input.ReleasePressed && movement != null
+                && (movement.CurrentThread != null || movement.CurrentWeb != null))
             {
                 movement.LetGo();
             }
@@ -96,6 +97,15 @@ namespace Spinnenspiel
             }
 
             if ((hit.point - silk.spinnerets.position).magnitude > silk.maxRange)
+            {
+                return;
+            }
+
+            // Treffer muss auch als Faden-Anker gültig sein (keine zu nahe / eigene Ebene).
+            Vector3 dir = hit.point - silk.spinnerets.position;
+            if (!Physics.Raycast(silk.spinnerets.position, dir.normalized, out RaycastHit thatHit,
+                    silk.maxRange, Physics.DefaultRaycastLayers & ~(1 << 2), QueryTriggerInteraction.Ignore)
+                || !silk.CanAnchor(silk.spinnerets.position, dir, thatHit, movement.SurfaceNormal))
             {
                 return;
             }

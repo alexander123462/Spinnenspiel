@@ -24,14 +24,72 @@ MonoBehaviour:
   - {fileID: 4300000, guid: ae4cddcc24afe474a88926846150a805, type: 2}
   - {fileID: 4300000, guid: 4f110d009113c474eba21ea6a9d0f45d, type: 2}
   - {fileID: 4300000, guid: 46737ff632534a744bc9b4c147362f2c, type: 2}
-  bark: {fileID: 2100000, guid: 9e3fe11cc73b9234388b25bbd070411d, type: 2}
+  bark: {fileID: 2100000, guid: 53594292533487942879b15407f6c1a3, type: 2}
   leaves: {fileID: 2100000, guid: a46c96ba1710d64419efcf8aebfb6dfb, type: 2}
-  bush: {fileID: 4300000, guid: b2c50a4a869109e419c99eb3e31a7dd9, type: 2}
-  fern: {fileID: 4300000, guid: 099c400881e49e1428d48976c9f03cf5, type: 2}
+  bush: {fileID: 830114310455821501, guid: 23db4f26732adef488a509c637ed9591, type: 3}
+  fern: {fileID: -1101056946369687347, guid: f46ac9d82e0940946b3ea00c2fd89a4d, type: 3}
   reed: {fileID: 4300000, guid: d5f4178a636866445847a11af0d805fc, type: 2}
-  bushMat: {fileID: 2100000, guid: 44be9c60907eb4d41811209be803912f, type: 2}
-  fernMat: {fileID: 2100000, guid: 52fcbfef4efd9de418cf7f2a0e280308, type: 2}
+  bushMat: {fileID: 2100000, guid: a3704bb223b7af24b9c1bf8ed6d08a84, type: 2}
+  fernMat: {fileID: 2100000, guid: 6ece19c60c3fd2247ba6752efe65f1cc, type: 2}
   reedMat: {fileID: 2100000, guid: a1391c9790a7e514d924d89d8373348d, type: 2}
+  giantLeaves:
+  - {fileID: 1593906062978676987, guid: e39360f3f430b2a429bb44da7c4cfe75, type: 3}
+  - {fileID: -8498475070775391364, guid: b7a8426607b80f94a847a86cf81fd507, type: 3}
+  - {fileID: 5292351456931464896, guid: 7f100dc66353554499934de3b5e87a9d, type: 3}
+  giantLeafMats:
+  - {fileID: 2100000, guid: fade971132bf9d442a324e5a2f57b8e7, type: 2}
+  - {fileID: 2100000, guid: 7f1d5c3edf1020a4cb8134ae4d17abba, type: 2}
+  - {fileID: 2100000, guid: 7edf52fe44230c24794fbbc8d81d29c3, type: 2}
+  treeFerns:
+  - {fileID: 3385503233844402379, guid: 9c53a3b6413382847ae568167c5827c1, type: 3}
+  - {fileID: -4262416572816261180, guid: 7c5743ff81947364e8b82f6f201e2b38, type: 3}
+  - {fileID: 6685440814674906772, guid: 08c07e8c31c600a43b66b28cd91497ea, type: 3}
+  treeFernLeafMat: {fileID: 2100000, guid: bb3ba566a0c082545a588f49fc8a0a07, type: 2}
+  treeFernStemMat: {fileID: 2100000, guid: 4fb9f269db86c804193d0f547f667ce9, type: 2}
+  groundCover:
+  - {fileID: -8799722270921484849, guid: b94e5972b11c77d4a9392cae2d8bd377, type: 3}
+  - {fileID: -8976219707546791707, guid: e4484f2e03a451446b0709e3332793d5, type: 3}
+  - {fileID: -3017959995843890192, guid: e96789b65e4384140b1da3d2c8ab306d, type: 3}
+  groundCoverMats:
+  - {fileID: 2100000, guid: 790302d2a6f2ef848af9384f23938297, type: 2}
+  - {fileID: 2100000, guid: 002e9d1e93bcaf942aa7114f825e664b, type: 2}
+  - {fileID: 2100000, guid: 6604d49ba0883b84b93a2c25f0762d96, type: 2}
+  phTreeLod0:
+  - {fileID: -3041392576114301669, guid: 6e4229031562afe4dbe2777d5f4e2918, type: 3}
+  - {fileID: -4573377648036762696, guid: 6289a73ef9ca18a4cb364b7e44df25c1, type: 3}
+  - {fileID: 7269387617276295180, guid: b1a47132eb34a6e46bdc64ca07ee178e, type: 3}
+  - {fileID: 8817124431214624275, guid: 68b917a39ac570c41ab2a1c270e2cfe7, type: 3}
+  - {fileID: 1384434759578104745, guid: 606ab53172926954fb9f536c7a451712, type: 3}
+  phTreeLod1:
+  - {fileID: 3208158450535171237, guid: 6e4229031562afe4dbe2777d5f4e2918, type: 3}
+  - {fileID: -7690267842432765104, guid: 6289a73ef9ca18a4cb364b7e44df25c1, type: 3}
+  - {fileID: -7419082993899318194, guid: b1a47132eb34a6e46bdc64ca07ee178e, type: 3}
+  - {fileID: 2291372102503624755, guid: 68b917a39ac570c41ab2a1c270e2cfe7, type: 3}
+  - {fileID: -6723503324878603599, guid: 606ab53172926954fb9f536c7a451712, type: 3}
+  phTreeWoodMats:
+  - {fileID: 2100000, guid: 67c7855bf2f66924ab721d1bfad7868d, type: 2}
+  - {fileID: 2100000, guid: 142bc6400d5d7ea4c837964884d1a6ee, type: 2}
+  - {fileID: 2100000, guid: dab2424b2acd2e543893388713fc581b, type: 2}
+  - {fileID: 2100000, guid: 0ded83e724634b1429a0ac5779042816, type: 2}
+  - {fileID: 2100000, guid: 0d0a914adb7871e4a93e6d706d305157, type: 2}
+  phTreeLeafMats:
+  - {fileID: 2100000, guid: c3305d48a9e79ea4da891cbb3d052783, type: 2}
+  - {fileID: 2100000, guid: 989f261b1adb4b3489e375e8e872ad08, type: 2}
+  - {fileID: 2100000, guid: f363da3824995c44c9d98e2488d083ae, type: 2}
+  - {fileID: 2100000, guid: 427bf6924f0357140b9a16201cdf4444, type: 2}
+  - {fileID: 2100000, guid: 2b879d8b1d62d3d4b9f0c785140cb224, type: 2}
+  phTreeScales:
+  - 1.731101
+  - 3
+  - 3.2929382
+  - 4.5635643
+  - 3
+  phTreeSlotNames:
+  - jacaranda_tree_branches|jacaranda_tree_leaves
+  - island_tree_01_branches|island_tree_01|island_tree_01_leaves
+  - island_tree_02_branches|island_tree_02|island_tree_02_leaves
+  - island_tree_03_branches|island_tree_03|island_tree_03_leaves
+  - tree_small_02_trunk|tree_small_02_branches|tree_small_02_leaves
   logs:
   - {fileID: 4300000, guid: cc578cc4491c562498645ea4e928559b, type: 2}
   - {fileID: 4300000, guid: 50a11b4b795adf44cbf08fd3195849b4, type: 2}
@@ -42,11 +100,11 @@ MonoBehaviour:
   - {fileID: 4300000, guid: db668d96075273b41890f37732c950f6, type: 2}
   - {fileID: 4300000, guid: f0a987fdc915dab44b8afb767843a33b, type: 2}
   - {fileID: 4300000, guid: 9bcb3dae0334d2d4aadd5e9c3389fef4, type: 2}
-  logMat: {fileID: 2100000, guid: 5707ec1e7d27c7d44bcc2dc8c0648eca, type: 2}
-  rockMat: {fileID: 2100000, guid: f73936a0f83636949ab76f7470a1bc61, type: 2}
+  logMat: {fileID: 2100000, guid: f57ad55ea36367b4c9d0a51c13c85209, type: 2}
+  rockMat: {fileID: 2100000, guid: 40e619c617653cf42bc425b5f167b9f0, type: 2}
   terrainLayers:
-  - {fileID: 8574412962073106934, guid: b369785cce6718143bd1f3a00fcdb5e2, type: 2}
-  - {fileID: 8574412962073106934, guid: a4e038e32bdba024a8e6658244c344bb, type: 2}
-  - {fileID: 8574412962073106934, guid: 8eb5e057f01b9df43b792a563abd2fdd, type: 2}
-  - {fileID: 8574412962073106934, guid: 33d98d1af8c096446b7e771ed6994e51, type: 2}
+  - {fileID: 8574412962073106934, guid: 12417b5eee9fdf74eb17385638778cf7, type: 2}
+  - {fileID: 8574412962073106934, guid: 414ab6540a5f22642a19fb66ea5e3568, type: 2}
+  - {fileID: 8574412962073106934, guid: 12810ffceed77844aa851e029add0939, type: 2}
+  - {fileID: 8574412962073106934, guid: 2bacf619ef2484544a81eb34223aaece, type: 2}
   water: {fileID: 2100000, guid: f22966d172d703241a5cb2082a58977f, type: 2}

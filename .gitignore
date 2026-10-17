@@ -18,3 +18,9 @@
 /AssetSource/
 /Assets/_Project/Art/Scans/
 /Assets/_Project/Art/Scans.meta
+
+# lokale Testreste
+InitTestScene*.unity
+InitTestScene*.unity.meta
+Claude outputs/
+Tools/inspect_riesenblatt.py

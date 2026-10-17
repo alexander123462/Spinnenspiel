@@ -48,7 +48,7 @@ namespace Spinnenspiel.EditorTools
             }
             else
             {
-                desiredDistance.floatValue = 1.0f;
+                desiredDistance.floatValue = 0.38f;
             }
 
             so.ApplyModifiedPropertiesWithoutUndo();

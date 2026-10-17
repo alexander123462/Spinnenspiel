@@ -127,6 +127,33 @@ namespace Spinnenspiel.Tests
         }
 
         [UnityTest]
+        public IEnumerator Silk_ShootIntoGroundNearby_Rejected()
+        {
+            yield return Setup();
+
+            // Spinne auf dem Boden, Blick +X: Schuss nach vorn-unten trifft den Boden direkt vor ihr.
+            movement.Teleport(new Vector3(0f, 0f, -2f), Quaternion.LookRotation(Vector3.right, Vector3.up));
+            yield return new WaitForSeconds(0.3f);
+
+            Vector3 dir = spider.transform.forward + Vector3.down * 0.6f;
+            SilkThread thread = silk.ShootThread(dir);
+            Assert.IsNull(thread, "Schuss in den Boden vor der Spinne hat unerwartet einen Faden erzeugt");
+
+            // Nach 1 s: keine Fadenverbindung, Spinne steht noch aufrecht und haftet.
+            yield return new WaitForSeconds(1.0f);
+
+            float dotUp = Vector3.Dot(spider.transform.up, Vector3.up);
+            string stats = string.Format(CultureInfo.InvariantCulture,
+                "thread={0} upDot={1:F3} attached={2} pos=({3:F2},{4:F2},{5:F2})",
+                movement.CurrentThread != null, dotUp, movement.IsAttached,
+                spider.transform.position.x, spider.transform.position.y, spider.transform.position.z);
+
+            Assert.IsNull(movement.CurrentThread, "Spinne ist unerwartet am Faden: " + stats);
+            Assert.IsTrue(dotUp > 0.9f, "Spinne liegt nach dem Schuss in den Boden nicht aufrecht: " + stats);
+            Assert.IsTrue(movement.IsAttached, "Spinne haftet nach dem Schuss in den Boden nicht: " + stats);
+        }
+
+        [UnityTest]
         public IEnumerator Silk_CrossThread_ToTrunk()
         {
             yield return Setup();
@@ -338,7 +365,7 @@ namespace Spinnenspiel.Tests
             Assert.IsTrue(dragline.AnchorCount >= 3, "Weniger als 3 Anker nach 4 s Vorwärts: " + stats);
             float dist = (spider.transform.position - dragline.LastAnchor).magnitude;
             Assert.IsTrue(dist <= dragline.AnchorSpacing + 0.1f, "Abstand LastAnchor↔Spinne > anchorSpacing + 0.1: " + stats);
-            Assert.IsTrue(dragline.Line != null && dragline.Line.enabled, "Dragline-LineRenderer ist nicht aktiv: " + stats);
+            Assert.IsFalse(dragline.Line.enabled, "Dragline beim Laufen sichtbar: " + stats);
         }
 
         [UnityTest]
@@ -477,6 +504,75 @@ namespace Spinnenspiel.Tests
 
             movement.SetScripted(false);
             movement.SetExternalMoveInput(null);
+        }
+
+        [UnityTest]
+        public IEnumerator Netze_AnkerFastUeberall_FadenLengthSagAndSurfaceShare()
+        {
+            yield return Setup();
+
+            // No auto-climb: we only want the thread as a taut rope (seilphysik), not the spider on it.
+            silk.autoAttach = false;
+
+            // --- Criterion 1+2: anchor on the trunk ~5 m away; length == distance +-0.1; rest-sag <= 0.3.
+            movement.Teleport(new Vector3(2.15f, 1.2f, 0f), Quaternion.LookRotation(Vector3.left, Vector3.up));
+            yield return new WaitForSeconds(0.3f);
+
+            Vector3 aim = (new Vector3(-3f, 1.4f, 0f) - silk.spinnerets.position).normalized;
+            SilkThread trunk = silk.ShootThread(aim);
+            Assert.IsNotNull(trunk, "No anchor thread on the trunk");
+            yield return new WaitForSeconds(1.5f); // extend+tighten done -> thread at rest
+
+            float dist = Vector3.Distance(silk.spinnerets.position, trunk.anchorB);
+            float droop = 0f;
+            for (int i = 0; i <= 24; i++)
+            {
+                float t = i / 24f;
+                Vector3 chord = Vector3.Lerp(trunk.anchorA, trunk.anchorB, t);
+                droop = Mathf.Max(droop, chord.y - trunk.PointAt(t).y);
+            }
+
+            string stats = string.Format(CultureInfo.InvariantCulture,
+                "dist={0:F3} len={1:F3} sag={2:F4} droop={3:F4}", dist, trunk.Length, trunk.sag, droop);
+            Assert.IsTrue(dist > 4.6f && dist < 5.4f, "Trunk anchor not at ~5 m: " + stats);
+            Assert.IsTrue(Mathf.Abs(trunk.Length - dist) <= 0.1f,
+                "Fadenlength != Abstand +-0.1 m: " + stats);
+            Assert.IsTrue(droop <= 0.3f && trunk.sag <= 0.3f,
+                "Rest-sag of the thread > 0.3 m: " + stats);
+
+            // --- Criterion 3: valid anchors on >= 90 % of tested surface types (Stamm, Wand, Block, Ueberhang).
+            Vector3[] vantage =
+            {
+                new Vector3(2.15f, 1.2f, 0f),   // Stamm
+                new Vector3(0f, 1.2f, 0f),       // Wand (front z=2.85)
+                new Vector3(2.0f, 0.2f, 0f),     // Block side x=3.3
+                new Vector3(0f, 0.02f, 1.0f),    // Ueberhang bottom y=2.0 (shot from ground, dist > 0.5 m)
+            };
+            Vector3[] targets =
+            {
+                new Vector3(-3f, 1.4f, 0f),
+                new Vector3(0f, 1.2f, 2.85f),
+                new Vector3(3.3f, 0.25f, 0f),
+                new Vector3(0f, 2.0f, 2.4f),
+            };
+
+            int valid = 0;
+            for (int i = 0; i < vantage.Length; i++)
+            {
+                movement.Teleport(vantage[i], Quaternion.LookRotation(targets[i] - vantage[i], Vector3.up));
+                yield return new WaitForSeconds(0.2f);
+                if (silk.ShootThread((targets[i] - silk.spinnerets.position).normalized) != null)
+                {
+                    valid++;
+                }
+            }
+
+            float share = (float)valid / vantage.Length;
+            string shareStats = string.Format(CultureInfo.InvariantCulture,
+                "valid={0}/{1} share={2:F2}", valid, vantage.Length, share);
+            Assert.IsTrue(share >= 0.9f, "Valid anchors on < 90 % of surface types: " + shareStats);
+
+            silk.autoAttach = true;
         }
     }
 }

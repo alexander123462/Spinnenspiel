@@ -1,4 +1,6 @@
-param([string]$Scene = 'C:\Users\vorau\dev\Spinnenspiel\Assets\_Project\Scenes\Klettertest.unity')
+param([string]$Scene = '')
+$Root = Split-Path -Parent $PSScriptRoot
+if (-not $Scene) { $Scene = Join-Path $Root 'Assets\_Project\Scenes\Klettertest.unity' }
 $raw = Get-Content $Scene -Raw
 $docs = [regex]::Split($raw, '(?m)^--- ')
 $names = @{}   # fileID -> name

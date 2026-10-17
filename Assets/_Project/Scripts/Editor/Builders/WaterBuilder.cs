@@ -15,27 +15,30 @@ namespace Spinnenspiel.EditorTools
 
         public static void Build()
         {
-            Shader shader = Shader.Find("Spinnenspiel/Water");
-            if (shader == null)
+            if (Shader.Find("HDRP/Lit") == null)
             {
-                Debug.LogError("[Spinnenspiel] Shader 'Spinnenspiel/Water' nicht gefunden – Wasser wird nicht gebaut.");
+                Debug.LogError("[Spinnenspiel] Shader 'HDRP/Lit' nicht gefunden – Wasser wird nicht gebaut.");
                 return;
             }
 
             Texture2D normal = TextureFactory.WaterNormal();
-            Material stream = CreateMaterial("MAT_WaterStream", shader, normal, new Vector4(1f, 0f, 0.14f, 0f));
-            Material pond = CreateMaterial("MAT_WaterPond", shader, normal, new Vector4(0.6f, 0.4f, 0.015f, 0f));
+            Material stream = CreateMaterial("MAT_WaterStream", normal);
+            Material pond = CreateMaterial("MAT_WaterPond", normal);
 
             Transform root = new GameObject("Water").transform;
             CreateWaterObject(root, "Stream", BuildStreamMesh(), stream);
             CreateWaterObject(root, "Pond", BuildPondMesh(), pond);
         }
 
-        private static Material CreateMaterial(string name, Shader shader, Texture2D normal, Vector4 flow)
+        /// <summary>
+        /// Erzeugt ein Wasser-Material als transparentes HDRP/Lit (Ersatz für „Spinnenspiel/Water").
+        /// Farbe und Normal-Tiling sind die Defaults des alten Shaders (ShallowColor, NormalTiling 0.8);
+        /// die Flow-Animation entfällt unter HDRP.
+        /// </summary>
+        private static Material CreateMaterial(string name, Texture2D normal)
         {
-            Material material = new Material(shader);
-            material.SetTexture("_NormalMap", normal);
-            material.SetVector("_FlowDirection", flow);
+            Color shallow = new Color(0.22f, 0.32f, 0.28f, 0.55f);
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Water(shallow, normal, 0.8f);
             return AssetUtil.ReplaceAsset(material, Folder + "/Materials/" + name + ".mat");
         }
 

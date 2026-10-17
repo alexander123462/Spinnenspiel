@@ -38,6 +38,12 @@ namespace Spinnenspiel
             All.Add(this);
         }
 
+        /// <summary>Per-Frame redraw so the wind sway animates (cheap: ~24 points).</summary>
+        private void Update()
+        {
+            Refresh();
+        }
+
         private void OnDisable()
         {
             All.Remove(this);
@@ -143,10 +149,27 @@ namespace Spinnenspiel
             float ext = Mathf.Clamp01(Extend01);
             int count = Mathf.Max(2, Mathf.FloorToInt(segments * ext) + 1);
             line.positionCount = count;
+            Vector3 sway = SwayOffset();
             for (int i = 0; i < count; i++)
             {
-                line.SetPosition(i, PointAt(i > 0 ? (float)i / (count - 1) * ext : 0f));
+                float t = i > 0 ? (float)i / (count - 1) * ext : 0f;
+                // Faden-Bauch swings most, the anchors not at all.
+                float bellyFactor = 4f * t * (1f - t);
+                line.SetPosition(i, PointAt(t) + sway * bellyFactor);
             }
+        }
+
+        /// <summary>Current visual wind offset for a thread of this sag.</summary>
+        private Vector3 SwayOffset()
+        {
+            WindController wind = WindController.Instance;
+            if (wind == null)
+            {
+                return Vector3.zero;
+            }
+
+            float amplitude = 0.02f * (wind.Strength + wind.Gust);
+            return wind.Direction * amplitude * Mathf.Sqrt(Mathf.Max(0f, sag));
         }
 
         private void EnsureLine()
@@ -176,15 +199,8 @@ namespace Spinnenspiel
             {
                 if (sharedMaterial == null)
                 {
-                    var mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-                    mat.color = new Color(1f, 1f, 1f, 0.8f);
-                    // URP: Surface Type Transparent + Blend-Einstellungen
-                    mat.SetFloat("_Surface", 1f);
-                    mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-                    mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);        // 5
-                    mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha); // 10
-                    mat.SetInt("_ZWrite", 0);
-                    mat.renderQueue = 3000;
+                    var mat = Spinnenspiel.Rendering.PipelineMaterials.Unlit(new Color(1f, 1f, 1f, 0.8f));
+                    Spinnenspiel.Rendering.PipelineMaterials.SetTransparent(mat, true);
                     sharedMaterial = mat;
                 }
 

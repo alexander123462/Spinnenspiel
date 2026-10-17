@@ -15,21 +15,21 @@ namespace Spinnenspiel
     {
         [Header("Referenzen")]
         [SerializeField] private Transform target;
-        [SerializeField] private Vector3 targetOffset = new Vector3(0f, 0.12f, 0f);
+        [SerializeField] private Vector3 targetOffset = new Vector3(0f, 0.05f, 0f); // A2 Groessengefuehl: niedrig/nah
         [SerializeField] private SpiderInput input;
 
         [Header("Orbit")]
         [SerializeField] private float yaw = 0f;
-        [SerializeField] private float pitch = 22f;
+        [SerializeField] private float pitch = 9f; // C1: näher/tiefer für Referenzlook
         [SerializeField] private float minPitch = -25f;
         [SerializeField] private float maxPitch = 75f;
         [Tooltip("Grad pro Input-Einheit (Maus-Delta in Pixeln, Stick in -1..1).")]
         [SerializeField] private float lookSensitivity = 0.15f;
 
         [Header("Distanz / Zoom")]
-        [SerializeField] private float desiredDistance = 1.0f;
+        [SerializeField] private float desiredDistance = 0.38f; // C1: näher/tiefer für Referenzlook
         [SerializeField] private float minDistance = 0.18f;
-        [SerializeField] private float minZoomDistance = 0.4f;
+        [SerializeField] private float minZoomDistance = 0.25f;
         [SerializeField] private float maxZoomDistance = 3.5f;
         [SerializeField] private float zoomStep = 0.12f;
 
@@ -46,12 +46,13 @@ namespace Spinnenspiel
         [SerializeField] private float groundClearance = 0.05f;
 
         [Header("Sprint")]
-        [SerializeField] private float baseFieldOfView = 60f;
+        [SerializeField] private float baseFieldOfView = 55f; // C1: näher/tiefer für Referenzlook
         [SerializeField] private float sprintFieldOfViewBoost = 7f;
         [SerializeField] private float fieldOfViewSmoothing = 5f;
 
         private Camera _camera;
         private SpiderMovement _movement;
+        private SpiderGrowth _growth; // K5: Kamera follows the spider's growth.
         private float _currentDistance;
         private float _zoomDistance;
         private Vector3 _pivotPosition;
@@ -77,6 +78,9 @@ namespace Spinnenspiel
 
         public float Yaw => yaw;
 
+        /// <summary>K5: Groeffieffeffe of the spider (1 = start size), 1 if no SpiderGrowth attached.</summary>
+        private float Growth => _growth != null ? _growth.GrowthScale : 1f;
+
         private void Awake()
         {
             // Pflanzen blockieren die Kamera nicht (eigene Layer-8-Ebene).
@@ -98,6 +102,7 @@ namespace Spinnenspiel
             if (target != null)
             {
                 _movement = target.GetComponent<SpiderMovement>();
+                _growth = target.GetComponent<SpiderGrowth>(); // K5: Kamera follows growth.
                 yaw = target.eulerAngles.y;
             }
 
@@ -132,15 +137,18 @@ namespace Spinnenspiel
             UpdateOrbit();
             UpdateZoom();
 
+            // K5: effective zoom scales with the spider's growth (camera follows).
+            float effZoom = _zoomDistance * Growth;
+
             _pivotPosition = Vector3.SmoothDamp(_pivotPosition, DesiredPivotPosition(), ref _pivotVelocity, followTime, Mathf.Infinity, deltaTime);
 
             Quaternion targetRotation = _frame * Quaternion.Euler(pitch, yaw, 0f);
             transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 1f - Mathf.Exp(-rotationSmoothing * deltaTime));
 
             Vector3 direction = transform.rotation * Vector3.back;
-            float allowed = _zoomDistance;
+            float allowed = effZoom;
             RaycastHit hit;
-            if (Physics.SphereCast(_pivotPosition, collisionRadius, direction, out hit, _zoomDistance + 0.05f, obstacleMask, QueryTriggerInteraction.Ignore))
+            if (Physics.SphereCast(_pivotPosition, collisionRadius * Growth, direction, out hit, effZoom + 0.05f, obstacleMask, QueryTriggerInteraction.Ignore))
             {
                 allowed = Mathf.Max(hit.distance - 0.01f, minDistance);
             }
@@ -227,7 +235,8 @@ namespace Spinnenspiel
         private Vector3 DesiredPivotPosition()
         {
             // Offset im Kamerarahmen: an der Wand zeigt „über der Spinne" von der Wand weg.
-            return target != null ? target.position + _frame * targetOffset : _frame * targetOffset;
+            // K5: the pivot offset scales with the spider's growth (camera height follows).
+            return target != null ? target.position + _frame * (targetOffset * Growth) : _frame * targetOffset;
         }
     }
 }

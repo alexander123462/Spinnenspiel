@@ -25,11 +25,19 @@ namespace Spinnenspiel
         [Tooltip("Heimpunkt, um den das Insekt herumwandert.")]
         public Vector3 home;
 
+        // J1: Beute haengen bleibt 20..40 s, falls die Spinne nicht frisst (30 s Default).
         [Tooltip("Wie lange (s) sich das Insekt im Netz zappelt, bevor es sich befreit.")]
-        public float escapeTime = 10f;
+        public float escapeTime = 30f;
 
         /// <summary>Wahrscheinlichkeit (0..1) pro Neu-Zielen, ein fertiges Netz anzufliegen (simulierte Flugschneise).</summary>
         public float webAttraction = 0.35f;
+
+        /// <summary>Z7: Motte-Parameter-Preset (slower + calmer than the fly).</summary>
+        public void SetFlightParams(float newSpeed, float newWanderRadius)
+        {
+            speed = newSpeed;
+            wanderRadius = newWanderRadius;
+        }
 
         /// <summary>Festhalten, damit es nicht aus dem Netz ausbricht (z. B. beim Einwickeln).</summary>
         public void Hold()
@@ -49,6 +57,9 @@ namespace Spinnenspiel
         private float _lastWebVibe;
 
         private float _webRunUntil; // Bis zu diesem Zeitpunkt wird die Home-Rückkehr unterdrückt (Flug ins Netz).
+        private Transform _spiderRef;   // J3a: Cached Spinne (GetComponent, no name-lookup).
+        private bool _spiderResolved;   // J3a: Search already done once (Spider does not change during a Partien).
+        private float _fleeUntil;       // J3a: Bis zu diesem Zeitpunkt flev.
 
         [SerializeField] private float wanderRadius = 2.5f;
         [SerializeField] private float minHeight = 0.25f;   // über dem Boden
@@ -59,6 +70,18 @@ namespace Spinnenspiel
 
         /// <summary>Position des vorigen Frames (für die Netz-Kollision).</summary>
         public Vector3 LastPosition { get; private set; }
+
+        /// <summary>J2a: Energy the spider gains when it eats this insect (Fly 25, Moth 40).</summary>
+        public float energyValue = 25f;
+
+        // J3a: Beute flieht. Benamed Constants: Bemerk-Abstand und Fluchtdauer.
+        private static readonly float noticeDistance = 2.5f; // m
+        private static readonly float fleeDuration = 2f;     // s
+
+        /// <summary>J3a: True while a flee is running (for Tests and later Points).</summary>
+        public bool IsFleeing { get; private set; } = false;
+        /// <summary>J3a: Current flight direction (for Tests: turn-rate check without pixels).</summary>
+        public Vector3 FlightDirection { get; private set; }
 
         /// <summary>Wird ausgelöst, wenn das Insekt die Szene verlässt (vor Destroy).</summary>
         public event System.Action<FlyingInsect> Removed;
@@ -74,6 +97,12 @@ namespace Spinnenspiel
         private float nextTargetTime;
         private float bobPhase;
         private float lastBob;
+        /// <summary>Z9 Perf: Physics-Casts throttled (every 0.2 s), cached between checks.</summary>
+        private const float castInterval = 0.2f;
+        private float nextCastTime;
+        private float cachedGroundY;
+        private bool blockedAhead;
+        private Vector3 blockedPoint;
 
         private void Awake()
         {
@@ -93,6 +122,9 @@ namespace Spinnenspiel
             {
                 home = transform.position;
             }
+
+            // Z9 Perf: Seed cached ground height so the first frames use a sane value.
+            cachedGroundY = GroundHeight(transform.position);
 
             target = home + Vector3.up * 0.5f;
             currentDirection = Vector3.forward;
@@ -233,6 +265,22 @@ namespace Spinnenspiel
             }
         }
 
+        /// <summary>J3a: Spinne-cache: typed-Lookup ONE Mal resolved (GetComponent-style, no name-lookup).</summary>
+        private void UpdateSpiderRef()
+        {
+            if (_spiderResolved)
+            {
+                return;
+            }
+
+            SpiderMovement spider = Object.FindFirstObjectByType<SpiderMovement>();
+            if (spider != null)
+            {
+                _spiderRef = spider.transform;
+                _spiderResolved = true;
+            }
+        }
+
         /// <summary>Neues Wandern-Ziel: zufälliger Punkt in der Kugel um home, Höhe über Boden geklemmt.</summary>
         private void Retarget()
         {
@@ -318,20 +366,73 @@ namespace Spinnenspiel
 
         private void UpdateFlight()
         {
-            float distanceToTarget = Vector3.Distance(transform.position, target);
-            if (distanceToTarget < 0.2f || Time.time >= nextTargetTime)
+            // J3a: Beute flieht – die Spinne ab noticeDistance m bemerk, dann fleh
+            // fleeDuration s (smooth via RotateTowards, not jerky).
+            UpdateSpiderRef();
+            bool fleeing = IsFleeing;
+            // J3a: ein Scripted FlyTo-Lane (naechste Ziel >5 s away) ist der Netz-Anflug
+            // bzw. die simulierte Flugschneise -> dort NOCH KEIN Flee (J1/Predation unchanged).
+            bool scriptedLane = nextTargetTime > Time.time + 5f;
+            if (_spiderRef != null && Time.time >= _webRunUntil && !scriptedLane)
             {
-                Retarget();
+                Vector3 spiderPos = _spiderRef.transform.position;
+                float distToSpider = Vector3.Distance(transform.position, spiderPos);
+                if (!fleeing && distToSpider <= noticeDistance)
+                {
+                    fleeing = true;
+                    IsFleeing = true;
+                    _fleeUntil = Time.time + fleeDuration;
+                }
+            }
+            if (fleeing && Time.time >= _fleeUntil)
+            {
+                fleeing = false;
+                IsFleeing = false;
+            }
+
+            if (fleeing)
+            {
+                // Target directly away from the spider, kept at flight height.
+                Vector3 away = transform.position - _spiderRef.transform.position;
+                away.y = 0f;
+                if (away.sqrMagnitude < 1e-6f)
+                {
+                    away = -currentDirection;
+                }
+
+                target = transform.position + away.normalized * wanderRadius;
+                target.y = cachedGroundY + Mathf.Clamp(Random.Range(minHeight, maxHeight), minHeight, maxHeight);
+            }
+            else
+            {
+                float distanceToTarget = Vector3.Distance(transform.position, target);
+                if (distanceToTarget < 0.2f || Time.time >= nextTargetTime)
+                {
+                    Retarget();
+                }
             }
 
             // Hindernis? SphereCast 0.3 m voraus – dann Ziel auf die Gegenseite.
             Vector3 facing = hasDirection ? currentDirection.normalized : transform.forward;
-            RaycastHit blocked;
-            if (Time.time >= _webRunUntil &&
-                Physics.SphereCast(transform.position, 0.03f, facing, out blocked, 0.3f,
-                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            // Z9 Perf: Cast only every castInterval s, otherwise cached result reused.
+            bool doCast = Time.time >= nextCastTime;
+            if (doCast)
             {
-                Vector3 away = transform.position + (transform.position - blocked.point).normalized * wanderRadius;
+                nextCastTime = Time.time + castInterval;
+            }
+            if (doCast && Time.time >= _webRunUntil)
+            {
+                RaycastHit blocked;
+                blockedAhead = Physics.SphereCast(transform.position, 0.03f, facing, out blocked, 0.3f,
+                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore);
+                if (blockedAhead)
+                {
+                    blockedPoint = blocked.point;
+                }
+            }
+            if (blockedAhead && Time.time >= _webRunUntil && !IsFleeing)
+            {
+                Vector3 away = transform.position + (transform.position - blockedPoint).normalized * wanderRadius;
                 away.y = GroundHeight(away) + Mathf.Clamp(Random.Range(minHeight, maxHeight), minHeight, maxHeight);
                 target = away;
                 nextTargetTime = Time.time + Random.Range(2f, 4f);
@@ -346,6 +447,7 @@ namespace Spinnenspiel
             // Weich drehen (turnRate Grad/s) und vorwärts fliegen, dazu leichtes Auf/Ab (sin, 3 Hz).
             currentDirection = Vector3.RotateTowards(currentDirection, desired, turnRate * Mathf.Deg2Rad * Time.deltaTime, 0f);
             hasDirection = true;
+            FlightDirection = currentDirection;
             // Bob als Pose-Änderung: nur die DIFferenz zum letzten Frame wird addiert,
             // sonst drifte das Insekt bei hoher Framerate in den Boden.
             float bob = Mathf.Sin(Time.time * Mathf.PI * 2f * 3f + bobPhase) * 0.03f;
@@ -355,17 +457,21 @@ namespace Spinnenspiel
             // Höhe absichern: Raycast startet KNAPP UNTER der Fliege – so trifft er
             // weder den eigenen Collider noch Überhänge/Baumkronen über uns (das
             // würde sonst jeden Frame nach oben teleportieren). Max. 10 m in den Boden.
-            RaycastHit ground;
-            float groundY;
-            if (Physics.Raycast(transform.position - Vector3.up * 0.05f, Vector3.down, out ground, 10f,
-                    Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            // Z9 Perf: Ground-Raycast throttled to the same castInterval and cached.
+            if (doCast)
             {
-                groundY = ground.point.y;
+                RaycastHit ground;
+                if (Physics.Raycast(transform.position - Vector3.up * 0.05f, Vector3.down, out ground, 10f,
+                        Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                {
+                    cachedGroundY = ground.point.y;
+                }
+                else
+                {
+                    cachedGroundY = GroundHeight(transform.position);
+                }
             }
-            else
-            {
-                groundY = GroundHeight(transform.position);
-            }
+            float groundY = cachedGroundY;
 
             float heightAboveGround = transform.position.y - groundY;
             if (heightAboveGround < minHeight * 0.5f)
@@ -383,7 +489,7 @@ namespace Spinnenspiel
             }
 
             // Zu weit weg von home: Ziel sofort in Richtung home neu wählen.
-            if (Time.time > _webRunUntil && Vector3.Distance(transform.position, home) > wanderRadius)
+            if (Time.time > _webRunUntil && !IsFleeing && Vector3.Distance(transform.position, home) > wanderRadius)
             {
                 Vector3 back = home + Vector3.up * Random.Range(minHeight, maxHeight);
                 target = back;
@@ -431,9 +537,8 @@ namespace Spinnenspiel
                 go.name = "Kokon";
                 go.transform.SetParent(transform, false);
                 go.transform.localPosition = Vector3.zero;
-                Material mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-                mat.color = new Color(0.92f, 0.92f, 0.88f);
-                mat.SetFloat("_Smoothness", 0.6f);
+                Material mat = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.92f, 0.92f, 0.88f));
+                Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(mat, 0.6f);
                 go.GetComponent<MeshRenderer>().sharedMaterial = mat;
                 cocoon = go.transform;
             }

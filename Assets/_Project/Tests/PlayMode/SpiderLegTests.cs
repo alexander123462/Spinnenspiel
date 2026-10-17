@@ -16,6 +16,16 @@ namespace Spinnenspiel.Tests
         private const string SceneName = "M1_Testgelaende";
         private const float GroundTolerance = 0.015f;
 
+        // Gait-Messung braucht Echtzeit: Die Zeitraffer-Fixture (TestSpeed) gibt
+        // jeder Frame eine feste 20 ms Spielzeit, das aendert das
+        // Physik/IK-Verhaeltnis beim Gehen/Sprinten. Deshalb hier wieder auf
+        // 0 zuruecksetzen (Echtzeit) und danach den Fixture-Wert wiederherstellen.
+        [SetUp]
+        public void ResetToRealtime() { Time.captureDeltaTime = 0f; }
+
+        [TearDown]
+        public void RestoreTimeLapse() { Time.captureDeltaTime = 1f / 50f; }
+
         private static float GroundHeightAt(Vector3 position)
         {
             Vector3 origin = position + Vector3.up * 0.5f;
@@ -147,9 +157,27 @@ namespace Spinnenspiel.Tests
 
                 // 3 s messen: pro Frame und Bein nur stehende Füße.
                 float time = 0f;
+                float sinceHitch = 1f;
                 while (time < 3f)
                 {
                     time += Time.deltaTime;
+
+                    // Load-Hitch-Filter: on Frames with abnormal Delta skip the Pose-Sampling
+                    // (the Spider jumped far in one Step -> the Leg-Pose is a Mess-Artifact, not Simulation).
+                    // Also skip the Recovery-Frames after a Hitch until the Feet re-planted.
+                    if (Time.deltaTime > 0.2f)
+                    {
+                        sinceHitch = 0f;
+                    }
+                    else
+                    {
+                        sinceHitch += Time.deltaTime;
+                    }
+                    if (sinceHitch < 0.5f)
+                    {
+                        yield return null;
+                        continue;
+                    }
 
                     for (int i = 0; i < legs.Length; i++)
                     {
@@ -230,6 +258,97 @@ namespace Spinnenspiel.Tests
             string logDir = Path.Combine(Application.dataPath, "../Logs/ci");
             Directory.CreateDirectory(logDir);
             File.WriteAllLines(Path.Combine(logDir, "gait_report.txt"), report);
+
+            Assert.IsEmpty(fehler, string.Join("\n", fehler));
+        }
+
+        [UnityTest]
+        public IEnumerator Legs_UseBlenderMeshes()
+        {
+            SceneManager.LoadScene(SceneName);
+            yield return null;
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+
+            string[] suffixes = { "_Femur", "_Tibia", "_Tarsus" };
+            List<MeshFilter> segmentFilters = new List<MeshFilter>();
+            foreach (MeshFilter mf in spider.GetComponentsInChildren<MeshFilter>())
+            {
+                foreach (string suffix in suffixes)
+                {
+                    if (mf.gameObject.name.EndsWith(suffix))
+                    {
+                        segmentFilters.Add(mf);
+                        break;
+                    }
+                }
+            }
+
+            Assert.AreEqual(24, segmentFilters.Count,
+                "Bein-Segment-MeshFilters unter der Spinne: " + segmentFilters.Count + " (es braucht 24)");
+
+            List<string> report = new List<string>();
+            List<string> fehler = new List<string>();
+            foreach (MeshFilter mf in segmentFilters)
+            {
+                Mesh mesh = mf.sharedMesh;
+                Assert.IsNotNull(mesh, "sharedMesh null auf " + mf.gameObject.name);
+                Vector3 size = mesh.bounds.size;
+                report.Add(mf.gameObject.name + " | " + mesh.name + " | size.y " + size.y.ToString("F4", CultureInfo.InvariantCulture));
+
+                if (mesh.name.Contains("Capsule"))
+                {
+                    fehler.Add(mf.gameObject.name + ": sharedMesh.name '" + mesh.name + "' contains Capsule");
+                }
+
+                if (size.y < 1.9f || size.y > 2.1f)
+                {
+                    fehler.Add(mf.gameObject.name + " (" + mesh.name + "): size.y " + size.y.ToString("F4", CultureInfo.InvariantCulture) + " outside 1.9..2.1");
+                }
+            }
+
+            string logDir = Path.Combine(Application.dataPath, "../Logs/ci");
+            Directory.CreateDirectory(logDir);
+            File.WriteAllLines(Path.Combine(logDir, "leg_mesh_report.txt"), report);
+
+            Assert.IsEmpty(fehler, string.Join("\n", fehler));
+        }
+
+        [UnityTest]
+        public IEnumerator Body_UsesScanMeshesAndDoubleSided()
+        {
+            SceneManager.LoadScene(SceneName);
+            yield return null;
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+
+            string[] bodyNames = { "Abdomen", "Cephalothorax" };
+            List<string> fehler = new List<string>();
+            foreach (string name in bodyNames)
+            {
+                Transform part = spider.transform.Find("Body/" + name);
+                Assert.IsTrue(part != null, "Koerper-Part fehlt: Body/" + name);
+                MeshFilter mf = part.GetComponent<MeshFilter>();
+                Assert.IsNotNull(mf, "MeshFilter fehlt auf " + name);
+                Mesh mesh = mf.sharedMesh;
+                Assert.IsNotNull(mesh, "sharedMesh null auf " + name);
+                if (mesh.name.Contains("Sphere"))
+                {
+                    fehler.Add(name + ": Kugel-Fallback still in use (mesh.name " + mesh.name + ")");
+                }
+
+                MeshRenderer mr = part.GetComponent<MeshRenderer>();
+                Assert.IsNotNull(mr, "MeshRenderer fehlt auf " + name);
+                Material mat = mr.sharedMaterial;
+                Assert.IsNotNull(mat, "Material null auf " + name);
+                float doubleSided = mat.GetFloat("_DoubleSidedEnable");
+                if (Math.Abs(doubleSided - 1f) > 0.001f)
+                {
+                    fehler.Add(name + ": _DoubleSidedEnable = " + doubleSided.ToString("F1") + " (needs 1 for Haerchens)");
+                }
+            }
 
             Assert.IsEmpty(fehler, string.Join("\n", fehler));
         }

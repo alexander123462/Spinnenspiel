@@ -1,0 +1,12 @@
+=== island_tree_02
+DEBUG straighten: Centerline-Lean 18.4deg
+DEBUG straighten: rotated -18.4deg about base -> upright
+00:27.875  render           | Saved: 'C:\Users\vorau\dev\Spinnenspiel\Assets\_Project\Art\Plants\PH_Baeume\island_tree_02\island_tree_02_LODs.png'
+Holz-Objekte ['island_tree_02_LOD0', 'island_tree_02_LOD0.001'] Blatt-Objekte ['island_tree_02_LOD0.002']
+DEBUG W_h 3.621368020772934 L_h 2.8930917978286743 H0 3.641186088323593
+island_tree_02: LOD0 84562, LOD1 21832, Hoehe 3.64, Breite 4.10, Blaetter 29781 (Karten 29781)
+84562 -> LOD0 <= 90000 -> OK
+21832 -> LOD1 <= 25000 -> OK
+3.64/3.64 -> Hoehe +-5% -> OK
+fertig
+=== ENDE
