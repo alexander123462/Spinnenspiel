@@ -788,8 +788,17 @@ namespace Spinnenspiel.EditorTools
                 }
 
                 lib.phTreeScales[i] = scale;
-                Debug.Log(string.Format("[Urwald] PH-Tree {0}: Hoehe {1:0.00} m -> Scale {2:0.00} -> Hoehe {3:0.0} m (Kriterium Jacaranda 25-35, else 9-20)",
-                    ids[i], height, scale, height * scale));
+
+                // Q3: Bark-UV-Tiling per tree type from mesh size (NOT fixed 4x10): one texture
+                // repeat covers about BarkMetersPerRepeat meters of trunk, so the bark reads as
+                // fine detail at any tree height instead of diagonal stretched stripes.
+                int woodSub = PickEditorWoodSubmesh(lib.phTreeSlotNames[i], lodMeshes[0]);
+                Vector2 barkST = ComputeBarkTilingPerMeter(lodMeshes[0], woodSub, scale);
+                SetPHUVScale(mats[0], barkST.x, barkST.y);
+
+                Rect uvRect = ComputeSubmeshUvBounds(lodMeshes[0], woodSub);
+                Debug.Log(string.Format("[Urwald] PH-Tree {0}: Hoehe {1:0.00} m -> Scale {2:0.00} -> Hoehe {3:0.0} m (Kriterium Jacaranda 25-35, else 9-20); Wood=Sub{4}, UVRect={5:0.00}x{6:0.00}, BarkST={7:0.0}x{8:0.0}",
+                    ids[i], height, scale, height * scale, woodSub, uvRect.width, uvRect.height, barkST.x, barkST.y));
             }
         }
 
@@ -811,10 +820,11 @@ namespace Spinnenspiel.EditorTools
             wood.SetFloat("_SurfaceType", 0f); // opaque
             wood.SetFloat("_AlphaCutoffEnable", 0f);
             wood.SetFloat("_Smoothness", 0.15f);
-            // M1c: Wood/Bark UV-Stretching. Trunk scales up to ~30 m; one bark texture (tiling 1x1)
-            // stretches over it -> diagonal flat-strip smear. Repeat the bark so it reads as fine
-            // detail. Set _ST on BaseColor/Normal/Mask together so all maps stay aligned.
-            SetPHUVScale(wood, 4f, 10f);
+            // Q3: Wood/Bark UV-TILING. Fixed 4x10 (M1c) was too coarse -> diagonal stretched
+            // stripes in the world images. The repeat counts now come from ComputeBarkTilingPerMeter
+            // per tree type (about one texture repeat per meter), set in LoadPHTrees where the
+            // mesh size and scale are known. Set _ST on BaseColor/Normal/Mask together so all
+            // maps stay aligned.
 
             Material leaf = GetOrLoadPHTreeMat("MAT_PHTree_" + id + "_Leaf");
             SetPHTexture(leaf, tex + id + "_leaves_Albedo.png", true);
@@ -895,6 +905,80 @@ namespace Spinnenspiel.EditorTools
             if (mat.HasProperty("_BaseColorMap")) mat.SetVector("_BaseColorMap_ST", st);
             if (mat.HasProperty("_NormalMap")) mat.SetVector("_NormalMap_ST", st);
             if (mat.HasProperty("_MaskMap")) mat.SetVector("_MaskMap_ST", st);
+        }
+
+        /// <summary>Q3: One bark-texture repeat should cover about this many meters of trunk
+        /// (Backlog: "Textur soll rund 1 m pro Wiederholung zeigen"). Single tuning constant.</summary>
+        private const float BarkMetersPerRepeat = 1f;
+
+        /// <summary>Q3: Wood-submesh index per FBX slot names ('|' = submesh, ground truth from
+        /// LoadPHTrees). bark|trunk wins; island trees have a bare species slug for the trunk ->
+        /// geometry fallback: reaches the mesh bottom + smallest footprint (same rule as the
+        /// runtime PickWoodSubmesh in JungleWorldGenerator).</summary>
+        private static int PickEditorWoodSubmesh(string slotNamesRaw, Mesh lod0)
+        {
+            int subs = System.Math.Max(1, lod0.subMeshCount);
+            if (subs == 1) return 0;
+            string[] slotNames = null;
+            if (slotNamesRaw != null && slotNamesRaw.Length > 0) slotNames = slotNamesRaw.Split('|');
+            float meshMinY = lod0.bounds.min.y;
+            int woodSub = -1;
+            float bestScore = 1e9f;
+            for (int s = 0; s < subs; s++)
+            {
+                Bounds sb = lod0.GetSubMesh(s).bounds;
+                if (sb.size.y < 0.5f) continue; // twig/flower submeshes never win
+                bool touchesGround = sb.min.y <= meshMinY + 0.3f;
+                if (!touchesGround) continue;
+                float score = sb.size.x * sb.size.z; // smallest footprint wins
+                if (slotNames != null && s < slotNames.Length)
+                {
+                    string n = slotNames[s].ToLower();
+                    if (n.Contains("bark") || n.Contains("trunk")) score -= 1e6f;
+                    else if (n.Contains("leaf") || n.Contains("leaves") || n.Contains("branch")) score += 1e6f;
+                }
+                if (score < bestScore) { bestScore = score; woodSub = s; }
+            }
+            return woodSub >= 0 ? woodSub : 0;
+        }
+
+        /// <summary>Q3: Bark tiling (repeat counts) from the trunk geometry so one texture repeat
+        /// covers ~BarkMetersPerRepeat meters. UV space of the wood submesh is measured from its
+        /// triangles' UVs (FBX bark UVs do NOT span 0..1; assuming 1x1 was the reason the fixed
+        /// 4x10 still smeared). U = around the trunk circumference, V = along its height.
+        /// Clamped to [1, 48] so branches sharing the wood material never explode.</summary>
+        private static Vector2 ComputeBarkTilingPerMeter(Mesh lod0, int woodSub, float scale)
+        {
+            Bounds sb = lod0.GetSubMesh(woodSub).bounds;
+            float hW = Mathf.Max(0.01f, sb.size.y * scale);                       // trunk height in meters
+            float perim = Mathf.PI * Mathf.Sqrt(Mathf.Max(0.01f, sb.size.x * scale * sb.size.z * scale)); // rough circumference
+            Rect uv = ComputeSubmeshUvBounds(lod0, woodSub);
+            float uvW = uv.width > 0.05f ? uv.width : 1f; // degenerate/missing UVs -> assume 0..1
+            float uvH = uv.height > 0.05f ? uv.height : 1f;
+            float u = Mathf.Clamp(perim / (BarkMetersPerRepeat * uvW), 1f, 48f);
+            float v = Mathf.Clamp(hW / (BarkMetersPerRepeat * uvH), 1f, 48f);
+            return new UnityEngine.Vector2(u, v);
+        }
+
+        /// <summary>Q3: UV extent (min/max) of the triangles belonging to one submesh. Measured,
+        /// not assumed — the FBX bark UV islands do not fill 0..1.</summary>
+        private static Rect ComputeSubmeshUvBounds(Mesh lod0, int sub)
+        {
+            var uvs = new System.Collections.Generic.List<UnityEngine.Vector2>();
+            lod0.GetUVs(0, uvs);
+            if (uvs.Count == 0) return new UnityEngine.Rect(0f, 0f, 1f, 1f);
+            int[] idx = lod0.GetIndices(sub);
+            if (idx.Length == 0) return new UnityEngine.Rect(0f, 0f, 1f, 1f);
+            float minU = 1e9f, minV = 1e9f, maxU = -1e9f, maxV = -1e9f;
+            for (int k = 0; k < idx.Length; k++)
+            {
+                UnityEngine.Vector2 uvv = uvs[idx[k]];
+                if (uvv.x < minU) minU = uvv.x;
+                if (uvv.x > maxU) maxU = uvv.x;
+                if (uvv.y < minV) minV = uvv.y;
+                if (uvv.y > maxV) maxV = uvv.y;
+            }
+            return new UnityEngine.Rect(minU, minV, maxU - minU, maxV - minV);
         }
 
         /// <summary>Lädt Scan-Bodendecker (Gras/Kraut) als Mesh-/Material-Paare in die Asset-Bibliothek.</summary>
