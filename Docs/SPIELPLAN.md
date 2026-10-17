@@ -82,16 +82,15 @@ Abnahme: Eine 30-Minuten-Partie hat einen spuerbaren Verlauf (Anfang, Spannungsb
 - **Qualitaetstore vor jedem Commit:** Tests gruen, Frametime im Budget, sichtbare Aenderung hat ein sauberes Galerie-Vorher/Nachher.
 - **Rhythmus:** alle 12 Stunden Zwischenstand (Backlog, Galerie, Spielbarkeit), danach neue Auftraege.
 
-## 5. Offene Entscheidungen (bitte klaeren)
+## 5. Entscheidungen (von Alex, 17.10.2026)
 
-1. **Ton des Spiels:** realistisch-ruhige Naturerfahrung, spannender Ueberlebenskampf oder gemuetlich-verspielt? Das bestimmt Musik, Gefahren, Farben, Schwierigkeit.
-2. **Spielstruktur:** endloses Ueberleben mit Wachstum, oder Tage/Missionen mit klarem Ende (z. B. "ueberlebe bis zur Eiablage")?
-3. **Zielgruppe/Plattform:** nur Windows-PC mit Tastatur/Maus und Controller? Wie wichtig ist es, dass es auf schwaecherer Hardware laeuft?
-4. **Soll die Spinne eine bestimmte Art sein?** (Radnetzspinne, Springspinne, Vogelspinne - bestimmt Netzbau, Sprung, Jagdstil.)
-5. **Wie viel Gefahr und Schwierigkeit?** Soll man oft sterben und es lernen, oder soll es fair und entspannt bleiben?
+1. **Ton:** spannender Ueberlebenskampf (Gefahren, Hunger, Nacht als Risiko).
+2. **Struktur:** endloses Ueberleben mit Wachstum (Tage und Naechte, Spinne wird groesser und staerker).
+3. **Schwierigkeit:** drei waehlbare Stufen (Entspannt, Normal, Hart) ueber Hunger, Gefahr und Beutemenge.
+Noch offen: Spinnenart (bestimmt Netzbau, Sprung, Jagdstil), Zielplattform/Hardware-Untergrenze.
 
 ## 6. Naechste konkrete Schritte
 1. Phase 0 weiter abarbeiten lassen (Q1b bis Q5, L1, L3, K2a).
 2. Qwen3.5-9B als Vision-KI wieder einrichten und Blender-Render-Ablauf (4 Ansichten) bauen.
 3. Fliege und Motte neu modellieren (erster Blender-Auftrag).
-4. Entscheidungen aus Abschnitt 5 klaeren, danach Phase 1 in kleine Auftraege zerlegen.
+4. Phase 1 ist als Backlog-Punkte S1 bis S9 eingetragen (Schwierigkeit, Muecke, Fang-/Fress-Rueckmeldung, Tagesbilanz, Netz-Verschleiss, Wespe, Tagesziele, Einstieg).
