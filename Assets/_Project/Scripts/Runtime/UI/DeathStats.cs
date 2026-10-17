@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Spinnenspiel
 {
@@ -16,13 +17,17 @@ namespace Spinnenspiel
         private SpiderHunger _hunger;
         private SpiderGrowth _growth;
         private SaveGame _save;
+        private SpiderEnergy _energy;
         private int _seenBuiltWebs;
+
+        public bool DeathTriggered { get => Stats.DeathShown; }
 
         private void Awake()
         {
             _hunger = transform.GetComponent<SpiderHunger>();
             _growth = transform.GetComponent<SpiderGrowth>();
             _save = transform.GetComponent<SaveGame>();
+            _energy = transform.GetComponent<SpiderEnergy>();
         }
 
         private void Update()
@@ -40,6 +45,10 @@ namespace Spinnenspiel
             if (_save == null)
             {
                 _save = transform.GetComponent<SaveGame>();
+            }
+            if (_energy == null)
+            {
+                _energy = transform.GetComponent<SpiderEnergy>();
             }
 
             // While alive, mirror the best values from the save (J6-file) into the model.
@@ -75,11 +84,37 @@ namespace Spinnenspiel
                 _seenBuiltWebs = built;
             }
 
-            // Tod: Hunger full (SpiderHunger 1.0).
-            if (_hunger != null && _hunger.Hunger >= 0.999f)
+            // Tod: Hunger full (SpiderHunger 1.0) ODER Energie leer (J2c, SpiderEnergy 0).
+            if ((_hunger != null && _hunger.Hunger >= 0.999f)
+                || (_energy != null && _energy.Energy <= 0f))
             {
                 Stats.ReportDeath();
             }
+
+            // J2c: on the death screen, N starts a fresh partie (counters reset, bests kept).
+            if (Stats.DeathShown)
+            {
+                Keyboard keyboard = Keyboard.current;
+                if (keyboard != null && keyboard.nKey.wasPressedThisFrame)
+                {
+                    StartNewPartie();
+                }
+            }
+        }
+
+        /// <summary>J2c: reset the counters and let the spider live again — energy back, hunger cleared.</summary>
+        private void StartNewPartie()
+        {
+            Stats.StartNewPartie();
+            if (_energy != null)
+            {
+                _energy.ResetEnergy();
+            }
+            if (_hunger != null)
+            {
+                _hunger.Hunger = 0f;
+            }
+            _seenBuiltWebs = 0;
         }
 
         private void OnGUI()

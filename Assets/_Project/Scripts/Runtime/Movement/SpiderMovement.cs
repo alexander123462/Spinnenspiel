@@ -43,6 +43,11 @@ namespace Spinnenspiel
         [SerializeField] private float detachDelay = 0.2f; // Toleranz nach Letztem Oberflächen-Treffer (s)
         [SerializeField] private float bodyRadius = 0.05f; // Körperkugel für Kollisionsschutz (m)
 
+        [Header("Energie-Folgen (J2c)")]
+        [SerializeField, Tooltip("Energie-component of the spider (tempo factor reads it).")] private SpiderEnergy energy;
+        [SerializeField, Tooltip("Under this energy the spider moves at the reduced tempo.")] private float lowEnergyThreshold = 25f;
+        [SerializeField, Tooltip("Tempo factor under the low-energy threshold.")] private float lowEnergyTempoFactor = 0.6f;
+
         [Header("Radnetz")]
         [SerializeField] private float webSpeedFactor = 0.6f; // Tempo-Faktor im Netz (Relativ zu Lauf-/Sprinttempo)
         [SerializeField] private float webGrip = 0.12f; // max. Abstand (m) zu einem Faden, damit die Spinne sich weiterbewegt
@@ -131,6 +136,21 @@ namespace Spinnenspiel
             }
 
             return input != null && input.SprintHeld;
+        }
+
+        /// <summary>J2c: Tempo-Faktor aus der Energie — under the threshold moves at the reduced tempo.
+        /// 1 when energy is unknown (no component) so movement never breaks.</summary>
+        public float EnergyTempoFactor()
+        {
+            if (energy == null)
+            {
+                energy = GetComponent<SpiderEnergy>();
+            }
+            if (energy == null)
+            {
+                return 1f;
+            }
+            return energy.Energy < lowEnergyThreshold ? lowEnergyTempoFactor : 1f;
         }
 
         /// <summary>
@@ -419,6 +439,10 @@ namespace Spinnenspiel
         {
             _surface = GetComponent<SpiderSurfaceDetector>();
             _bodyCollider = GetComponent<Collider>();
+            if (energy == null)
+            {
+                energy = GetComponent<SpiderEnergy>();
+            }
 
             if (input == null)
             {
@@ -619,7 +643,7 @@ namespace Spinnenspiel
 
             bool sprinting = IsSprintHeld() && dir.sqrMagnitude > 0.0001f;
             float surfaceFactor = _surface != null ? _surface.SpeedMultiplier : 1f;
-            float targetSpeed = (sprinting ? sprintSpeed : walkSpeed) * surfaceFactor * Mathf.Clamp01(dir.magnitude);
+            float targetSpeed = (sprinting ? sprintSpeed : walkSpeed) * surfaceFactor * EnergyTempoFactor() * Mathf.Clamp01(dir.magnitude);
             Vector3 targetVelocity = dir * targetSpeed;
 
             // Beschleunigen/Abbremsen mit getrennten Werten.

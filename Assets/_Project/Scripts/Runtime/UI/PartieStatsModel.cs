@@ -56,6 +56,15 @@ namespace Spinnenspiel
             }
         }
 
+        /// <summary>J2c: player pressed 'Neue Partie' — clear the counters and live again (bests kept).</summary>
+        public void StartNewPartie()
+        {
+            SurvivalTime = 0f;
+            EatenCount = 0;
+            WebsBuilt = 0;
+            DeathShown = false;
+        }
+
         /// <summary>Load best values from an earlier save (restart of the application keeps them).</summary>
         public void LoadBests(float time, int eaten, int webs)
         {

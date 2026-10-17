@@ -92,6 +92,17 @@ namespace Spinnenspiel
             return _model != null ? _model.Fraction() : 0f;
         }
 
+        /// <summary>J2c: fresh partie — energy back to start (bests untouched).</summary>
+        public void ResetEnergy()
+        {
+            if (_model == null)
+            {
+                return;
+            }
+            _model.Reset();
+            Energy = _model.Energy;
+        }
+
         /// <summary>The pure model (read by tests/consequences).</summary>
         public SpiderEnergyModel GetModel()
         {
