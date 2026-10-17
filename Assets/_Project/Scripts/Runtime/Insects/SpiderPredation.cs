@@ -25,12 +25,14 @@ namespace Spinnenspiel
         private SpiderWebBuilder _builder;
         private SpiderSilk _silk;
         private SpiderHunger _hunger;
+        private SpiderEnergy _energy;
 
         private void Awake()
         {
             _builder = GetComponent<SpiderWebBuilder>();
             _silk = GetComponent<SpiderSilk>();
             _hunger = GetComponent<SpiderHunger>();
+            _energy = GetComponent<SpiderEnergy>();
         }
 
         private void OnEnable()
@@ -195,6 +197,10 @@ namespace Spinnenspiel
                 if (_hunger != null)
                 {
                     _hunger.Eat(0.35f);
+                }
+                if (_energy != null && prey.energyValue > 0f)
+                {
+                    _energy.FeedEnergy(prey.energyValue);
                 }
                 System.Action<FlyingInsect> handler = PreyEaten;
                 prey.Remove();

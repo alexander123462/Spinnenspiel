@@ -68,6 +68,9 @@ namespace Spinnenspiel
         /// <summary>Position des vorigen Frames (für die Netz-Kollision).</summary>
         public Vector3 LastPosition { get; private set; }
 
+        /// <summary>J2a: Energy the spider gains when it eats this insect (Fly 25, Moth 40).</summary>
+        public float energyValue = 25f;
+
         /// <summary>Wird ausgelöst, wenn das Insekt die Szene verlässt (vor Destroy).</summary>
         public event System.Action<FlyingInsect> Removed;
 
