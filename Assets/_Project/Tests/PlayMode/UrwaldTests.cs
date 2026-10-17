@@ -811,7 +811,7 @@ namespace Spinnenspiel.Tests
         // readback clamps to [0,1] and thus renders dark/soft (Max ~172). The proven ScreenshotTool
         // path fixes this with an HDR RT (ARGBHalf) + geometric-mean auto-exposure + ACES tonemap.
         // Returns (Mittel 0..255, Max 0..255, Magenta count, SharpFraction 0..1).
-        private static Vector4 SaveFrameHdr(Camera cam, int w, int h, string file)
+        internal static Vector4 SaveFrameHdr(Camera cam, int w, int h, string file)
         {
             var rt = new RenderTexture(w, h, 0, RenderTextureFormat.ARGBHalf);
             rt.antiAliasing = 4;
@@ -889,7 +889,7 @@ namespace Spinnenspiel.Tests
             return new Vector4(mean, (float)maxv, (float)magenta, sharpFrac);
         }
 
-        private static float AcesTone(float x)
+        internal static float AcesTone(float x)
         {
             x = Mathf.Max(x - 0.003f, 0f);
             return (x * (2.51f * x + 0.03f)) / ((x * (2.43f * x + 0.59f) + 0.14f));
