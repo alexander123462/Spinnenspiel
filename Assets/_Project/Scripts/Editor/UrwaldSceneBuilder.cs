@@ -811,6 +811,10 @@ namespace Spinnenspiel.EditorTools
             wood.SetFloat("_SurfaceType", 0f); // opaque
             wood.SetFloat("_AlphaCutoffEnable", 0f);
             wood.SetFloat("_Smoothness", 0.15f);
+            // M1c: Wood/Bark UV-Stretching. Trunk scales up to ~30 m; one bark texture (tiling 1x1)
+            // stretches over it -> diagonal flat-strip smear. Repeat the bark so it reads as fine
+            // detail. Set _ST on BaseColor/Normal/Mask together so all maps stay aligned.
+            SetPHUVScale(wood, 4f, 10f);
 
             Material leaf = GetOrLoadPHTreeMat("MAT_PHTree_" + id + "_Leaf");
             SetPHTexture(leaf, tex + id + "_leaves_Albedo.png", true);
@@ -879,6 +883,18 @@ namespace Spinnenspiel.EditorTools
 
             string prop = texPath.EndsWith("Normal.png") ? "_NormalMap" : texPath.EndsWith("Mask.png") ? "_MaskMap" : "_BaseColorMap";
             mat.SetTexture(prop, tex);
+        }
+
+        /// <summary>Sets UV-Tiling (ST) on the Wood/Bark maps so bark repeats instead of one
+        /// texture stretched over a tall trunk. Vector4 = tiling.xy, offset.zw.</summary>
+        private static void SetPHUVScale(Material mat, float u, float v)
+        {
+            // Proven pattern (cf. ScanBark): mainTextureScale drives HDRP UV-tiling for the base map.
+            mat.mainTextureScale = new UnityEngine.Vector2(u, v);
+            var st = new UnityEngine.Vector4(u, v, 0f, 0f);
+            if (mat.HasProperty("_BaseColorMap")) mat.SetVector("_BaseColorMap_ST", st);
+            if (mat.HasProperty("_NormalMap")) mat.SetVector("_NormalMap_ST", st);
+            if (mat.HasProperty("_MaskMap")) mat.SetVector("_MaskMap_ST", st);
         }
 
         /// <summary>Lädt Scan-Bodendecker (Gras/Kraut) als Mesh-/Material-Paare in die Asset-Bibliothek.</summary>
