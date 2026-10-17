@@ -8,6 +8,8 @@ param(
     [string]$Filter = ""
 )
 
+# Eigenes Konsolenfenster verstecken (sonst poppt es bei jedem CI-Lauf kurz auf, wenn Hermes den Aufruf startet).
+try { Add-Type -Name W -Namespace CiWin -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c); [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();'; [void][CiWin.W]::ShowWindow([CiWin.W]::GetConsoleWindow(), 0) } catch {}
 $ErrorActionPreference = 'Continue'
 # Bei Aufruf ueber -File kommen Listen als ein String "a,b" an -> aufteilen.
 $Method = @($Method | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })

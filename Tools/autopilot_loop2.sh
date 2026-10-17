@@ -76,6 +76,8 @@ Blockierter Punkt: $id" \
   echo "-- Eskalation $id beendet exit=$? $(date '+%T')" >> $LOG
 }
 
+# Hermes (Python) soll Ausgabe sofort ins Fenster schreiben (sonst gepuffert, Fenster wirkt tot).
+export PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
 mkdir -p Logs
 echo "== Start $(date '+%F %T') Endzeit=${ENDE:-keine}" >> $LOG
 
@@ -95,7 +97,7 @@ while :; do
   echo "-- Runde $RUNDE $(date '+%T') offen=$OFFEN -> $PUNKT" >> $LOG
 
   cat > Logs/autopilot_auftrag.txt <<AUF
-Arbeitsordner $ROOT, Branch hdrp. Lies zuerst vollstaendig: C:/Users/vorau/Desktop/Spinnenspiel-Autopilot.md (Abschnitte 1, 3, 4) und Docs/LERNEN.md.
+Arbeitsordner $ROOT, Branch hdrp. Lies zuerst vollstaendig: .hermes.md und AGENTS.md im Projektordner.
 
 ZUERST: git --no-optional-locks status --short ansehen. Geaenderte oder neue Dateien unter Assets/_Project/Scripts oder Assets/_Project/Tests stammen aus einer frueheren Runde DIESER Schleife, nicht von einem anderen Agenten. Behandle sie so:
 - Gehoeren sie zum obersten offenen Punkt: diese Arbeit fertigstellen (Kompilierfehler beheben) und mit committen.
@@ -111,7 +113,7 @@ Such dir KEINEN anderen Punkt aus. Eingerueckte Unterpunkte ("  - [ ]") gehoeren
 
 Vorgehen: in Schritte zerlegen; Code nur in Stuecken (max. ca. 60 Zeilen pro Schreibvorgang); bestehende Dateien nur per Patch aendern und vorher lesen; zu neuer Logik gehoert ein Test. WAEHREND der Entwicklung nur die betroffenen Tests laufen lassen (schneller): powershell -ExecutionPolicy Bypass -File $ROOT/Tools/ci.ps1 -Name r$RUNDE-f1 -Method Spinnenspiel.EditorTools.UrwaldSceneBuilder.Build -Tests -Filter "Spinnenspiel.Tests.<Klasse>.<Testname>*" (Namen -f2, -f3 fuer weitere Versuche). Erst wenn die gezielten Tests gruen sind, EINMAL der volle CI-Lauf vor dem Commit (ohne -Filter), nie mehr als zweimal voll pro Punkt:
 powershell -ExecutionPolicy Bypass -File $ROOT/Tools/ci.ps1 -Name r$RUNDE -Method Spinnenspiel.EditorTools.UrwaldSceneBuilder.Build -Tests
-Ergebnis aus Logs/ci/r$RUNDE-summary.txt lesen. Commit-Gate: Lies Docs/ROT.md. Committen, wenn der Test deines Punktes gruen ist und JEDER fehlgeschlagene Test in Docs/ROT.md steht (diese Fehlschlaege zaehlen NICHT als Fehlversuch und sind KEIN Grund, eigene Aenderungen zurueckzunehmen). Steht ein Fehlschlag NICHT in Docs/ROT.md, ist er deine Regression - dann nicht committen. Nur die eigenen Dateien committen (nie git add -A). NEU: nach einem erfolgreichen Commit zusaetzlich "git push origin hdrp" ausfuehren, damit Alex den Fortschritt am Server sieht. Nie nach main pushen. Schlaegt der Push fehl, den Punkt trotzdem als [x] stehen lassen, den Fehler in einer Zeile melden und NICHT wiederholen. Danach Punkt in Docs/BACKLOG.md auf [x] setzen (mit Commit-Hash), eine Zeile in Docs/BERICHT.md anhaengen und HOECHSTENS 1 neue Lehre in Docs/LERNEN.md, nur wenn sie dort sinngemaess noch nicht steht und nicht in AGENTS.md steht. Docs/LERNEN.md hat eine harte Grenze (40 Zeilen, 8000 Zeichen, siehe Kopfzeile): ueberschreitest du sie, entscheidest du selbst, was am unwichtigsten ist, und vergisst es (Zeile loeschen, Doppeltes zusammenlegen).
+Ergebnis aus Logs/ci/r$RUNDE-summary.txt lesen. Commit-Gate: Lies Docs/ROT.md. Committen, wenn der Test deines Punktes gruen ist und JEDER fehlgeschlagene Test in Docs/ROT.md steht (diese Fehlschlaege zaehlen NICHT als Fehlversuch und sind KEIN Grund, eigene Aenderungen zurueckzunehmen). Steht ein Fehlschlag NICHT in Docs/ROT.md, ist er deine Regression - dann nicht committen. Nur die eigenen Dateien committen (nie git add -A). NEU: nach einem erfolgreichen Commit zusaetzlich "git push origin hdrp" ausfuehren, damit Alex den Fortschritt am Server sieht. Nie nach main pushen. Schlaegt der Push fehl, den Punkt trotzdem als [x] stehen lassen, den Fehler in einer Zeile melden und NICHT wiederholen. Danach Punkt in Docs/BACKLOG.md auf [x] setzen (mit Commit-Hash), eine Zeile in Docs/BERICHT.md anhaengen.
 
 Roter Test deines Punktes: Pruefe ZUERST, ob die Annahme des Tests stimmt (Testaufbau, Vorbedingungen, Zaehler, Zeitfenster; vergleiche mit einem aehnlichen gruenen Test in derselben Datei), bevor du den Spielcode umbaust. Meist liegt der Fehler im Testaufbau. Lies bei jedem Fehlschlag die konkrete Meldung in Logs/ci/r$RUNDE-tests.log.
 
@@ -128,7 +130,8 @@ AUF
   "$HERMES" chat --query-file "$ROOT/Logs/autopilot_auftrag.txt" --yolo -v \
     --provider "$PROVIDER" -m "$MODELL" --in "$ROOT" --source cli --run-budget 7200 \
     2>&1 | tee -a Logs/autopilot_runde.out
-  begrenze_lernen
+  # K2a: Unity-Rauschen (.mat/.asset/.unity, only fileID restamps) auto-reset after each round.
+  powershell -ExecutionPolicy Bypass -File "$ROOT/Tools/reset_unity_rauschen.ps1" >> Logs/autopilot_rausch.out 2>&1
   eskaliere "$BLK_VOR"
   echo "-- Runde $RUNDE Ende $(date '+%T') exit=${PIPESTATUS[0]} HEAD=$(git --no-optional-locks log -1 --format=%h 2>/dev/null)" >> $LOG
   if grep -q "^- \[!\] $KUERZEL " Docs/BACKLOG.md 2>/dev/null; then
