@@ -308,6 +308,7 @@ namespace Spinnenspiel.Tests
                 foreach (var lg in clone.GetComponentsInChildren<LODGroup>()) lg.enabled = false;
                 foreach (var rr in clone.GetComponentsInChildren<Renderer>()) { rr.enabled = true; rr.forceRenderingOff = false; }
                 clone.transform.SetParent(null);
+                clone.transform.localScale = src.transform.lossyScale;
                 clone.transform.rotation = Quaternion.identity;
                 clone.transform.position = studioPos;
                 yield return null;
