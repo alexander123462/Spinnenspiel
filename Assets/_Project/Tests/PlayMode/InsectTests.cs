@@ -622,6 +622,85 @@ namespace Spinnenspiel.Tests
             Assert.LessOrEqual(escapedAt, 40f, "Not freed even after 40 s");
         }
 
+        /// <summary>J3a: Beute fleh. Ab 2.5 m (noticeDistance) bemekt die Spinne und fleh 2 s
+        /// (fleeDuration). Criteria: at 3.5 m no reaction; in >= 15 of 20 Annäherings from 2.0 m
+        /// the distance grows; direction change stays smooth (not jerky).</summary>
+        [UnityTest]
+        public IEnumerator Beute_fleesWhenSpiderApproaches()
+        {
+            yield return LoadScene();
+
+            InsectSpawner spawner = Object.FindFirstObjectByType<InsectSpawner>();
+            Assert.IsNotNull(spawner, "Spawner 'Insekten' nicht gefunden");
+            GameObject template = spawner.template;
+            Assert.IsNotNull(template, "Vorlage-Fliege des Spawners fehlt");
+
+            SpiderMovement spider = Object.FindFirstObjectByType<SpiderMovement>();
+            Assert.IsNotNull(spider, "SpiderMovement missing");
+            Vector3 spiderHome = spider.transform.position;
+
+            // Criterion 1: at 3.5 m (> noticeDistance 2.5 m) the insect does NOT react.
+            GameObject idleFly = Object.Instantiate(template, spiderHome + new Vector3(3.5f, 0.7f, 0f), Quaternion.identity);
+            idleFly.name = "TestfliegeIdle";
+            FlyingInsect idleInsect = idleFly.GetComponent<FlyingInsect>();
+            Assert.IsNotNull(idleInsect, "Testfliege hat kein FlyingInsect");
+            idleInsect.home = idleFly.transform.position;
+            idleInsect.webAttraction = 0f;
+            idleFly.SetActive(true);
+            yield return new WaitForSeconds(0.4f);
+            bool reactedAt35 = idleInsect.IsFleeing;
+            Debug.Log("[J3a] react at 3.5 m: " + (!reactedAt35 ? "no -> OK" : "yes -> NOK"));
+            Assert.False(reactedAt35, "Insect fled already at 3.5 m");
+
+            // Criterion 2: 20 trials, spider sits at 2.0 m -> distance grows in >= 15.
+            int grew = 0;
+            float maxTurnPerSecond = 0f;
+            for (int trial = 0; trial < 20; trial++)
+            {
+                GameObject fly = Object.Instantiate(template, spider.transform.position + new Vector3(2.0f, 0.7f, 0f), Quaternion.identity);
+                fly.name = "TestfliegeFlee";
+                FlyingInsect insect = fly.GetComponent<FlyingInsect>();
+                Assert.IsNotNull(insect, "Testfliege hat kein FlyingInsect");
+                insect.home = fly.transform.position;
+                insect.webAttraction = 0f;
+                fly.SetActive(true);
+
+                float distStart = Vector3.Distance(fly.transform.position, spider.transform.position);
+                Vector3 dirPrev = insect.FlightDirection;
+                float t = 0f;
+                while (t < 1.6f)
+                {
+                    yield return null;
+                    t += Time.deltaTime;
+                    Vector3 dirNow = insect.FlightDirection;
+                    if (dirPrev.sqrMagnitude > 1e-6f && dirNow.sqrMagnitude > 1e-6f)
+                    {
+                        float deg = Vector3.Angle(dirPrev, dirNow);
+                        maxTurnPerSecond = Mathf.Max(maxTurnPerSecond, deg / Mathf.Max(Time.deltaTime, 0.001f));
+                    }
+
+                    dirPrev = dirNow;
+                }
+
+                float distEnd = Vector3.Distance(fly.transform.position, spider.transform.position);
+                if (distEnd > distStart + 0.2f)
+                {
+                    grew++;
+                }
+
+                Object.Destroy(fly.gameObject);
+            }
+
+            Debug.Log("[J3a] distance grew in " + grew + " of 20 -> >= 15 -> " + (grew >= 15 ? "OK" : "NOK"));
+            Assert.GreaterOrEqual(grew, 15, "Flee did not grow distance often enough: " + grew + "/20");
+
+            // Criterion 3: smooth turn (rate-limited), NOT an instant flip.
+            Debug.Log("[J3a] max turn " + maxTurnPerSecond.ToString("F0") + " deg/s -> <= 260 -> " + (maxTurnPerSecond <= 260f ? "OK" : "NOK"));
+            Assert.LessOrEqual(maxTurnPerSecond, 260f, "Jerky direction change: " + maxTurnPerSecond.ToString("F0") + " deg/s");
+
+            Object.Destroy(idleFly.gameObject);
+        }
+
         /// <summary>K3: Beute-Hinweis. With a caught insect hanging in the web, PreyHint must
         /// show a marker (HasTarget) with the true distance; proofshot k3_hint.png gets the
         /// marker painted at the model-projected screen position over the rendered frame.</summary>
