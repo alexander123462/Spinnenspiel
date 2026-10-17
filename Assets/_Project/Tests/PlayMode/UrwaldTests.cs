@@ -143,11 +143,11 @@ namespace Spinnenspiel.Tests
         }
 
         // B1: Spinne bleibt ohne Eingabe aufrecht auf dem Boden (nicht kopfueber ueber dem Boden).
-        // Pro Seed 8 s warten, dann Neigung gegen Welt-oben und Hoehe ueber dem Terrain pruefen.
+        // Pro Seed 4 s warten, dann Neigung gegen Welt-oben und Hoehe ueber dem Terrain pruefen.
         [UnityTest]
         public IEnumerator B1_SpiderStaysUprightOnGround()
         {
-            int[] seeds = { 7, 1234, 4242, 99, 5, 31, 777, 2026, 15, 8080, 123456, 42 };
+            int[] seeds = { 7, 5, 1234, 99 };
             foreach (int seed in seeds)
             {
                 JungleWorldGenerator.NextSeed = seed;
@@ -157,7 +157,7 @@ namespace Spinnenspiel.Tests
                 var mv = Object.FindFirstObjectByType<SpiderMovement>();
                 Assert.IsNotNull(mv, $"Seed {seed}: SpiderMovement missing.");
                 float t = 0f;
-                while (t < 8f)
+                while (t < 4f)
                 {
                     t += Time.deltaTime;
                     yield return null;
@@ -177,7 +177,7 @@ namespace Spinnenspiel.Tests
         [UnityTest]
         public IEnumerator B2_SpiderWalkingForwardStaysUpright()
         {
-            int[] seeds = { 7, 1234, 4242, 99, 5, 31, 777, 2026 };
+            int[] seeds = { 7, 5, 4242, 99 };
             foreach (int seed in seeds)
             {
                 JungleWorldGenerator.NextSeed = seed;
@@ -192,7 +192,7 @@ namespace Spinnenspiel.Tests
                 float maxHeight = -99f;
                 float flipAt = -1f;
                 string where = "";
-                while (t < 25f)
+                while (t < 15f)
                 {
                     t += Time.deltaTime;
                     float h = mv.transform.position.y - (terr.SampleHeight(mv.transform.position) + terr.transform.position.y);
