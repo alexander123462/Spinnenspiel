@@ -1000,14 +1000,31 @@ namespace Spinnenspiel.EditorTools
             {
                 existing.CopyPropertiesFromMaterial(src);
                 existing.color = tint;
+                NormalizeDoubleSidedFlip(existing);
                 EditorUtility.SetDirty(existing);
                 AssetDatabase.SaveAssets();
                 return existing;
             }
             Material copy = new Material(src) { name = name };
             copy.color = tint;
+            NormalizeDoubleSidedFlip(copy);
             AssetDatabase.CreateAsset(copy, path);
             return copy;
+        }
+
+        /// <summary>
+        /// Q2: Normalen-Modus der Laubseiten eingebeidseitig Flip (mode 2) anstatt Mirror
+        /// (mode 1) abfangen. Mirror lit die Blatt-Rueckside normal-inward -> tiefschwarz.
+        /// Only touches materials that are already double-sided enabled.
+        /// </summary>
+        private static void NormalizeDoubleSidedFlip(Material m)
+        {
+            if (m == null || m.GetFloat("_DoubleSidedEnable") < 0.5f)
+            {
+                return;
+            }
+            m.SetFloat("_DoubleSidedNormalMode", 2f); // 2 = Flip
+            m.SetVector("_DoubleSidedConstants", new Vector4(1f, 1f, 1f, 0f));
         }
 
         private static Material ScanMaterial(string path, Material fallback)

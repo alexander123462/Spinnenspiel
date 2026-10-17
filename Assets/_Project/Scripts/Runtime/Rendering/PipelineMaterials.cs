@@ -108,7 +108,12 @@ namespace Spinnenspiel.Rendering
             SetSmoothness(m, 0.35f);
             SetAlphaClip(m, cutoff);
             SetDoubleSided(m, true);
-            m.SetFloat("_DoubleSidedNormalMode", 1f); // 1 = Mirror (beidseitig gespiegelte Normalen)
+            // Q2: Flip statt Mirror. Mirror (_DoubleSidedNormalMode=1, constants b=-1) lit die
+            // Blatt-Rueckside normal-inward -> tiefschwarz (Immergruen/Unkraut/Brennnessel/Busch1).
+            // Flip (mode 2, constants {1,1,1}) = Muster der gut Riesenblatt/Grundfarn: Rueckside
+            // korrekt beleuchtet.
+            m.SetFloat("_DoubleSidedNormalMode", 2f); // 2 = Flip
+            m.SetVector("_DoubleSidedConstants", new Vector4(1f, 1f, 1f, 0f));
             HDMaterial.ValidateMaterial(m);
             return m;
         }
