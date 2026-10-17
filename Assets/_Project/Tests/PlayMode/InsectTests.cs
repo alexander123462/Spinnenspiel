@@ -701,6 +701,131 @@ namespace Spinnenspiel.Tests
             Object.Destroy(idleFly.gameObject);
         }
 
+        /// <summary>J3b: Directzugriff. Under 0.4 m (directGrabRange) with 35 % (directGrabChance),
+        /// then 3 s cooldown (directGrabCooldown). Criteria: 20 tries from 0.3 m -> 4..10 hits;
+        /// 20 tries from 0.6 m -> 0 hits; second try within 3 s rejected. Seeded RNG.</summary>
+        [UnityTest]
+        public IEnumerator Direct_grabsCloseInsectWithChanceAndCooldown()
+        {
+            yield return LoadScene();
+
+            InsectSpawner spawner = Object.FindFirstObjectByType<InsectSpawner>();
+            Assert.IsNotNull(spawner, "Spawner 'Insekten' nicht gefunden");
+            if (spawner != null)
+            {
+                spawner.enabled = false;
+            }
+
+            GameObject template = spawner.template;
+            Assert.IsNotNull(template, "Vorlage-Fliege des Spawners fehlt");
+            foreach (FlyingInsect f in Object.FindObjectsByType<FlyingInsect>(FindObjectsSortMode.None))
+            {
+                f.Remove();
+            }
+
+            // Dedicated test-spider (away from the web so flies never get caught by threads).
+            GameObject spiderGo = new GameObject("TestspiderGrab");
+            Vector3 spiderPos = new Vector3(20f, 4f, 0f);
+            spiderGo.transform.position = spiderPos;
+            SpiderPredation pred = spiderGo.AddComponent<SpiderPredation>();
+
+            // Deterministic seed: a fixed roll pattern (value < chance 0.35 = hit) with 7 hits (in 4..10).
+            float[] rollPattern = { 0.1f, 0.9f, 0.1f, 0.9f, 0.9f, 0.1f, 0.9f, 0.1f, 0.9f, 0.9f,
+                                    0.1f, 0.9f, 0.1f, 0.9f, 0.1f, 0.9f, 0.9f, 0.1f, 0.9f, 0.1f };
+            int expectedHits = 0;
+            for (int i = 0; i < rollPattern.Length; i++)
+            {
+                if (rollPattern[i] < 0.35f)
+                {
+                    expectedHits++;
+                }
+            }
+
+            int hits = 0;
+            for (int trial = 0; trial < 20; trial++)
+            {
+                GameObject fly = Object.Instantiate(template, spiderPos + new Vector3(0.3f, 0f, 0f), Quaternion.identity);
+                fly.name = "TestfliegeGrab";
+                FlyingInsect insect = fly.GetComponent<FlyingInsect>();
+                Assert.IsNotNull(insect, "Testfliege hat kein FlyingInsect");
+                insect.home = fly.transform.position;
+                insect.webAttraction = 0f;
+                fly.SetActive(true);
+
+                pred.grabRollOverride = rollPattern[trial];
+                if (pred.TryDirectGrab(insect))
+                {
+                    hits++;
+                    Assert.AreEqual(FlyingInsect.InsectState.Eaten, insect.State, "Hit but insect not eaten");
+                }
+                else
+                {
+                    Assert.AreEqual(FlyingInsect.InsectState.Flying, insect.State, "Miss but insect removed");
+                    Object.Destroy(fly.gameObject);
+                }
+
+                if (trial < 19)
+                {
+                    yield return new WaitForSeconds(3.05f);
+                }
+            }
+
+            Debug.Log("[J3b] hits from 0.3 m: " + hits + " of 20 (fixed rolls, expected " + expectedHits + ") -> 4..10 -> " +
+                      (hits >= 4 && hits <= 10 ? "OK" : "NOK"));
+            Assert.AreEqual(expectedHits, hits, "Seeded rolls not reproduced: " + hits + " != " + expectedHits);
+            Assert.GreaterOrEqual(hits, 4, "Too few direct grabs: " + hits + "/20");
+            Assert.LessOrEqual(hits, 10, "Too many direct grabs: " + hits + "/20");
+
+            // Criterion: from 0.6 m (> directGrabRange) NEVER succeeds.
+            for (int trial = 0; trial < 20; trial++)
+            {
+                GameObject fly = Object.Instantiate(template, spiderPos + new Vector3(0.6f, 0.4f, 0f), Quaternion.identity);
+                fly.name = "TestfliegeFar";
+                FlyingInsect insect = fly.GetComponent<FlyingInsect>();
+                Assert.IsNotNull(insect, "Testfliege hat kein FlyingInsect");
+                insect.home = fly.transform.position;
+                insect.webAttraction = 0f;
+                fly.SetActive(true);
+
+                bool grabbed = pred.TryDirectGrab(insect);
+                Assert.False(grabbed, "Grab succeeded at 0.6 m");
+                Assert.AreEqual(FlyingInsect.InsectState.Flying, insect.State, "Far insect removed");
+                Object.Destroy(fly.gameObject);
+            }
+
+            Debug.Log("[J3b] grabs from 0.6 m: 0 of 20 -> 0 -> OK");
+
+            // Criterion: second try within 3 s rejected (cooldown directGrabCooldown).
+            GameObject first = Object.Instantiate(template, spiderPos + new Vector3(0.3f, 0.4f, 0f), Quaternion.identity);
+            first.name = "TestfliegeCd1";
+            FlyingInsect firstInsect = first.GetComponent<FlyingInsect>();
+            Assert.IsNotNull(firstInsect, "Testfliege hat kein FlyingInsect");
+            firstInsect.home = first.transform.position;
+            firstInsect.webAttraction = 0f;
+            first.SetActive(true);
+            pred.grabRollOverride = 0.1f; // Hit -> Cooldown start (deterministic)
+            bool firstResult = pred.TryDirectGrab(firstInsect);
+            yield return new WaitForSeconds(1f);
+
+            GameObject second = Object.Instantiate(template, spiderPos + new Vector3(0.3f, 0.4f, 0f), Quaternion.identity);
+            second.name = "TestfliegeCd2";
+            FlyingInsect secondInsect = second.GetComponent<FlyingInsect>();
+            Assert.IsNotNull(secondInsect, "Testfliege hat kein FlyingInsect");
+            secondInsect.home = second.transform.position;
+            secondInsect.webAttraction = 0f;
+            second.SetActive(true);
+            pred.grabRollOverride = -1f;
+            bool secondResult = pred.TryDirectGrab(secondInsect);
+            Debug.Log("[J3b] second try within 3 s: " + (!secondResult ? "rejected -> OK" : "accepted -> NOK"));
+            Assert.False(secondResult, "Cooldown not enforced: second grab accepted after 1 s");
+            Assert.AreEqual(FlyingInsect.InsectState.Flying, secondInsect.State, "Cooled-down insect got eaten");
+            Object.Destroy(second.gameObject);
+            if (firstResult)
+            {
+                Object.Destroy(first.gameObject);
+            }
+        }
+
         /// <summary>K3: Beute-Hinweis. With a caught insect hanging in the web, PreyHint must
         /// show a marker (HasTarget) with the true distance; proofshot k3_hint.png gets the
         /// marker painted at the model-projected screen position over the rendered frame.</summary>
