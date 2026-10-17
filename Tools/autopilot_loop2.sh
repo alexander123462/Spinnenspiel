@@ -48,6 +48,34 @@ LER
     git --no-optional-locks commit -q -m "LERNEN.md verdichtet (Hermes hat Unwichtiges vergessen)" -- Docs/LERNEN.md >/dev/null 2>&1
   fi
 }
+# Eingreifen von Claude bei neu blockierten Punkten ([!]): hoechstens ESK_MAX pro Tag, Abschalten per Datei Logs/no_claude.
+ESK_MAX=4
+eskaliere() {
+  local vor="$1" nach id n datei
+  [ -f Logs/no_claude ] && return 0
+  nach=$(grep -o '^- \[!\] [A-Za-z0-9.]*' Docs/BACKLOG.md | sort)
+  id=$(comm -13 <(printf '%s\n' "$vor") <(printf '%s\n' "$nach") | head -1 | sed 's/^- \[!\] //')
+  [ -n "$id" ] || return 0
+  datei="Logs/eskalation_$(date +%F).count"
+  n=$(cat "$datei" 2>/dev/null || echo 0)
+  if [ "$n" -ge "$ESK_MAX" ]; then
+    echo "-- Eskalation fuer $id uebersprungen (Tageslimit $ESK_MAX erreicht)" >> $LOG
+    return 0
+  fi
+  echo $((n+1)) > "$datei"
+  echo "-- Eskalation an Claude fuer Punkt $id $(date '+%T')" >> $LOG
+  melde "Spinnenspiel: Hermes ist bei Punkt $id blockiert, Claude greift ein ($(date '+%F %T'))."
+  timeout 3600 "$HOME/.local/bin/claude" -p "$(cat Tools/overseer_eskalation.md)
+
+Blockierter Punkt: $id" \
+    --permission-mode acceptEdits \
+    --allowedTools "Read" "Edit" "Write" "Grep" "Glob" "Bash(git:*)" "Bash(python:*)" "Bash(powershell:*)" "Bash(grep:*)" "Bash(ls:*)" "Bash(tasklist:*)" "Bash(date:*)" "Bash(cat:*)" "Bash(wc:*)" "Bash(head:*)" "Bash(tail:*)" \
+    --disallowedTools "Bash(git push --force:*)" "Bash(git push origin main:*)" "Bash(rm:*)" "Bash(del:*)" \
+    --max-turns 60 \
+    >> "Logs/eskalation_$id.log" 2>&1
+  echo "-- Eskalation $id beendet exit=$? $(date '+%T')" >> $LOG
+}
+
 mkdir -p Logs
 echo "== Start $(date '+%F %T') Endzeit=${ENDE:-keine}" >> $LOG
 
@@ -96,10 +124,12 @@ Wenn du einen Punkt als [!] markierst, also nicht weiterkommst: schreibe ZUSAETZ
 Wenn der Punkt fertig (committet) oder als [!] markiert ist: sofort aufhoeren und in maximal 5 Zeilen melden: Punkt, Ergebnis, Commit-Hash, naechster offener Punkt.
 AUF
 
+  BLK_VOR=$(grep -o '^- \[!\] [A-Za-z0-9.]*' Docs/BACKLOG.md | sort)
   "$HERMES" chat --query-file "$ROOT/Logs/autopilot_auftrag.txt" --yolo -v \
     --provider "$PROVIDER" -m "$MODELL" --in "$ROOT" --source cli --run-budget 7200 \
     2>&1 | tee -a Logs/autopilot_runde.out
   begrenze_lernen
+  eskaliere "$BLK_VOR"
   echo "-- Runde $RUNDE Ende $(date '+%T') exit=${PIPESTATUS[0]} HEAD=$(git --no-optional-locks log -1 --format=%h 2>/dev/null)" >> $LOG
   if grep -q "^- \[!\] $KUERZEL " Docs/BACKLOG.md 2>/dev/null; then
     melde "Spinnenspiel: Hermes kommt bei Punkt $KUERZEL nicht weiter und hat ihn als blockiert markiert ($(date '+%F %T')). Grund steht in Docs/BACKLOG.md. Die Schleife macht mit dem naechsten Punkt weiter."
