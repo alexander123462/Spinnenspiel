@@ -62,6 +62,90 @@ namespace Spinnenspiel.Tests
             Assert.Greater(minHeightAboveGround, 0.1f, "Hoehe ueber Boden < 0.1: " + info);
         }
 
+        /// <summary>
+        /// K4a: Regen sinkt die Zielzahl to 30 Prozent (benannte Konstante), aber ohne schlagartig
+        /// verschappen: eeste Insekt nur nach dem Interval leave, dry-side ist instant.
+        /// Der WeatherController-Update (RainAtTime(Time.time)) cannot be driven from outside,
+        /// so the test warps timeScale to reach the rain phase quickly.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Spawner_RainReducesInsectCount()
+        {
+            yield return LoadScene();
+
+            InsectSpawner spawner = Object.FindFirstObjectByType<InsectSpawner>();
+            Assert.IsNotNull(spawner, "Spawner 'Insekten' nicht gefunden");
+
+            // Weather-Controller: Klettertest has none, create one (defaults dry90/rain30/trans6).
+            GameObject weather = new GameObject("WeatherTest");
+            WeatherController controller = weather.AddComponent<WeatherController>();
+            Assert.IsNotNull(WeatherController.Instance, "WeatherController.Instance not set");
+
+            // Deterministic count for the test (scene may serialize another value).
+            spawner.count = 6;
+
+            // Phase-Geometry from the pure function (same defaults as the component):
+            float dry = 90f, rain = 30f, trans = 6f;
+            float rainStart = WeatherController.RainAtTimeFor(dry - trans * 0.5f, dry, rain, trans);
+            Assert.GreaterOrEqual(rainStart, 0.5f, "Rain starts at t=dry-trans/2.");
+
+            // Time-warp: reach the rain phase (t~87) in ~9 s realtime.
+            Time.timeScale = 10f;
+            float deadline = Time.time + dry + rain;
+            while (!spawner.Raining && Time.time < deadline)
+            {
+                yield return null;
+            }
+
+            Assert.GreaterOrEqual(WeatherController.Instance.Rain01, 0.5f, "Rain never reached.");
+            int aliveAtStart = spawner.AliveCount;
+            Assert.AreEqual(spawner.count, aliveAtStart, "Dry count at rain start");
+
+            // Criterion 3: first 5 s of rain the living count stays unchanged (staggered fade).
+            float fiveGameSeconds = 5f;
+            deadline = Time.time + fiveGameSeconds;
+            while (Time.time < deadline)
+            {
+                Assert.AreEqual(aliveAtStart, spawner.AliveCount,
+                    "Insect vanished abruptly within the first 5 s of rain");
+                yield return null;
+            }
+
+            // Steady state in rain: target = round(6 * 0.3) = 2; fade spans ~20 s.
+            deadline = Time.time + 24f;
+            while (spawner.AliveCount > 2 && Time.time < deadline)
+            {
+                yield return null;
+            }
+
+            int wetAlive = spawner.AliveCount;
+            float ratio = (float)wetAlive / (float)spawner.count;
+            Debug.Log("[K4a] wetAlive=" + wetAlive + " ratio=" + ratio.ToString("F2")
+                + " -> 0.3 +-0.05 -> " + ((ratio > 0.25f && ratio < 0.35f) ? "OK" : "NOK"));
+            Assert.AreEqual(2, wetAlive, "Rain target must be round(6*0.3)=2: " + wetAlive);
+
+            // Wait until dry again (rain ends at phase dry+rain-trans/2).
+            deadline = Time.time + dry + rain;
+            while (spawner.Raining && Time.time < deadline)
+            {
+                yield return null;
+            }
+
+            Assert.Less(WeatherController.Instance.Rain01, 0.5f, "Dry not reached.");
+
+            // Criterion 2: back to full count within 60 s after rain end (instant respawn).
+            deadline = Time.time + 60f;
+            while (spawner.AliveCount < spawner.count && Time.time < deadline)
+            {
+                yield return null;
+            }
+
+            Assert.AreEqual(spawner.count, spawner.AliveCount,
+                "Normal count not restored within 60 s after rain end");
+
+            Time.timeScale = 1f;
+        }
+
         [UnityTest]
         public IEnumerator Spawner_KeepsCount()
         {
