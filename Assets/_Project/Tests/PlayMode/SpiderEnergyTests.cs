@@ -58,5 +58,29 @@ namespace Spinnenspiel.Tests
             model.Reset();
             Assert.That(model.Energy >= 99.9f && model.Energy <= 100.1f, "Start energy not 100");
         }
+
+        // ---- J2b: HUD-Balken value-test (no screenshot possible in batch HDRP). ----
+
+        [Test]
+        public void Bar_fill_matches_energy_100_50_20()
+        {
+            float f100 = Spinnenspiel.SpiderHunger.BarFill(100f);
+            float f50 = Spinnenspiel.SpiderHunger.BarFill(50f);
+            float f20 = Spinnenspiel.SpiderHunger.BarFill(20f);
+            Assert.That(f100 >= 0.99f && f100 <= 1.01f, "Fill at energy 100 not ~1.0");
+            Assert.That(f50 >= 0.49f && f50 <= 0.51f, "Fill at energy 50 not ~0.5");
+            Assert.That(f20 >= 0.19f && f20 <= 0.21f, "Fill at energy 20 not ~0.2");
+        }
+
+        [Test]
+        public void Bar_color_green_yellow_red_at_energy_60_40_10()
+        {
+            int c60 = Spinnenspiel.SpiderHunger.BarColorIndex(Spinnenspiel.SpiderHunger.BarFill(60f));
+            int c40 = Spinnenspiel.SpiderHunger.BarColorIndex(Spinnenspiel.SpiderHunger.BarFill(40f));
+            int c10 = Spinnenspiel.SpiderHunger.BarColorIndex(Spinnenspiel.SpiderHunger.BarFill(10f));
+            Assert.That(c60 == 0, "Energy 60 not green");
+            Assert.That(c40 == 1, "Energy 40 not yellow");
+            Assert.That(c10 == 2, "Energy 10 not red");
+        }
     }
 }
