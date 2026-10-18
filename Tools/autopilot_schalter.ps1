@@ -40,6 +40,25 @@ if (Test-Path $pause) {
 } else {
   Write-Host ''
   Write-Host 'AUTOPILOT PAUSIEREN' -ForegroundColor Cyan
+  # Komprimiert Hermes gerade? Dann geht die Rechenarbeit (5-9 Min) beim Abbruch verloren und beginnt beim Fortsetzen neu.
+  function Komprimiert {
+    $f = "$root\Logs\autopilot_runde.out"
+    if (-not (Test-Path $f)) { return $false }
+    $t = (Get-Content $f -Tail 400 -ErrorAction SilentlyContinue) -join "`n"
+    $s = $t.LastIndexOf('context compression started')
+    $d = $t.LastIndexOf('context compression done')
+    return ($s -ge 0 -and $s -gt $d)
+  }
+  if (Komprimiert) {
+    Write-Host 'ACHTUNG: Hermes komprimiert gerade seinen Kontext (dauert 5-9 Minuten).' -ForegroundColor Yellow
+    Write-Host 'Pausierst du jetzt, geht diese Arbeit verloren und beginnt beim Fortsetzen von vorn.'
+    $a = Read-Host 'W = warten bis fertig (max. 15 Minuten), J = trotzdem sofort pausieren'
+    if ($a -match '^[Ww]') {
+      $t = [Diagnostics.Stopwatch]::StartNew()
+      while ((Komprimiert) -and $t.Elapsed.TotalMinutes -lt 15) { Write-Host ('  warte ... {0:N0} s' -f $t.Elapsed.TotalSeconds); Start-Sleep 15 }
+      Write-Host 'Komprimierung fertig (oder Zeit abgelaufen), pausiere jetzt.'
+    }
+  }
   New-Item -ItemType File -Force $pause | Out-Null
   New-Item -ItemType File -Force "$root\Logs\autopilot_resume_ok" | Out-Null
   Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'hermes.exe chat' -or $_.CommandLine -match 'autopilot_loop2' -or $_.Name -eq 'tee.exe' -or ($_.Name -eq 'Unity.exe' -and $_.CommandLine -match 'batchmode') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
