@@ -59,10 +59,17 @@ namespace Spinnenspiel
         [Tooltip("Energy component whose Fraction drives the HUD bar.")]
         [SerializeField] private SpiderEnergy _energy;
 
+        /// <summary>S4: Fress-feedback component driving the bar flash (set by SpiderBuilder).</summary>
+        [Tooltip("FeedFeedback component whose flash brightens the bar after eating.")]
+        [SerializeField] private FeedFeedback _feedFeedback;
+
         /// <summary>Fraction the bar currently shows (read by the value-test).</summary>
         public float ShownFill;
         /// <summary>Color index the bar currently shows: 0 green, 1 yellow, 2 red.</summary>
         public int ShownColorIndex = -1;
+
+        /// <summary>S4: current bar-flash intensity 0..1 (read by the value-test).</summary>
+        public float ShownFlash;
 
         private void OnGUI()
         {
@@ -72,10 +79,28 @@ namespace Spinnenspiel
             ShownFill = fill;
             ShownColorIndex = colorIdx;
 
+            // S4 Fress-Rueckmeldung: the bar blinks brighter for 0.4 s after eating (FeedFeedback).
+            float flash = 0f;
+            if (_feedFeedback == null)
+            {
+                _feedFeedback = GetComponent<FeedFeedback>();
+            }
+            if (_feedFeedback != null)
+            {
+                flash = _feedFeedback.CurrentBarFlash();
+            }
+            ShownFlash = flash;
+
             GUI.Box(new Rect(16f, 16f, 168f, 22f), "Energy");
             Color c = colorIdx == 0 ? Color.green : (colorIdx == 1 ? Color.yellow : Color.red);
             GUI.color = c;
             GUI.DrawTexture(new Rect(18f, 18f, 164f * fill, 18f), Texture2D.whiteTexture);
+            if (flash > 0f)
+            {
+                // Brighter overlay on the bar while flashing.
+                GUI.color = new Color(1f, 1f, 1f, flash);
+                GUI.DrawTexture(new Rect(18f, 18f, 164f * fill, 18f), Texture2D.whiteTexture);
+            }
             GUI.color = Color.white;
         }
     }

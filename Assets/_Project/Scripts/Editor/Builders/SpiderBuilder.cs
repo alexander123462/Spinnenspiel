@@ -122,6 +122,9 @@ namespace Spinnenspiel.EditorTools
             // S3 Fang-Rueckmeldung: Zupfton + Kamera-Wackeln on AnyCaught (only at own web).
             root.AddComponent<FangFeedback>();
 
+            // S4 Fress-Rueckmeldung: bar flash + Crunch + "+25" on PreyEaten.
+            root.AddComponent<FeedFeedback>();
+
             // K5 Wachstum: je 10 gefressene Insekten +8 %, Max 150 % (Abo: PreyEaten).
             root.AddComponent<SpiderGrowth>();
 

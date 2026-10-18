@@ -317,7 +317,49 @@ namespace Spinnenspiel
             return _pluck;
         }
 
+        /// <summary>S4: kurzes Knacken/Schmatz (Crunch) — two bite-hits: bright snap plus muffled chew.</summary>
+        public static AudioClip Crunch()
+        {
+            if (_crunch != null)
+            {
+                return _crunch;
+            }
+
+            float duration = 0.22f;
+            int length = Mathf.CeilToInt(duration * SampleRate);
+            float[] data = new float[length];
+            System.Random random = new System.Random(909);
+
+            // Hit 1: sharp crack (filtered noise snap), Hit 2: softer schmatz a bit later.
+            for (int hit = 0; hit < 2; hit++)
+            {
+                float t0 = hit * 0.09f;
+                float lowpass = hit == 0 ? 0.5f : 0.2f;
+                float decay = hit == 0 ? 0.004f : 0.03f;
+                float amp = hit == 0 ? 0.5f : 0.3f;
+                float filtered = 0f;
+                for (int i = Mathf.RoundToInt(t0 * SampleRate); i < length; i++)
+                {
+                    float t = (i - t0 * SampleRate) / (float)SampleRate;
+                    float noise = (float)random.NextDouble() * 2f - 1f;
+                    filtered += (noise - filtered) * lowpass;
+                    data[i] += filtered * amp * Mathf.Exp(-t / decay);
+                }
+            }
+
+            // Chewing body: low pulse under the second hit.
+            for (int i = Mathf.RoundToInt(0.09f * SampleRate); i < length; i++)
+            {
+                float t = (i - 0.09f * SampleRate) / (float)SampleRate;
+                data[i] += Mathf.Sin(2f * Mathf.PI * 160f * t) * 0.12f * Mathf.Exp(-t / 0.05f);
+            }
+
+            _crunch = Create("Feed_Crunch", data);
+            return _crunch;
+        }
+
         private static AudioClip _pluck;
+        private static AudioClip _crunch;
 
         private static float[] Crossfade(float[] data, int samples)
         {
