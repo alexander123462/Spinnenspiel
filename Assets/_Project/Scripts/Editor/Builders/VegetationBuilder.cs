@@ -12,6 +12,11 @@ namespace Spinnenspiel.EditorTools
     {
         private const string MaterialFolder = AssetUtil.GeneratedRoot + "/Materials";
 
+        // Q4 Schilf: gellich-gruen statt cremewiss-bleached (HSV H~70°, S 0.55, V 0.42), matte.
+        private static readonly Color ReedBaseColor = new Color(0.388f, 0.42f, 0.189f);
+        private const float ReedSmoothness = 0.12f;
+
+
         public static void Build(Terrain terrain, int seed)
         {
             Shader foliage = Shader.Find("HDRP/Lit");
@@ -29,7 +34,9 @@ namespace Spinnenspiel.EditorTools
             Material fern = FoliageMaterial("MAT_Fern", null, new Color(0.14f, 0.28f, 0.08f));
             Material litter = FoliageMaterial("MAT_Litter", null, Color.white);
             Material leaves = FoliageMaterial("MAT_Leaves", leafAtlas, new Color(0.75f, 0.85f, 0.7f));
-            Material reed = FoliageMaterial("MAT_Reed", null, new Color(0.25f, 0.33f, 0.14f));
+            // Q4: Schilf nicht mehr cremewiss/bleached -> gellich-gruen, Value 0.35, matte (Q2/Q3-Verlaeus).
+            Material reed = FoliageMaterial("MAT_Reed", null, ReedBaseColor);
+            reed.SetFloat("_Smoothness", ReedSmoothness); // Blatte nicht spengle, Schilf matt
 
             Mesh grassFine = VegetationMeshFactory.GrassClump("VM_GrassFine", 16, 0.025f, 0.07f, 7);
             Mesh grassA = VegetationMeshFactory.GrassClump("VM_GrassA", 10, 0.06f, 0.13f, 1);

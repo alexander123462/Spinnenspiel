@@ -20,6 +20,12 @@ namespace Spinnenspiel.EditorTools
         private const string MatFolder = "Assets/_Project/Art/Generated/Materials/";
         private const string LayerFolder = "Assets/_Project/Art/Generated/Terrain/";
 
+        // Q4 Schilf: gellich-gruen (HSV H~70°, S 0.55, V 0.42 -> RGB unten) und matte.
+        private const float ReedBaseR = 0.388f;
+        private const float ReedBaseG = 0.42f;
+        private const float ReedBaseB = 0.189f;
+        private const float ReedSmoothness = 0.12f;
+
         [MenuItem("Spinnenspiel/Build/Urwald")]
         public static void Build()
         {
@@ -45,7 +51,7 @@ namespace Spinnenspiel.EditorTools
             lib.rocks = LoadMeshes(new[] { "M_Rock0", "M_Rock1", "M_Rock2", "M_Rock3", "M_Rock4" });
 
             lib.leaves = LoadMaterial("MAT_Leaves");
-            lib.reedMat = LoadMaterial("MAT_Reed");
+            lib.reedMat = ReedMaterial(LoadMaterial("MAT_Reed"));
             lib.water = LoadMaterial("MAT_WaterPond");
 
             // Scan-Assets (Poly Haven) ersetzen die prozeduralen Klötzchen; fehlt einer, bleibt der bisherige Wert.
@@ -1109,6 +1115,22 @@ namespace Spinnenspiel.EditorTools
             }
             m.SetFloat("_DoubleSidedNormalMode", 2f); // 2 = Flip
             m.SetVector("_DoubleSidedConstants", new Vector4(1f, 1f, 1f, 0f));
+        }
+
+        // Q4 Schilf: MAT_Reed wirkt cremeweiss/bleached in der Galerie (Schilf_vorne/Schilf_seite)
+        // -> gellich-gruen (HSV H~70°, S~0.6, V~0.42) und matte (Smoothness 0.12 statt 0.35,
+        // die Specular-Highlights bleached die Blatte unter der Galerie-Licht).
+        private static Material ReedMaterial(Material reed)
+        {
+            if (reed == null)
+            {
+                Debug.LogWarning("[Urwald] MAT_Reed fehlt, Schilf-Ton nicht adapt.");
+                return reed;
+            }
+            reed.SetColor("_BaseColor", new Color(ReedBaseR, ReedBaseG, ReedBaseB, 1f));
+            reed.SetFloat("_Smoothness", ReedSmoothness);
+            EditorUtility.SetDirty(reed);
+            return reed;
         }
 
         private static Material ScanMaterial(string path, Material fallback)
