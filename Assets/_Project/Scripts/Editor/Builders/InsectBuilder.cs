@@ -100,6 +100,53 @@ namespace Spinnenspiel.EditorTools
             return root;
         }
 
+        /// <summary>
+        /// T1: Kaefer (Beetle) — armored, slow day-prey built from primitives (no Blender):
+        /// oval dark body, wing covers (elytra). Energy 35, speed 0.6 x fly (0.48),
+        /// escapeTime 20 s, durability cost 15 % per catch (via durabilityCostOverride).
+        /// </summary>
+        public static GameObject CreateBeetle()
+        {
+            Material body = CreateBeetleBodyMaterial();
+            Material elytra = CreateBeetleElytraMaterial();
+
+            GameObject root = new GameObject("Kaefer");
+            FlyingInsect insect = root.AddComponent<FlyingInsect>();
+            // 0.6 x the fly speed (default 0.8) -> 0.48; same wander radius as the fly.
+            insect.SetFlightParams(0.48f, 2.5f);
+            insect.energyValue = 35f;
+            insect.escapeTime = 20f;
+            insect.durabilityCostOverride = BeetleDurabilityCost;
+
+            // Ovaler dunkler Koerper: gedreht Kapsule, ~1.4 x der Fliege (armored, bigger).
+            GameObject koerper = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            koerper.name = "Koerper";
+            SetNoCollider(koerper);
+            koerper.transform.SetParent(root.transform, false);
+            koerper.transform.localPosition = Vector3.zero;
+            koerper.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            koerper.transform.localScale = new Vector3(0.017f, 0.022f, 0.014f);
+            SetMaterial(koerper, body);
+
+            // Kopf: Kugel bei z=+0.026 (vorne).
+            GameObject kopf = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            kopf.name = "Kopf";
+            SetNoCollider(kopf);
+            kopf.transform.SetParent(root.transform, false);
+            kopf.transform.localPosition = new Vector3(0f, 0f, 0.026f);
+            kopf.transform.localScale = Vector3.one * 0.014f;
+            SetMaterial(kopf, body);
+
+            // Fluegeldecken (Elytra): two glossy dark Quads lying on the back.
+            CreateBeetleElytra(root.transform, "Wing_L", new Vector3(-0.011f, 0.009f, -0.006f), elytra);
+            CreateBeetleElytra(root.transform, "Wing_R", new Vector3(0.011f, 0.009f, -0.006f), elytra);
+
+            return root;
+        }
+
+        /// <summary>T1: Durability cost of a beetle catch (Prozent).</summary>
+        private const float BeetleDurabilityCost = 15f;
+
         /// <summary>Z7: Motte (Insekten 2) from ArtSource/Insekten/motte.py FBX; bigger + slower than the fly.</summary>
         public static GameObject CreateMoth()
         {
@@ -195,6 +242,38 @@ namespace Spinnenspiel.EditorTools
             go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // liegend
             go.transform.localScale = new Vector3(0.008f, 0.020f, 1f);
             SetMaterial(go, material);
+        }
+
+        /// <summary>T1: Fluegeldecke (Elytra) — a glossy dark Quad lying on the Kaefer's back.</summary>
+        private static void CreateBeetleElytra(Transform parent, string name, Vector3 localPos, Material material)
+        {
+            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = name;
+            SetNoCollider(go);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // liegend
+            go.transform.localScale = new Vector3(0.012f, 0.030f, 1f);
+            SetMaterial(go, material);
+        }
+
+        /// <summary>T1: Dark, shiny armored Kaefer-Body (HDRP Lit) als Asset MAT_BeetleBody.</summary>
+        private static Material CreateBeetleBodyMaterial()
+        {
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.10f, 0.11f, 0.12f));
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.75f);
+            material.SetFloat("_Metallic", 0.5f);
+            material.enableInstancing = true;
+            return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_BeetleBody.mat");
+        }
+
+        /// <summary>T1: Glossy dark Fluegeldecke (HDRP Lit) als Asset MAT_BeetleElytra.</summary>
+        private static Material CreateBeetleElytraMaterial()
+        {
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.14f, 0.13f, 0.10f));
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.85f);
+            material.enableInstancing = true;
+            return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_BeetleElytra.mat");
         }
 
         /// <summary>S2: Helle, schmaerkoe Muecke-Body (HDRP Lit) als Asset MAT_MosquitoBody.</summary>

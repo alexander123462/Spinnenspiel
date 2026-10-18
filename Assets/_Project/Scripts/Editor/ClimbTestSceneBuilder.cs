@@ -81,7 +81,7 @@ namespace Spinnenspiel.EditorTools
             vorlage.SetActive(false);
             insektenSpawner.template = vorlage;
 
-            // S2: Muecke-Vorlage → Tag-Spawner mischt Fliegen und Muecken.
+            // S2: Muecke-Vorlage → der Tag-Spawner mischt Fliegen und Muecken.
             GameObject mueckeVorlage = InsectBuilder.CreateMosquito();
             if (mueckeVorlage != null)
             {
@@ -89,6 +89,16 @@ namespace Spinnenspiel.EditorTools
                 mueckeVorlage.transform.SetParent(insekten.transform, false);
                 mueckeVorlage.SetActive(false);
                 insektenSpawner.mosquitoTemplate = mueckeVorlage;
+            }
+
+            // T1: Kaefer-Vorlage → der Tag-Spawner mischt rare Kaefer in (10 %).
+            GameObject kaeferVorlage = InsectBuilder.CreateBeetle();
+            if (kaeferVorlage != null)
+            {
+                kaeferVorlage.name = "Vorlage_Kaefer";
+                kaeferVorlage.transform.SetParent(insekten.transform, false);
+                kaeferVorlage.SetActive(false);
+                insektenSpawner.beetleTemplate = kaeferVorlage;
             }
 
             EnsureScenesFolder();

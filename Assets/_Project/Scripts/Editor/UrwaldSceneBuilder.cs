@@ -176,6 +176,16 @@ namespace Spinnenspiel.EditorTools
                 insektenSpawner.mosquitoTemplate = mueckeVorlage;
             }
 
+            // T1: Kaefer-Vorlage → der Tag-Spawner mischt rare Kaefer in (10 %).
+            GameObject kaeferVorlage = InsectBuilder.CreateBeetle();
+            if (kaeferVorlage != null)
+            {
+                kaeferVorlage.name = "Vorlage_Kaefer";
+                kaeferVorlage.transform.SetParent(insekten.transform, false);
+                kaeferVorlage.SetActive(false);
+                insektenSpawner.beetleTemplate = kaeferVorlage;
+            }
+
             GameObject insekten2 = new GameObject("Insekten_Motte");
             InsectSpawner motteSpawner = insekten2.AddComponent<InsectSpawner>();
             motteSpawner.count = 4;

@@ -390,5 +390,62 @@ namespace Spinnenspiel.EditorTools
             Object.DestroyImmediate(target);
             Object.DestroyImmediate(image);
         }
+
+        /// <summary>
+        /// T1: Proof image of the Kaefer (Beetle). Builds the Klettertest scene, activates the
+        /// Kaefer-Vorlage (beetleTemplate) as a real insect and renders it close-up to
+        /// Logs/ci/shot_kaefer.png so its primitive model (oval dark body + wing covers) can be verified.
+        /// </summary>
+        [MenuItem("Spinnenspiel/Debug/Kaefer-Kontrolldbild rendern")]
+        public static void CaptureBeetle()
+        {
+            const string scenePath = "Assets/_Project/Scenes/Klettertest.unity";
+            EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            InsectSpawner spawner = Object.FindFirstObjectByType<InsectSpawner>();
+            if (spawner == null || spawner.beetleTemplate == null)
+            {
+                Debug.LogError("[Spinnenspiel] Screenshot: Spawner oder Kaefer-Vorlage fehlt (Klettertest).");
+                return;
+            }
+
+            GameObject kaefer = Object.Instantiate(spawner.beetleTemplate, new Vector3(5.4f, 0.7f, 1.0f), Quaternion.identity);
+            kaefer.name = "ShotKaefer";
+            kaefer.SetActive(true);
+            FlyingInsect insect = kaefer.GetComponent<FlyingInsect>();
+            if (insect != null)
+            {
+                insect.home = kaefer.transform.position; // stay put for the shot
+            }
+
+            GameObject camGo = new GameObject("BeetleShotCamera");
+            Camera cam = camGo.AddComponent<Camera>();
+            cam.clearFlags = CameraClearFlags.Skybox;
+
+            RenderTexture target = new RenderTexture(1200, 900, 24, RenderTextureFormat.ARGB32);
+            target.antiAliasing = 4;
+            Texture2D image = new Texture2D(1200, 900, TextureFormat.RGB24, false);
+
+            Vector3 c = kaefer.transform.position;
+            cam.transform.position = c + new Vector3(0.06f, 0.05f, -0.12f);
+            cam.transform.LookAt(c);
+            cam.nearClipPlane = 0.01f;
+            cam.farClipPlane = 20f;
+            cam.targetTexture = target;
+            cam.Render();
+            RenderTexture.active = target;
+            image.ReadPixels(new Rect(0, 0, 1200, 900), 0, 0);
+            image.Apply();
+            RenderTexture.active = null;
+            cam.targetTexture = null;
+
+            string folder = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ci");
+            Directory.CreateDirectory(folder);
+            File.WriteAllBytes(Path.Combine(folder, "shot_kaefer.png"), image.EncodeToPNG());
+            Debug.Log("[Spinnenspiel] Kaefer-Kontrolldbild: shot_kaefer.png");
+
+            Object.DestroyImmediate(camGo);
+            Object.DestroyImmediate(target);
+            Object.DestroyImmediate(image);
+        }
     }
 }

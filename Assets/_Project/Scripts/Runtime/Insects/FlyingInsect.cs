@@ -74,6 +74,9 @@ namespace Spinnenspiel
         /// <summary>J2a: Energy the spider gains when it eats this insect (Fly 25, Moth 40).</summary>
         public float energyValue = 25f;
 
+        /// <summary>T1: Per-Insect durability cost of a catch in percent (-1 = model default catchCost; beetle 15).</summary>
+        public float durabilityCostOverride = -1f;
+
         // J3a: Beute flieht. Benamed Constants: Bemerk-Abstand und Fluchtdauer.
         private static readonly float noticeDistance = 2.5f; // m
         private static readonly float fleeDuration = 2f;     // s
@@ -211,7 +214,15 @@ namespace Spinnenspiel
             _lastTwitch = 0f;
             _lastWebVibe = 0f;
             web.Vibrate(1f);
-            web.ApplyCatch();
+            // T1: per-Insect durability cost (beetle 15 %), otherwise the model default.
+            if (durabilityCostOverride >= 0f && web.Durability != null)
+            {
+                web.Durability.AddDamage(durabilityCostOverride);
+            }
+            else
+            {
+                web.ApplyCatch();
+            }
             System.Action<FlyingInsect, OrbWeb> handler = AnyCaught;
             if (handler != null)
             {
