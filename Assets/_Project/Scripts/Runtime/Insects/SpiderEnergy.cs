@@ -22,6 +22,7 @@ namespace Spinnenspiel
         {
             _model = new SpiderEnergyModel();
             _model.Reset();
+            _model.difficultyMultiplier = GameDifficulty.DrainMultiplier();
             if (_movement == null)
             {
                 _movement = GetComponent<SpiderMovement>();

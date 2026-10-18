@@ -26,6 +26,9 @@ namespace Spinnenspiel
         public float MouseSensitivity = 1f;
         public float ViewDistance = 60f;
 
+        /// <summary>S1: selected difficulty level (persisted with the other settings).</summary>
+        public GameDifficulty.Level DifficultyLevel = GameDifficulty.Level.Normal;
+
         private void Awake()
         {
             LoadSettingsFromDisk();
@@ -55,6 +58,14 @@ namespace Spinnenspiel
             SaveSettings();
         }
 
+        /// <summary>S1: select the difficulty level and save immediately.</summary>
+        public void SetDifficulty(GameDifficulty.Level level)
+        {
+            DifficultyLevel = level;
+            GameDifficulty.selectedLevel = level;
+            SaveSettings();
+        }
+
         /// <summary>True when a settings file exists on disk.</summary>
         public bool SettingsFileExists() => File.Exists(FilePath);
 
@@ -80,6 +91,7 @@ namespace Spinnenspiel
             payload.volume = Volume;
             payload.sensitivity = MouseSensitivity;
             payload.viewDistance = ViewDistance;
+            payload.difficulty = GameDifficulty.LevelToStored(DifficultyLevel);
             var json = JsonUtility.ToJson(payload);
             try
             {
@@ -109,6 +121,8 @@ namespace Spinnenspiel
             Volume = Mathf.Clamp(payload.volume, VolumeMin, VolumeMax);
             MouseSensitivity = Mathf.Clamp(payload.sensitivity, SensitivityMin, SensitivityMax);
             ViewDistance = Mathf.Clamp(payload.viewDistance, ViewDistanceMin, ViewDistanceMax);
+            DifficultyLevel = GameDifficulty.LevelFromStored(payload.difficulty);
+            GameDifficulty.selectedLevel = DifficultyLevel;
         }
     }
 
@@ -119,5 +133,7 @@ namespace Spinnenspiel
         public float volume;
         public float sensitivity;
         public float viewDistance;
+        /// <summary>S1: stored difficulty (0 = not stored / legacy -> Normal).</summary>
+        public int difficulty;
     }
 }

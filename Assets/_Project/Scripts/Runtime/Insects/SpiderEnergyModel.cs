@@ -28,6 +28,9 @@ namespace Spinnenspiel
         /// <summary>Gain when eating a moth.</summary>
         public static readonly float feedMoth = 40f;
 
+        /// <summary>S1: difficulty multiplier on the drain rate (1 = Normal).</summary>
+        public float difficultyMultiplier = 1f;
+
         /// <summary>Current energy (0..maxEnergy).</summary>
         public float Energy;
 
@@ -58,7 +61,7 @@ namespace Spinnenspiel
                 rate = drainClimb;
             }
 
-            Energy -= rate * dt;
+            Energy -= rate * difficultyMultiplier * dt;
             if (Energy < 0f)
             {
                 Energy = 0f;

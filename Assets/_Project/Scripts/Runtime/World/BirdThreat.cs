@@ -50,7 +50,9 @@ namespace Spinnenspiel
         private void OnEnable()
         {
             _model = new BirdThreatModel();
-            _model.warnTime = warnTime;
+            // S1: danger frequency scales with difficulty (Hart reacts faster -> shorter warn time).
+            float threatMultiplier = GameDifficulty.BirdThreatMultiplier();
+            _model.warnTime = threatMultiplier > 0f ? warnTime / threatMultiplier : warnTime;
             _model.attackDelay = attackDelay;
             _spiderTransform = transform;
             _webBuilder = GetComponent<SpiderWebBuilder>();

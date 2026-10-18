@@ -19,10 +19,13 @@ namespace Spinnenspiel
         private int _worldSeedOverride;
         public void SetWorldSeed(int seed) { _worldSeedOverride = seed; }
 
-        /// <summary>K6: Best values over earlier partien, persisted together with J6 in this file.</summary>
+        /// <summary>K6: best values over earlier partien, persisted together with J6 in this file.</summary>
         public float BestSurvivalTime;
         public int BestEaten;
         public int BestWebs;
+
+        /// <summary>S1: difficulty level of the saved partie (persisted with the save).</summary>
+        public GameDifficulty.Level DifficultyLevel = GameDifficulty.Level.Normal;
 
         private GameMenu menu;
 
@@ -59,6 +62,8 @@ namespace Spinnenspiel
                 : (gen != null ? gen.Seed : 0);
             payload.position = transform.position;
             payload.energy = Energy;
+            // S1: the difficulty level travels with the savegame.
+            payload.difficulty = GameDifficulty.LevelToStored(DifficultyLevel);
             var hunger = GetComponent<SpiderHunger>();
             payload.hunger = hunger != null ? hunger.Hunger : 0f;
             // K6: best values over earlier partien travel with this save file.
@@ -137,6 +142,9 @@ namespace Spinnenspiel
             }
             transform.position = payload.position;
             Energy = payload.energy;
+            // S1: restore the difficulty level of the saved partie.
+            DifficultyLevel = GameDifficulty.LevelFromStored(payload.difficulty);
+            GameDifficulty.selectedLevel = DifficultyLevel;
             // K6: restore the best values from earlier partien.
             BestSurvivalTime = payload.bestTime;
             BestEaten = payload.bestEaten;
@@ -180,6 +188,8 @@ namespace Spinnenspiel
         public Vector3 position;
         public float hunger;
         public float energy;
+        /// <summary>S1: stored difficulty (0 = not stored / legacy -> Normal).</summary>
+        public int difficulty;
         public List<Vector3> anchorPoints = new List<Vector3>();
         /// <summary>K6: Best values from earlier partien (0 = none yet).</summary>
         public float bestTime;

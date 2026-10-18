@@ -39,6 +39,16 @@ namespace Spinnenspiel
             return save != null && save.SaveFileExists();
         }
 
+        /// <summary>S1: choose the difficulty level from the start/pause menu.
+        /// The value itself persists via GameSettings and SaveGame.</summary>
+        public void SetDifficulty(GameDifficulty.Level level)
+        {
+            GameDifficulty.selectedLevel = level;
+        }
+
+        /// <summary>The level currently selected (for display and tests).</summary>
+        public GameDifficulty.Level DifficultyLevel { get => GameDifficulty.selectedLevel; }
+
         private void Update()
         {
             Keyboard k = Keyboard.current;
@@ -161,6 +171,9 @@ namespace Spinnenspiel
             GUI.Label(new Rect(0f, Screen.height / 3f + 88f, Screen.width, 24f),
                 new GUIContent("Neue Partie: Q + Neustart"));
             GUI.color = Color.white;
+            // S1: the difficulty level is visible and selectable at the menu.
+            GUI.Label(new Rect(0f, Screen.height / 3f + 112f, Screen.width, 24f),
+                new GUIContent("Difficulty: " + GameDifficulty.LevelName(GameDifficulty.selectedLevel)));
         }
     }
 }
