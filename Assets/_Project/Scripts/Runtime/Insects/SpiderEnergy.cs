@@ -110,6 +110,17 @@ namespace Spinnenspiel
             Energy = _model.Energy;
         }
 
+        /// <summary>T3: A frog tongue-strike takes energy off the spider (delegates to the model).</summary>
+        public void ApplyStrike(float amount)
+        {
+            if (_model == null)
+            {
+                return;
+            }
+            _model.ApplyStrike(amount);
+            Energy = _model.Energy;
+        }
+
         /// <summary>Energy as fraction 0..1 (for HUD / consequences).</summary>
         public float Fraction()
         {

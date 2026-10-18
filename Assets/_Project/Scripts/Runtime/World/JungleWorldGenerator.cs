@@ -41,6 +41,7 @@ namespace Spinnenspiel
         public float DebrisMaxSizeMeters { get; private set; }
         public int LogCount { get; private set; }
         public int RockCount { get; private set; }
+        public int FrogCount { get; private set; }
 
         private void Awake()
         {
@@ -107,6 +108,10 @@ namespace Spinnenspiel
             water.AddComponent<MeshCollider>().sharedMesh = waterMesh;
             water.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Water;
             water.AddComponent<WaterBody>();
+
+            // 3b) Frosch (T3: EIN Bedaenger per Sumpfzone — lurks on the bank at the water edge)
+            var frogRoot = new GameObject("Froesch");
+            PlaceFrogs(frogRoot.transform);
 
             // 4) Bäume
             Transform treesRoot = new GameObject("Bäume").transform;
@@ -1362,6 +1367,64 @@ namespace Spinnenspiel
             mesh.RecalculateNormals();
             mesh.RecalculateBounds();
             return mesh;
+        }
+
+        /// <summary>
+        /// T3: Place one frog per water body (Sumpf/Bach), on the bank at the water edge.
+        /// Built from primitives: green body + two eyes, no colliders (insects/dangers are
+        /// collider-free). Spot selection is deterministic over the Seed via FrogModel.
+        /// </summary>
+        private void PlaceFrogs(Transform parent)
+        {
+            var spots = FrogModel.FindFrogSpots(World);
+            Material body = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.18f, 0.45f, 0.2f));
+            Material eye = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.9f, 0.85f, 0.2f));
+
+            int placedFrogs = 0;
+            foreach (Vector3 spot in spots)
+            {
+                GameObject frog = new GameObject("Frosch");
+                frog.transform.SetParent(parent, false);
+                frog.transform.position = spot + Vector3.up * 0.02f;
+                frog.AddComponent<Frog>();
+
+                GameObject koerper = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                koerper.name = "Koerper";
+                DropCollider(koerper);
+                koerper.transform.SetParent(frog.transform, false);
+                koerper.transform.position = frog.transform.position;
+                koerper.transform.localScale = new Vector3(0.12f, 0.07f, 0.16f);
+                koerper.GetComponent<MeshRenderer>().sharedMaterial = body;
+
+                GameObject eyeL = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                eyeL.name = "Eye_L";
+                DropCollider(eyeL);
+                eyeL.transform.SetParent(frog.transform, false);
+                eyeL.transform.position = frog.transform.position + new Vector3(-0.04f, 0.05f, 0.06f);
+                eyeL.transform.localScale = Vector3.one * 0.03f;
+                eyeL.GetComponent<MeshRenderer>().sharedMaterial = eye;
+
+                GameObject eyeR = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                eyeR.name = "Eye_R";
+                DropCollider(eyeR);
+                eyeR.transform.SetParent(frog.transform, false);
+                eyeR.transform.position = frog.transform.position + new Vector3(0.04f, 0.05f, 0.06f);
+                eyeR.transform.localScale = Vector3.one * 0.03f;
+                eyeR.GetComponent<MeshRenderer>().sharedMaterial = eye;
+
+                placedFrogs++;
+            }
+
+            FrogCount = placedFrogs;
+        }
+
+        private static void DropCollider(GameObject go)
+        {
+            Collider collider = go.GetComponent<Collider>();
+            if (collider != null)
+            {
+                UnityEngine.Object.DestroyImmediate(collider);
+            }
         }
 
         private void OnGUI()

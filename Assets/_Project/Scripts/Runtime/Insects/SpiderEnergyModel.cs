@@ -95,6 +95,25 @@ namespace Spinnenspiel
             }
         }
 
+        /// <summary>T3: Energy a frog tongue-strike takes from the spider (energy loss,
+        /// but NOT counted as a wasp sting for the S8 stingless-night goal).</summary>
+        public static readonly float frogStrikeCost = 25f;
+
+        /// <summary>T3: Frog strike damage — energy loss (not scaled by difficulty drain).</summary>
+        public void ApplyStrike(float amount)
+        {
+            if (amount <= 0f)
+            {
+                return;
+            }
+
+            Energy -= amount;
+            if (Energy < 0f)
+            {
+                Energy = 0f;
+            }
+        }
+
         /// <summary>S6: Spend energy (e.g. repairing the web). False when not enough energy.</summary>
         public bool SpendEnergy(float amount)
         {
