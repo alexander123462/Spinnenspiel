@@ -211,6 +211,7 @@ namespace Spinnenspiel
             _lastTwitch = 0f;
             _lastWebVibe = 0f;
             web.Vibrate(1f);
+            web.ApplyCatch();
             System.Action<FlyingInsect, OrbWeb> handler = AnyCaught;
             if (handler != null)
             {

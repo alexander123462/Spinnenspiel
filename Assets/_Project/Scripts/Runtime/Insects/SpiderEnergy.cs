@@ -87,6 +87,18 @@ namespace Spinnenspiel
             Energy = _model.Energy;
         }
 
+        /// <summary>S6: Spend energy for an action (repair). False when not enough energy.</summary>
+        public bool SpendEnergy(float amount)
+        {
+            if (_model == null)
+            {
+                return false;
+            }
+            bool ok = _model.SpendEnergy(amount);
+            Energy = _model.Energy;
+            return ok;
+        }
+
         /// <summary>Energy as fraction 0..1 (for HUD / consequences).</summary>
         public float Fraction()
         {

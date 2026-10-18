@@ -72,6 +72,21 @@ namespace Spinnenspiel
             }
         }
 
+        /// <summary>S6: Spend energy (e.g. repairing the web). False when not enough energy.</summary>
+        public bool SpendEnergy(float amount)
+        {
+            if (amount <= 0f)
+            {
+                return false;
+            }
+            if (Energy < amount)
+            {
+                return false;
+            }
+            Energy -= amount;
+            return true;
+        }
+
         /// <summary>Raise energy by amount, capped at maxEnergy.</summary>
         public void Feed(float amount)
         {

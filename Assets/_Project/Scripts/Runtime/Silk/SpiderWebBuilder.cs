@@ -38,6 +38,7 @@ namespace Spinnenspiel
         private SpiderMovement _movement;
         private SpiderSilk _silk;
         private SpiderInput _input;
+        private SpiderEnergy _energy;
         private LineRenderer _bauFaden;
         private Vector3 _normal = Vector3.up;
         private Quaternion _currentRotation = Quaternion.identity;
@@ -60,6 +61,7 @@ namespace Spinnenspiel
             _movement = GetComponent<SpiderMovement>();
             _silk = GetComponent<SpiderSilk>();
             _input = GetComponent<SpiderInput>();
+            _energy = GetComponent<SpiderEnergy>();
         }
 
         /// <summary>Startet den sichtbaren Netzbau des übergebenen Netzes.</summary>
@@ -111,6 +113,17 @@ namespace Spinnenspiel
 
             if (SuppressRelease)
             {
+                return;
+            }
+
+            // S6: Repair at the web — costs 5 energy, sets durability back to 100.
+            if (_input.RepairPressed)
+            {
+                if (Web != null && _energy != null
+                    && _energy.SpendEnergy(NetDurabilityModel.repairEnergyCost))
+                {
+                    Web.Repair();
+                }
                 return;
             }
 
