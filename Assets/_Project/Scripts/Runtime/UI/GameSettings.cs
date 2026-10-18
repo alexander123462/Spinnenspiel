@@ -35,6 +35,12 @@ namespace Spinnenspiel
         /// <summary>S3: static mirror so CameraShake can ask without a component reference.</summary>
         public static bool cameraShakeEnabled = true;
 
+        /// <summary>S9: bitmask of first-step hints already used (bit = HintId), persisted.</summary>
+        public int FirstStepsUsedMask;
+
+        /// <summary>S9: entrance hints on/off (persisted; "Hinweise aus" -> nothing shows).</summary>
+        public bool EintranceHintsEnabled = true;
+
         private void Awake()
         {
             LoadSettingsFromDisk();
@@ -80,6 +86,20 @@ namespace Spinnenspiel
             SaveSettings();
         }
 
+        /// <summary>S9: switch the entrance hints on/off and save immediately.</summary>
+        public void SetEntranceHints(bool enabled)
+        {
+            EintranceHintsEnabled = enabled;
+            SaveSettings();
+        }
+
+        /// <summary>S9: store the used first-step hint bitmask and save immediately.</summary>
+        public void SetFirstStepsUsed(int mask)
+        {
+            FirstStepsUsedMask = mask;
+            SaveSettings();
+        }
+
         /// <summary>True when a settings file exists on disk.</summary>
         public bool SettingsFileExists() => File.Exists(FilePath);
 
@@ -108,6 +128,9 @@ namespace Spinnenspiel
             payload.difficulty = GameDifficulty.LevelToStored(DifficultyLevel);
             // S3: 0 = not stored / legacy -> on; 1 = explicitly off.
             payload.cameraShakeOff = CameraShakeEnabled ? 0 : 1;
+            // S9: used-hint bitmask and hint switch travel with the settings.
+            payload.firstStepsUsedMask = FirstStepsUsedMask;
+            payload.entranceHintsOff = EintranceHintsEnabled ? 0 : 1;
             var json = JsonUtility.ToJson(payload);
             try
             {
@@ -142,6 +165,9 @@ namespace Spinnenspiel
             // S3: legacy files lack the field -> 0 -> on (default, no surprise for old players).
             CameraShakeEnabled = payload.cameraShakeOff == 0;
             cameraShakeEnabled = CameraShakeEnabled;
+            // S9: legacy files lack the fields -> mask 0 (nothing used yet), hints on.
+            FirstStepsUsedMask = payload.firstStepsUsedMask;
+            EintranceHintsEnabled = payload.entranceHintsOff == 0;
         }
     }
 
@@ -156,5 +182,9 @@ namespace Spinnenspiel
         public int difficulty;
         /// <summary>S3: stored camera-shake switch (0 = not stored / legacy -> on, 1 = off).</summary>
         public int cameraShakeOff;
+        /// <summary>S9: bitmask of first-step hints already used (bit = HintId).</summary>
+        public int firstStepsUsedMask;
+        /// <summary>S9: stored entrance-hint switch (0 = not stored / legacy -> on, 1 = off).</summary>
+        public int entranceHintsOff;
     }
 }

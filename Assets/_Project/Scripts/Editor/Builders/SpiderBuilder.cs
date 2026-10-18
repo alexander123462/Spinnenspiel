@@ -150,6 +150,12 @@ namespace Spinnenspiel.EditorTools
             // Menu (B8): Startscreen, Esc-Pause, Sensitivity in PlayerPrefs.
             root.AddComponent<GameMenu>();
 
+            // S9 Einstieg: one-time hints at first start (WASD/Jump/Silk/Net/Collect),
+            // each shown when its situation happens and gone after first use; bitmask
+            // persisted in GameSettings. Must come BEFORE GameSettings (its Awake loads
+            // the settings before this Start reads them).
+            root.AddComponent<FirstStepsHint>();
+
             // K7 Einstellungen merken: Lautstaerke/Empfindlichkeit/Sichtweite in own versioned file.
             root.AddComponent<GameSettings>();
 
