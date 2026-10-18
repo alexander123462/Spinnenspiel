@@ -141,6 +141,9 @@ namespace Spinnenspiel.EditorTools
             // K6 Statistik beim Tod: Ueberlebenszeit/Fressen/Netzes + Hoechstwert (J6-File).
             root.AddComponent<DeathStats>();
 
+            // S5 Tagesbilanz: at night->morning a short window shows the day that just ended.
+            root.AddComponent<Spinnenspiel.DayBalance>();
+
             // Menu (B8): Startscreen, Esc-Pause, Sensitivity in PlayerPrefs.
             root.AddComponent<GameMenu>();
 

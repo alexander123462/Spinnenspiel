@@ -2,6 +2,7 @@ using Spinnenspiel;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.Rendering.HighDefinition;
 using UnityEngine.Rendering.Universal;
 
@@ -127,6 +128,22 @@ namespace Spinnenspiel.EditorTools
             Vector3 spawn = new Vector3(48f, 20f, 48f);
             GameObject spider = SpiderBuilder.Create(spawn, cam.transform);
 
+            // S5 Tagesbilanz: the sunrise event of the cycle opens the balance window on the
+            // spider; bird pre-warnings count as the biggest danger of the day.
+            DayBalance dayBalance = spider.GetComponent<Spinnenspiel.DayBalance>();
+            if (dayBalance != null)
+            {
+                dayBalance.SetCycle(dayCycle);
+                BirdThreat birdThreat = spider.GetComponent<Spinnenspiel.BirdThreat>();
+                if (birdThreat != null)
+                {
+                    if (birdThreat.WarnFired == null)
+                    {
+                        birdThreat.WarnFired = new UnityEvent();
+                    }
+                    birdThreat.WarnFired.AddListener(dayBalance.OnWarning);
+                }
+            }
             EffectsBuilder.Build(spider);
             SetLayerRecursive(spider, 2); // "Ignore Raycast": Kamera- und Beinstrahlen ignorieren die Spinne
 

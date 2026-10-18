@@ -37,6 +37,9 @@ namespace Spinnenspiel
         /// <summary>True once the strike has landed in the current threat cycle.</summary>
         public bool Attacked;
 
+        /// <summary>Fires when the pre-warning triggers (S5: the day balance counts these as danger).</summary>
+        public UnityEvent WarnFired;
+
         /// <summary>Fires when the strike lands (bird attacks).</summary>
         public UnityEvent AttackFired;
 
@@ -76,6 +79,10 @@ namespace Spinnenspiel
             Warned = _model.Warned;
             Attacked = _model.Attacked;
 
+            if (!wasWarned && _model.Warned)
+            {
+                WarnFired.Invoke();
+            }
             if (!wasAttacked && _model.Attacked)
             {
                 AttackFired.Invoke();

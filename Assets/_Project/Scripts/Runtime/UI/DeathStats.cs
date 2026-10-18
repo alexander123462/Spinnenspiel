@@ -61,9 +61,17 @@ namespace Spinnenspiel
             Stats.TickAlive(Time.deltaTime);
 
             // Eaten insects: read from the single source of truth (K5 counter).
+            // S5: feed the model per NEW insect so the day-counters stay in sync with the totals.
             if (_growth != null)
             {
-                Stats.EatenCount = _growth.EatenCount;
+                while (Stats.EatenCount < _growth.EatenCount)
+                {
+                    Stats.OnInsectEaten();
+                }
+                if (Stats.EatenCount > _growth.EatenCount)
+                {
+                    Stats.EatenCount = _growth.EatenCount;
+                }
             }
 
             // Built webs: count newly built webs once (OrbWeb.All is the registry).

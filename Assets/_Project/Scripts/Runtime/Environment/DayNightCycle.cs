@@ -1,4 +1,6 @@
+using System.Collections;
 using UnityEngine;
+using UnityEngine.Events;
 
 namespace Spinnenspiel
 {
@@ -38,6 +40,10 @@ namespace Spinnenspiel
         /// <summary>J5: Night factor 1 (deep night) .. 0 (full day). Ramps over transitionMinutes at dawn/dusk.</summary>
         public float CurrentNightFactor;
 
+        /// <summary>S5 Tagesbilanz: fires exactly once when the cycle crosses sunrise (night -> morning).
+        /// Initialized explicitly so runtime-created components (tests) can hook listeners.</summary>
+        public UnityEvent MorningFired;
+
         /// <summary>J5: Minutes of the cycle that are dark (night core, ramps excluded).</summary>
         [Tooltip("Minutes per cycle that are dark (night core, ramps excluded)")]
         [SerializeField] private float nightMinutes = 6f;
@@ -52,6 +58,7 @@ namespace Spinnenspiel
 
         private float dayFraction;
         private float ambientTimer;
+        private float lastDayFraction; // S5: previous fraction for the sunrise-crossing check.
 
         // Night color as configuration value (HDRP: Fog-Albedo lives in the Volume,
         // the fog color itself is not changed at runtime).
@@ -62,6 +69,7 @@ namespace Spinnenspiel
         {
             dayFraction = startDayFraction - Mathf.Floor(startDayFraction);
             DayProgress = dayFraction;
+            lastDayFraction = dayFraction;
             if (sun == null)
             {
                 sun = RenderSettings.sun;
@@ -77,6 +85,8 @@ namespace Spinnenspiel
         {
             dayFraction = progress - Mathf.Floor(progress);
             DayProgress = dayFraction;
+            // S5: a Test-Jump is not a natural sunrise — no event, only the baseline moves.
+            lastDayFraction = dayFraction;
         }
 
         private void Update()
@@ -85,6 +95,17 @@ namespace Spinnenspiel
             dayFraction += Time.deltaTime / (lengthMinutes * 60f);
             if (dayFraction >= 1f) dayFraction -= 1f;
             DayProgress = dayFraction;
+
+            // S5: sunrise at 0.25 — the event fires only on a natural forward crossing
+            // (not on wrap-around midnight, not on a Test-Jump via SetDayProgress).
+            if (lastDayFraction < 0.25f && dayFraction >= 0.25f)
+            {
+                if (MorningFired != null)
+                {
+                    MorningFired.Invoke();
+                }
+            }
+            lastDayFraction = dayFraction;
 
             if (sun == null) return;
 

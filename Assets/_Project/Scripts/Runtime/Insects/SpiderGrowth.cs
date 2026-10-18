@@ -23,6 +23,9 @@ namespace Spinnenspiel
 
         public float GrowthScale = 1f;
 
+        /// <summary>S5 Tagesbilanz: current growth step (one per insectsPerStep eaten prey).</summary>
+        public int GrowthStage { get => insectsPerStep > 0 ? EatenCount / insectsPerStep : 0; }
+
         private SpiderPredation _predation;
         private Vector3 _baseLocalScale = Vector3.one;
 
