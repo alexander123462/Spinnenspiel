@@ -119,6 +119,9 @@ namespace Spinnenspiel.EditorTools
             // Beute 2 (t73a3): zur Beute laufen, einwickeln, zurücktragen, fressen.
             root.AddComponent<SpiderPredation>();
 
+            // S3 Fang-Rueckmeldung: Zupfton + Kamera-Wackeln on AnyCaught (only at own web).
+            root.AddComponent<FangFeedback>();
+
             // K5 Wachstum: je 10 gefressene Insekten +8 %, Max 150 % (Abo: PreyEaten).
             root.AddComponent<SpiderGrowth>();
 

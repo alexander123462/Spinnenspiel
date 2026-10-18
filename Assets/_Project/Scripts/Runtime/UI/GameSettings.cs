@@ -29,6 +29,12 @@ namespace Spinnenspiel
         /// <summary>S1: selected difficulty level (persisted with the other settings).</summary>
         public GameDifficulty.Level DifficultyLevel = GameDifficulty.Level.Normal;
 
+        /// <summary>S3 Fang-Rueckmeldung: camera shake on/off (persisted like the other settings).</summary>
+        public bool CameraShakeEnabled = true;
+
+        /// <summary>S3: static mirror so CameraShake can ask without a component reference.</summary>
+        public static bool cameraShakeEnabled = true;
+
         private void Awake()
         {
             LoadSettingsFromDisk();
@@ -66,6 +72,14 @@ namespace Spinnenspiel
             SaveSettings();
         }
 
+        /// <summary>S3: switch the Fang-Rueckmeldung camera shake on/off and save immediately.</summary>
+        public void SetCameraShake(bool enabled)
+        {
+            CameraShakeEnabled = enabled;
+            cameraShakeEnabled = enabled;
+            SaveSettings();
+        }
+
         /// <summary>True when a settings file exists on disk.</summary>
         public bool SettingsFileExists() => File.Exists(FilePath);
 
@@ -92,6 +106,8 @@ namespace Spinnenspiel
             payload.sensitivity = MouseSensitivity;
             payload.viewDistance = ViewDistance;
             payload.difficulty = GameDifficulty.LevelToStored(DifficultyLevel);
+            // S3: 0 = not stored / legacy -> on; 1 = explicitly off.
+            payload.cameraShakeOff = CameraShakeEnabled ? 0 : 1;
             var json = JsonUtility.ToJson(payload);
             try
             {
@@ -123,6 +139,9 @@ namespace Spinnenspiel
             ViewDistance = Mathf.Clamp(payload.viewDistance, ViewDistanceMin, ViewDistanceMax);
             DifficultyLevel = GameDifficulty.LevelFromStored(payload.difficulty);
             GameDifficulty.selectedLevel = DifficultyLevel;
+            // S3: legacy files lack the field -> 0 -> on (default, no surprise for old players).
+            CameraShakeEnabled = payload.cameraShakeOff == 0;
+            cameraShakeEnabled = CameraShakeEnabled;
         }
     }
 
@@ -135,5 +154,7 @@ namespace Spinnenspiel
         public float viewDistance;
         /// <summary>S1: stored difficulty (0 = not stored / legacy -> Normal).</summary>
         public int difficulty;
+        /// <summary>S3: stored camera-shake switch (0 = not stored / legacy -> on, 1 = off).</summary>
+        public int cameraShakeOff;
     }
 }

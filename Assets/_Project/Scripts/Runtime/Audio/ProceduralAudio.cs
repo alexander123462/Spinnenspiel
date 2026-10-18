@@ -279,6 +279,46 @@ namespace Spinnenspiel
             return _rainforest;
         }
 
+        /// <summary>S3: kurze Zupfton (Pluck) — kurza twang: bright snap plus quick descending glissando.</summary>
+        public static AudioClip Pluck()
+        {
+            if (_pluck != null)
+            {
+                return _pluck;
+            }
+
+            float duration = 0.16f;
+            int length = Mathf.CeilToInt(duration * SampleRate);
+            float[] data = new float[length];
+            System.Random random = new System.Random(4242);
+            float baseFrequency = 1450f + (float)random.NextDouble() * 250f;
+
+            // Snap: filtered noise hit at t=0 (the string being plucked).
+            float filtered = 0f;
+            for (int i = 0; i < length; i++)
+            {
+                float t = i / (float)SampleRate;
+                float noise = (float)random.NextDouble() * 2f - 1f;
+                filtered += (noise - filtered) * 0.4f;
+                data[i] = filtered * 0.35f * Mathf.Exp(-t / 0.004f);
+            }
+
+            // Tone: glissando down with a fast decay and a slight vibrato.
+            for (int i = 0; i < length; i++)
+            {
+                float t = i / (float)SampleRate;
+                float frequency = baseFrequency * (1f - 0.35f * Mathf.Clamp01(t / duration));
+                float phase = 2f * Mathf.PI * frequency * t * (1f + 0.02f * Mathf.Sin(t * 70f));
+                float envelope = Mathf.Exp(-t / 0.05f);
+                data[i] += Mathf.Sin(phase) * envelope * 0.5f;
+            }
+
+            _pluck = Create("Fang_Pluck", data);
+            return _pluck;
+        }
+
+        private static AudioClip _pluck;
+
         private static float[] Crossfade(float[] data, int samples)
         {
             // Ende weich in den Anfang überblenden, damit die Schleife nahtlos ist.

@@ -70,6 +70,9 @@ namespace Spinnenspiel
         /// <summary>Zusätzlicher FOV-Versatz für spätere Kamera-Modi (z. B. Kampf, große Gegner).</summary>
         public float FieldOfViewOffset { get; set; }
 
+        /// <summary>S3: Wackel-Offset (m, camera-local right/up) — CameraShake per Frame setzen; LateUpdate verhuert.</summary>
+        public Vector3 ShakeOffset { get; set; }
+
         public Transform Target
         {
             get => target;
@@ -165,7 +168,7 @@ namespace Spinnenspiel
 
             Vector3 position = _pivotPosition + direction * _currentDistance;
             position = KeepAboveGround(position);
-            transform.position = position;
+            transform.position = position + ShakeOffset; // S3: Wackeln from CameraShake
 
             UpdateFieldOfView(deltaTime);
         }

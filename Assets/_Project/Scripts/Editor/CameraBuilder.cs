@@ -14,6 +14,7 @@ namespace Spinnenspiel.EditorTools
             cam.farClipPlane = 500f;
             go.AddComponent<AudioListener>();
             go.AddComponent<Spinnenspiel.SpiderCamera>();
+            go.AddComponent<Spinnenspiel.CameraShake>(); // S3: Fang-Rueckmeldung Wackeln
             return cam;
         }
 
