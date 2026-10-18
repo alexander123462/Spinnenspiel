@@ -53,6 +53,53 @@ namespace Spinnenspiel.EditorTools
             return root;
         }
 
+        /// <summary>
+        /// S2: Muecke (new small fast prey) derived from the fly parts: ~60 % of the fly body,
+        /// helle schlanke Fluegel, flies by day. Faster than the fly (1.6 x) and gives 10 energy.
+        /// No new Blender work – built from primitives like CreateFly.
+        /// </summary>
+        public static GameObject CreateMosquito()
+        {
+            Material body = CreateMosquitoBodyMaterial();
+            Material wing = CreateMosquitoWingMaterial();
+            Material eye = CreateEyeMaterial();
+
+            GameObject root = new GameObject("Muecke");
+            FlyingInsect insect = root.AddComponent<FlyingInsect>();
+            // 1.6 x the fly speed (default 0.8) -> 1.28; same wander radius as the fly.
+            insect.SetFlightParams(1.28f, 2.5f);
+            insect.energyValue = 10f;
+
+            // Kapselkoerper: ~60 % der Fliege (fly capsule 0.012/0.018/0.012).
+            GameObject koerper = GameObject.CreatePrimitive(PrimitiveType.Capsule);
+            koerper.name = "Koerper";
+            SetNoCollider(koerper);
+            koerper.transform.SetParent(root.transform, false);
+            koerper.transform.localPosition = Vector3.zero;
+            koerper.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            koerper.transform.localScale = new Vector3(0.0072f, 0.0108f, 0.0072f);
+            SetMaterial(koerper, body);
+
+            // Kopf: Kugel bei z=+0.012 (vorne), ~60 % der Fliege.
+            GameObject kopf = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            kopf.name = "Kopf";
+            SetNoCollider(kopf);
+            kopf.transform.SetParent(root.transform, false);
+            kopf.transform.localPosition = new Vector3(0f, 0f, 0.012f);
+            kopf.transform.localScale = Vector3.one * 0.0072f;
+            SetMaterial(kopf, body);
+
+            // Augen: zwei kleine Kaege seitlich am Kopf (scaled to the smaller body).
+            CreateEyeScaled(root.transform, "Auge_L", new Vector3(-0.0036f, 0.0018f, 0.0144f), 0.0042f, eye);
+            CreateEyeScaled(root.transform, "Auge_R", new Vector3(0.0036f, 0.0018f, 0.0144f), 0.0042f, eye);
+
+            // Fluegel: liegende, SCHLANKER Quads (narrower than the fly), helle + translucent.
+            CreateWingSlim(root.transform, "Wing_L", new Vector3(-0.006f, 0.004f, -0.002f), wing);
+            CreateWingSlim(root.transform, "Wing_R", new Vector3(0.006f, 0.004f, -0.002f), wing);
+
+            return root;
+        }
+
         /// <summary>Z7: Motte (Insekten 2) from ArtSource/Insekten/motte.py FBX; bigger + slower than the fly.</summary>
         public static GameObject CreateMoth()
         {
@@ -123,6 +170,48 @@ namespace Spinnenspiel.EditorTools
             go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // liegend
             go.transform.localScale = new Vector3(0.014f, 0.028f, 1f);
             SetMaterial(go, material);
+        }
+
+        /// <summary>S2: Augen-Sphere mit geaendem Radius (Muecke = smaller than the fly).</summary>
+        private static void CreateEyeScaled(Transform parent, string name, Vector3 localPos, float size, Material material)
+        {
+            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.name = name;
+            SetNoCollider(go);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            go.transform.localScale = Vector3.one * size;
+            SetMaterial(go, material);
+        }
+
+        /// <summary>S2: Fluegel-Quad, schlanke (narrower than the fly) for the Muecke.</summary>
+        private static void CreateWingSlim(Transform parent, string name, Vector3 localPos, Material material)
+        {
+            GameObject go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = name;
+            SetNoCollider(go);
+            go.transform.SetParent(parent, false);
+            go.transform.localPosition = localPos;
+            go.transform.localRotation = Quaternion.Euler(90f, 0f, 0f); // liegend
+            go.transform.localScale = new Vector3(0.008f, 0.020f, 1f);
+            SetMaterial(go, material);
+        }
+
+        /// <summary>S2: Helle, schmaerkoe Muecke-Body (HDRP Lit) als Asset MAT_MosquitoBody.</summary>
+        private static Material CreateMosquitoBodyMaterial()
+        {
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.55f, 0.56f, 0.6f));
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.4f);
+            material.enableInstancing = true;
+            return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_MosquitoBody.mat");
+        }
+
+        /// <summary>S2: Helle, schlanke Muecke-Fluegel (Unlit transparent) als Asset MAT_MosquitoWing.</summary>
+        private static Material CreateMosquitoWingMaterial()
+        {
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Unlit(new Color(0.9f, 0.92f, 0.95f, 0.3f));
+            Spinnenspiel.Rendering.PipelineMaterials.SetTransparent(material, true);
+            return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_MosquitoWing.mat");
         }
 
         private static void SetMaterial(GameObject go, Material material)

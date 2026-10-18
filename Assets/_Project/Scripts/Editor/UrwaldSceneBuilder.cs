@@ -142,7 +142,16 @@ namespace Spinnenspiel.EditorTools
             vorlage.SetActive(false);
             insektenSpawner.template = vorlage;
 
-            // Insekten 2 (Z7): Motte-Spawner — same spawner class, Motte template (slower, bigger).
+            // S2: Muecke-Vorlage → der Tag-Spawner mischt Fliegen und Muecken (~40 % Muecken).
+            GameObject mueckeVorlage = InsectBuilder.CreateMosquito();
+            if (mueckeVorlage != null)
+            {
+                mueckeVorlage.name = "Vorlage_Muecke";
+                mueckeVorlage.transform.SetParent(insekten.transform, false);
+                mueckeVorlage.SetActive(false);
+                insektenSpawner.mosquitoTemplate = mueckeVorlage;
+            }
+
             GameObject insekten2 = new GameObject("Insekten_Motte");
             InsectSpawner motteSpawner = insekten2.AddComponent<InsectSpawner>();
             motteSpawner.count = 4;

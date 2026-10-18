@@ -988,6 +988,77 @@ namespace Spinnenspiel.Tests
             Object.Destroy(s.insect.gameObject);
         }
 
+        /// <summary>
+        /// S2: Muecke as new day-prey. The spawner carries a mosquitoTemplate; the mosquito flies
+        /// 1.6x faster than the fly, gives 10 energy (fly 25), and its body is ~60% of the fly body.
+        /// Measured on the templates directly (deterministic, no flying needed).
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Mosquito_IsSmallerFasterPrey()
+        {
+            yield return LoadScene();
+
+            InsectSpawner spawner = Object.FindFirstObjectByType<InsectSpawner>();
+            Assert.IsNotNull(spawner, "Spawner 'Insekten' nicht gefunden");
+            GameObject flyTemplate = spawner.template;
+            GameObject mosquitoTemplate = spawner.mosquitoTemplate;
+            Assert.IsNotNull(flyTemplate, "Fliegen-Vorlage fehlt");
+            Assert.IsNotNull(mosquitoTemplate, "Muecke-Vorlage (mosquitoTemplate) des Spawners fehlt");
+
+            FlyingInsect fly = flyTemplate.GetComponent<FlyingInsect>();
+            FlyingInsect muecke = mosquitoTemplate.GetComponent<FlyingInsect>();
+            Assert.IsNotNull(fly, "Fliegen-Vorlage hat kein FlyingInsect");
+            Assert.IsNotNull(muecke, "Muecke-Vorlage hat kein FlyingInsect");
+
+            // Criterion 1: energy 10 (fly 25).
+            Debug.Log("[S2] muecke.energyValue=" + muecke.energyValue + " fly.energyValue=" + fly.energyValue);
+            Assert.AreEqual(10f, muecke.energyValue,
+                "Muecke-Energie != 10: " + muecke.energyValue);
+
+            // Criterion 2: body ~60% of the fly body (compare capsule Koerper localScale.z).
+            GameObject flyBody = flyTemplate.transform.Find("Koerper").gameObject;
+            GameObject mueckeBody = mosquitoTemplate.transform.Find("Koerper").gameObject;
+            float ratio = mueckeBody.transform.localScale.z / flyBody.transform.localScale.z;
+            Debug.Log("[S2] body ratio=" + ratio);
+            Assert.Greater(ratio, 0.5f, "Muecke-Body < 50% der Fliege: " + ratio);
+            Assert.Less(ratio, 0.7f, "Muecke-Body > 70% der Fliege: " + ratio);
+
+            // Criterion 3: no colliders (insects are collider-free).
+            Assert.AreEqual(0, mosquitoTemplate.GetComponentsInChildren<Collider>().Length,
+                "Muecke hat einen Collider");
+
+            // Criterion 4: speed — measured as flight distance over a fixed window. The mosquito
+            // must cover clearly more ground than the fly (1.6x speed). Both start at their home.
+            Vector3 home = new Vector3(5.4f, 0.7f, 1.0f);
+            GameObject flyInst = Object.Instantiate(flyTemplate, home, Quaternion.identity);
+            flyInst.name = "Testfliege";
+            flyInst.GetComponent<FlyingInsect>().home = home;
+            flyInst.SetActive(true);
+            GameObject mueckeInst = Object.Instantiate(mosquitoTemplate, home, Quaternion.identity);
+            mueckeInst.name = "Testmuecke";
+            mueckeInst.GetComponent<FlyingInsect>().home = home;
+            mueckeInst.SetActive(true);
+
+            float flyDist = 0f, mueckeDist = 0f;
+            Vector3 fp = flyInst.transform.position, mp = mueckeInst.transform.position;
+            float t = 0f;
+            while (t < 5f)
+            {
+                Vector3 fc = flyInst.transform.position, mc = mueckeInst.transform.position;
+                flyDist += Vector3.Distance(fc, fp);
+                mueckeDist += Vector3.Distance(mc, mp);
+                fp = fc; mp = mc;
+                t += Time.deltaTime;
+                yield return null;
+            }
+            Object.Destroy(flyInst);
+            Object.Destroy(mueckeInst);
+            Debug.Log("[S2] flyDist=" + flyDist + " mueckeDist=" + mueckeDist);
+            Assert.Greater(mueckeDist, flyDist * 1.3f,
+                "Muecke nicht deutlich schneller als die Fliege: " + mueckeDist + " vs " + flyDist);
+        }
+
+
         private static IEnumerator LoadScene()
         {
             SceneManager.LoadScene(SceneName);

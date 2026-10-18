@@ -24,6 +24,9 @@ namespace Spinnenspiel
         [Tooltip("Optional: dann ist home für alle Insekten homeOverride.position.")]
         public Transform homeOverride;
 
+        [Tooltip("S2: Optional Muecke-Vorlage (deaktivierte). Ist es set, the spawner mixes flies and mosquitoes.")]
+        public GameObject mosquitoTemplate;
+
         [Tooltip("J5: Tag/Nacht-Cycle. Without it the spawner is always active (day/night ignored).")]
         public DayNightCycle cycle;
 
@@ -35,6 +38,9 @@ namespace Spinnenspiel
         private const float RainThreshold = 0.5f;      // Rain01 ueber this = "es regnt"
         private const float RainFadeSeconds = 20f;     // Vorhandene Insekten ueber this many s auslaufen
         private const float RainLeadSeconds = 0.5f;    // Kurze Fuerspan: eeste Remove nur nach dem Interval
+
+        // S2: Anteil Muecken among the spawns (of the day species) as a named constant.
+        private const float MosquitoShare = 0.4f;      // ~40 % of day-insects are mosquitoes
 
         private float rainRemovalTimer;   // K4a: Countdown bis naechsten staggered Remove.
         private float rainRemovalInterval; // K4a: Constant interval while raining (fade stays smooth).
@@ -280,13 +286,20 @@ namespace Spinnenspiel
             // Höhe 0.4–1.4 m über dem Boden (Raycast nach unten).
             pos.y = GroundHeight(pos) + Mathf.Lerp(0.4f, 1.4f, (float)rng.NextDouble());
 
-            FlyingInsect templateInsect = template.GetComponent<FlyingInsect>();
+            // S2: Ist ein Muecke-Vorlage set? Dann ~MosquitoShare der Spawns are mosquitoes.
+            GameObject chosenTemplate = template;
+            if (mosquitoTemplate != null && rng.NextDouble() < MosquitoShare)
+            {
+                chosenTemplate = mosquitoTemplate;
+            }
+
+            FlyingInsect templateInsect = chosenTemplate.GetComponent<FlyingInsect>();
             if (templateInsect == null)
             {
                 return;
             }
 
-            GameObject spawned = Instantiate(template, pos, Quaternion.identity, transform);
+            GameObject spawned = Instantiate(chosenTemplate, pos, Quaternion.identity, transform);
             spawned.SetActive(true);
             FlyingInsect insect = spawned.GetComponent<FlyingInsect>();
             if (insect != null)

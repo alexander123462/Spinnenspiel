@@ -81,6 +81,16 @@ namespace Spinnenspiel.EditorTools
             vorlage.SetActive(false);
             insektenSpawner.template = vorlage;
 
+            // S2: Muecke-Vorlage → Tag-Spawner mischt Fliegen und Muecken.
+            GameObject mueckeVorlage = InsectBuilder.CreateMosquito();
+            if (mueckeVorlage != null)
+            {
+                mueckeVorlage.name = "Vorlage_Muecke";
+                mueckeVorlage.transform.SetParent(insekten.transform, false);
+                mueckeVorlage.SetActive(false);
+                insektenSpawner.mosquitoTemplate = mueckeVorlage;
+            }
+
             EnsureScenesFolder();
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScenePath);
             // Vorhandene Build-Szenen behalten, Klettertest nur ergaenzen.
