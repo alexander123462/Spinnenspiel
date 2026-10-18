@@ -81,6 +81,14 @@ export PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
 mkdir -p Logs
 echo "== Start $(date '+%F %T') Endzeit=${ENDE:-keine}" >> $LOG
 
+# Nach einer Pause per Schalter (Marker Logs/autopilot_resume_ok): die unterbrochene Hermes-Sitzung fortsetzen.
+RESUME_ID=""
+if [ -f Logs/autopilot_resume_ok ]; then
+  rm -f Logs/autopilot_resume_ok
+  RESUME_ID=$(tr -d '\033' < Logs/autopilot_runde.out 2>/dev/null | grep -a -o '\[[0-9]\{8\}_[0-9]\{6\}_[0-9a-f]\{6\}\]' | tail -1 | tr -d '[]')
+  [ -n "$RESUME_ID" ] && echo "-- Setze Hermes-Sitzung $RESUME_ID fort" >> $LOG
+fi
+
 RUNDE=100
 while :; do
   [ -f Logs/autopilot_stop ] && { echo "== Stopp-Datei gefunden $(date '+%T')" >> $LOG; melde "Spinnenspiel: Autopilot angehalten (Stopp-Datei) um $(date '+%F %T')."; break; }
@@ -127,7 +135,12 @@ Wenn der Punkt fertig (committet) oder als [!] markiert ist: sofort aufhoeren un
 AUF
 
   BLK_VOR=$(grep -o '^- \[!\] [A-Za-z0-9.]*' Docs/BACKLOG.md | sort)
-  "$HERMES" chat --query-file "$ROOT/Logs/autopilot_auftrag.txt" --yolo -v \
+  QF="$ROOT/Logs/autopilot_auftrag.txt"; RES_ARGS=""
+  if [ -n "$RESUME_ID" ]; then
+    printf '%s\n' "Du wurdest unterbrochen (Pause am PC). Mach GENAU dort weiter, wo du aufgehoert hast. Pruefe zuerst kurz git status, damit du siehst, was schon geaendert ist. Der Auftrag und alle Regeln bleiben unveraendert (siehe oben). Wenn du den Punkt fertig hast: committen, pushen, Backlog-Punkt abhaken, aufhoeren." > "$ROOT/Logs/autopilot_weiter.txt"
+    QF="$ROOT/Logs/autopilot_weiter.txt"; RES_ARGS="--resume $RESUME_ID"; RESUME_ID=""
+  fi
+  "$HERMES" chat --query-file "$QF" $RES_ARGS --yolo -v \
     --provider "$PROVIDER" -m "$MODELL" --in "$ROOT" --source cli --run-budget 7200 \
     2>&1 | tee -a Logs/autopilot_runde.out
   # K2a: Unity-Rauschen (.mat/.asset/.unity, only fileID restamps) auto-reset after each round.
