@@ -99,6 +99,17 @@ namespace Spinnenspiel
             return ok;
         }
 
+        /// <summary>S7: A wasp sting takes energy off the spider (delegates to the model).</summary>
+        public void ApplySting(float amount)
+        {
+            if (_model == null)
+            {
+                return;
+            }
+            _model.ApplySting(amount);
+            Energy = _model.Energy;
+        }
+
         /// <summary>Energy as fraction 0..1 (for HUD / consequences).</summary>
         public float Fraction()
         {

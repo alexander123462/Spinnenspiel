@@ -72,6 +72,24 @@ namespace Spinnenspiel
             }
         }
 
+        /// <summary>S7: Energy a wasp sting takes from the spider.</summary>
+        public static readonly float stingEnergyCost = 20f;
+
+        /// <summary>S7: Sting damage — energy loss (not scaled by difficulty drain).</summary>
+        public void ApplySting(float amount)
+        {
+            if (amount <= 0f)
+            {
+                return;
+            }
+
+            Energy -= amount;
+            if (Energy < 0f)
+            {
+                Energy = 0f;
+            }
+        }
+
         /// <summary>S6: Spend energy (e.g. repairing the web). False when not enough energy.</summary>
         public bool SpendEnergy(float amount)
         {

@@ -153,6 +153,21 @@ namespace Spinnenspiel
             return energy.Energy < lowEnergyThreshold ? lowEnergyTempoFactor : 1f;
         }
 
+        /// <summary>S7: Bis zu diesem Moment betauebt (Wespe-Sting): movement input ignored.</summary>
+        private float _stunUntil;
+
+        /// <summary>S7: Betaeubing: the spider cannot move for the given seconds.</summary>
+        public void SetStun(float seconds)
+        {
+            if (seconds > 0f)
+            {
+                _stunUntil = Time.time + seconds;
+            }
+        }
+
+        /// <summary>S7: True while a stun runs (for tests and HUD).</summary>
+        public bool IsStunned { get; private set; }
+
         /// <summary>
         /// Setzt eine externe, kamerarelative Bewegungsrichtung (z. B. für automatisierte Tests).
         /// Wenn nicht null, ersetzt der Wert die Tastatur-/Gamepad-Eingabe.
@@ -473,6 +488,15 @@ namespace Spinnenspiel
 
             Vector3 up = transform.up;
 
+            // S7: Betaeubing (Wespe-Sting): input ignored, no movement while stunned.
+            IsStunned = Time.time < _stunUntil;
+            if (IsStunned)
+            {
+                _externalMoveInput = null;
+                _externalMoveLocal = null;
+                _externalSprint = null;
+            }
+
             // a) Eingabe -> Richtung in der Ebene senkrecht zu up.
             bool local = _externalMoveLocal.HasValue;
             Vector2 moveInput;
@@ -487,6 +511,11 @@ namespace Spinnenspiel
             else
             {
                 moveInput = input != null ? input.Move : Vector2.zero;
+            }
+
+            if (IsStunned)
+            {
+                moveInput = Vector2.zero;
             }
 
             Vector3 dir = local

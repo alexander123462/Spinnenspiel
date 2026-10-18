@@ -34,6 +34,12 @@ namespace Spinnenspiel
             Durability -= catchCost;
         }
 
+        /// <summary>S7: A wasp caught in the net tears more of it (arbitrary percent).</summary>
+        public void AddDamage(float amount)
+        {
+            Durability -= amount;
+        }
+
         /// <summary>Rain wears the net: 1 % per 10 s at full rain (intensity 0..1).</summary>
         public void TickRain(float dt, float intensity)
         {
