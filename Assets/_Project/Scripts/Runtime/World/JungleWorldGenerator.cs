@@ -1305,31 +1305,51 @@ namespace Spinnenspiel
         /// </summary>
         private static Mesh BuildWaterMesh(JungleWorld world, float size)
         {
-            const float cell = 1f;
+            // Q5: fein 0.5-m-Gitter + Deterministic-Jitter -> weicher, organic Shoreline
+            // statt 1-m-Stair-Stepping mit harter polygonales Rand (warum: kantig Wasser).
+            const float cell = 0.5f;
             int n = (int)(size / cell);
             var verts = new System.Collections.Generic.List<Vector3>();
             var uvs = new System.Collections.Generic.List<Vector2>();
             var tris = new System.Collections.Generic.List<int>();
             Vector2 center = new Vector2(size * 0.5f, size * 0.5f);
 
+            // Gitter-Eckpoints shared between quads, with deterministic jitter (hash of
+            // grid coords) so the shoreline looks organic instead of stair-stepped.
+            var gridIdx = new System.Collections.Generic.List<int>();
+            for (int i = 0; i < (n + 1) * (n + 1); i++) gridIdx.Add(-1);
+
             for (int gx = 0; gx < n; gx++)
             {
                 for (int gz = 0; gz < n; gz++)
                 {
                     float x0 = gx * cell, z0 = gz * cell;
-                    // Cell wet when its center below WaterLevel.
                     if (world.Height(x0 + cell * 0.5f, z0 + cell * 0.5f) >= JungleWorld.WaterLevel) continue;
 
-                    int baseIdx = verts.Count;
+                    int[] corner = new int[4];
                     for (int c = 0; c < 4; c++)
                     {
-                        float cx = x0 + ((c & 1) ^ ((c >> 1) & 1)) * cell; // 0,1,1,0 order below
-                        float cz = z0 + ((c >> 1) & 1) * cell;
-                        verts.Add(new Vector3(cx, JungleWorld.WaterLevel, cz));
-                        uvs.Add(new Vector2(cx - center.x, cz - center.y));
+                        int px = gx + ((c >> 1) & 1);
+                        int pz = gz + (c & 1);
+                        int gi = pz * (n + 1) + px;
+                        int vi = gridIdx[gi];
+                        if (vi < 0)
+                        {
+                            float jx = world.Hash01(px, pz, 11) * 2f - 1f;
+                            float jz = world.Hash01(px, pz, 23) * 2f - 1f;
+                            float cx = px * cell + jx * cell * 0.28f;
+                            float cz = pz * cell + jz * cell * 0.28f;
+                            verts.Add(new Vector3(cx, JungleWorld.WaterLevel, cz));
+                            uvs.Add(new Vector2(cx - center.x, cz - center.y));
+                            vi = verts.Count - 1;
+                            gridIdx[gi] = vi;
+                        }
+                        corner[c] = vi;
                     }
-                    tris.Add(baseIdx); tris.Add(baseIdx + 2); tris.Add(baseIdx + 1);
-                    tris.Add(baseIdx); tris.Add(baseIdx + 3); tris.Add(baseIdx + 2);
+                    // Quad mit Eckpoints c0=(gx,gz) c1=(gx,gz+cell) c2=(gx+cell,gz) c3=(gx+cell,gz+cell);
+                    // Winding wie original (oben zeigt nach +Y).
+                    tris.Add(corner[0]); tris.Add(corner[3]); tris.Add(corner[2]);
+                    tris.Add(corner[0]); tris.Add(corner[1]); tris.Add(corner[3]);
                 }
             }
 

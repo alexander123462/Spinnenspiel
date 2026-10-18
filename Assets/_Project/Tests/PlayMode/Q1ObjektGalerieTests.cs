@@ -390,12 +390,20 @@ namespace Spinnenspiel.Tests
                 {
                     Bounds wb = wr.bounds;
                     cam.nearClipPlane = 0.05f; cam.farClipPlane = 500f;
-                    Vector3 c = new Vector3(Mathf.Lerp(wb.min.x, wb.max.x, 0.35f), wb.center.y + 1.2f, Mathf.Lerp(wb.min.z, wb.max.z, 0.35f));
+                    // Q5: niedrige Kamera ueber der Wasserflaeche, Blick HORIZONTIELL zum Ufer.
+                    // Sky/vegetation oben, water below -> image not upside-down anymore.
+                    Vector3 pc = wb.center;
+                    float rad = Mathf.Max(wb.extents.x, wb.extents.z);
+                    // Cam 1: shore cam just above the surface, looking ACROSS the pond.
+                    // Water surface fills the lower half, far shoreline mid, canopy top -> upright,
+                    // no longer "on the head" (the old shot had the pale water/fog on top).
+                    Vector3 c = new Vector3(pc.x - rad * 0.9f, wb.max.y + 1.2f, pc.z);
                     cam.transform.position = c;
-                    cam.transform.LookAt(c + new Vector3(3f, -0.6f, 2f));
+                    cam.transform.LookAt(new Vector3(pc.x + rad * 0.5f, wb.max.y - 0.1f, pc.z));
                     yield return Shot(cam, "Wasser", "spiel", veg);
-                    cam.transform.position = c + new Vector3(0f, 8f, 0f);
-                    cam.transform.LookAt(c + new Vector3(2f, 0f, 1f));
+                    // Cam 2: from above, looking down at surface -> shows organic jittered shoreline.
+                    cam.transform.position = new Vector3(pc.x, wb.max.y + 7f, pc.z - rad * 0.4f);
+                    cam.transform.LookAt(new Vector3(pc.x, wb.max.y, pc.z));
                     yield return Shot(cam, "Wasser", "oben", veg);
                     typCount++;
                 }
