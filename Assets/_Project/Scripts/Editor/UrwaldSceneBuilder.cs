@@ -144,6 +144,13 @@ namespace Spinnenspiel.EditorTools
                     birdThreat.WarnFired.AddListener(dayBalance.OnWarning);
                 }
             }
+            // S8 Tagesziele: the same sunrise event rolls the goals of the new day.
+            Spinnenspiel.DailyGoals dailyGoals = spider.GetComponent<Spinnenspiel.DailyGoals>();
+            if (dailyGoals != null)
+            {
+                dailyGoals.SetCycle(dayCycle);
+            }
+
             EffectsBuilder.Build(spider);
             SetLayerRecursive(spider, 2); // "Ignore Raycast": Kamera- und Beinstrahlen ignorieren die Spinne
 

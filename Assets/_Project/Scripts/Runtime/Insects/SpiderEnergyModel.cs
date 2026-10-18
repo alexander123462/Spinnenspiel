@@ -42,10 +42,11 @@ namespace Spinnenspiel
             Climb
         }
 
-        /// <summary>Set energy back to start (fresh partie).</summary>
+        /// <summary>Fresh partie: zero the sting counter too.</summary>
         public void Reset()
         {
             Energy = startEnergy;
+            StingCount = 0;
         }
 
         /// <summary>Advance one tick by dt seconds at the given activity.</summary>
@@ -75,6 +76,9 @@ namespace Spinnenspiel
         /// <summary>S7: Energy a wasp sting takes from the spider.</summary>
         public static readonly float stingEnergyCost = 20f;
 
+        /// <summary>S8: how many stings hit the spider this partie (for the stingless-night goal).</summary>
+        public int StingCount;
+
         /// <summary>S7: Sting damage — energy loss (not scaled by difficulty drain).</summary>
         public void ApplySting(float amount)
         {
@@ -82,6 +86,7 @@ namespace Spinnenspiel
             {
                 return;
             }
+            StingCount++;
 
             Energy -= amount;
             if (Energy < 0f)

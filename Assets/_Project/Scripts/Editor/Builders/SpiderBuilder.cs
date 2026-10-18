@@ -144,6 +144,9 @@ namespace Spinnenspiel.EditorTools
             // S5 Tagesbilanz: at night->morning a short window shows the day that just ended.
             root.AddComponent<Spinnenspiel.DayBalance>();
 
+            // S8 Tagesziele: three small goals per day (Seed + Tagnummer), reward once each.
+            root.AddComponent<Spinnenspiel.DailyGoals>();
+
             // Menu (B8): Startscreen, Esc-Pause, Sensitivity in PlayerPrefs.
             root.AddComponent<GameMenu>();
 
