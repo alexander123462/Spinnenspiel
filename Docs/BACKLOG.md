@@ -396,7 +396,7 @@
   - Schritt 1: Ziel-Modell (rein): Zieltypen, Fortschritt, Pruefung, Belohnung; Verbindung zu Statistik-Zaehlern aus S5.
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': gleicher Seed + gleiche Tagnummer -> gleiche drei Ziele; nach 3 Faengen ist "faenge 3 Insekten" erfuellt und die Belohnung wird genau einmal gegeben; nach Mitternacht neue Ziele.
   - Schritt 3: gezielt testen, einmal voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] S9 Einstieg. Kurze Hinweise beim ersten Start (einmalig, im Spielstand/Einstellungen gemerkt): "WASD laufen", "Leertaste springen", "F Faden spinnen", "N Netz bauen", "E Beute holen". Jeder Hinweis erscheint erst, wenn die Situation eintritt (zum Beispiel Netz-Hinweis nach 20 s ohne Netz) und verschwindet nach der ersten Benutzung.
+- [x] S9 Einstieg. Kurze Hinweise beim ersten Start (einmalig, im Spielstand/Einstellungen gemerkt): "WASD laufen", "Leertaste springen", "F Faden spinnen", "N Netz bauen", "E Beute holen". Jeder Hinweis erscheint erst, wenn die Situation eintritt (zum Beispiel Netz-Hinweis nach 20 s ohne Netz) und verschwindet nach der ersten Benutzung.
   - Schritt 1: Hinweis-Modell (rein): Hinweis-Liste, Bedingungen, "gesehen"-Flags; Anzeige ueber die vorhandene Hilfe-Leiste (ControlsHelp).
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': nach 20 s ohne Netz erscheint der Netz-Hinweis genau einmal; nach Benutzung erscheint er nie wieder (auch nach Neuladen); mit Einstellung "Hinweise aus" erscheint nichts.
   - Schritt 3: gezielt testen, einmal voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
