@@ -36,6 +36,9 @@ namespace Spinnenspiel
         [Tooltip("T1: Optional Kaefer-Vorlage (deaktivierte). Ist es set, the spawner mixes rare armored beetles in.")]
         public GameObject beetleTemplate;
 
+        [Tooltip("T2: Optional Libelle-Vorlage (deaktivierte). Ist es set, the spawner mixes very rare libelles in (3 %).")]
+        public GameObject libelleTemplate;
+
         // K4a: Regen-Zustand des WeatherController (Instance singleton).
         private const float RainShareOfCount = 0.3f;   // Zielzahl waahtrend Regen (30 Prozent)
         private const float RainThreshold = 0.5f;      // Rain01 ueber this = "es regnt"
@@ -47,6 +50,9 @@ namespace Spinnenspiel
 
         // T1: Anteil Kaefer among the day-spawns (rare armored prey) as a named constant.
         private static float BeetleShare => PreyMixModel.beetleShare; // 10 %, from the pure model
+
+        // T2: Anteil Libelle among the day-spawns (very rare risky prey) as a named constant.
+        private static float LibelleShare => LibelleModel.libelleShare; // 3 %, from the pure model
 
         private float rainRemovalTimer;   // K4a: Countdown bis naechsten staggered Remove.
         private float rainRemovalInterval; // K4a: Constant interval while raining (fade stays smooth).
@@ -294,13 +300,18 @@ namespace Spinnenspiel
 
             // S2: Ist ein Muecke-Vorlage set? Dann ~MosquitoShare der Spawns are mosquitoes.
             // T1: Ist ein Kaefer-Vorlage set? Dann ~BeetleShare (10 %) der day-spawns are beetles (drawn first).
+            // T2: Ist ein Libelle-Vorlage set? Dann ~LibelleShare (3 %) der day-spawns are libelles (drawn first).
             GameObject chosenTemplate = template;
             double speciesRoll = rng.NextDouble();
-            if (beetleTemplate != null && PreyMixModel.IsBeetleRoll(speciesRoll))
+            if (libelleTemplate != null && LibelleModel.IsLibelleRoll(speciesRoll))
+            {
+                chosenTemplate = libelleTemplate;
+            }
+            else if (beetleTemplate != null && speciesRoll < LibelleShare + BeetleShare)
             {
                 chosenTemplate = beetleTemplate;
             }
-            else if (mosquitoTemplate != null && speciesRoll < BeetleShare + MosquitoShare)
+            else if (mosquitoTemplate != null && speciesRoll < LibelleShare + BeetleShare + MosquitoShare)
             {
                 chosenTemplate = mosquitoTemplate;
             }

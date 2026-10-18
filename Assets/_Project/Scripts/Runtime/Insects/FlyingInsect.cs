@@ -74,8 +74,11 @@ namespace Spinnenspiel
         /// <summary>J2a: Energy the spider gains when it eats this insect (Fly 25, Moth 40).</summary>
         public float energyValue = 25f;
 
-        /// <summary>T1: Per-Insect durability cost of a catch in percent (-1 = model default catchCost; beetle 15).</summary>
+        /// <summary>T1: per-Insect durability cost of a catch in percent (-1 = model default catchCost; beetle 15).</summary>
         public float durabilityCostOverride = -1f;
+
+        /// <summary>T2: Chance (0..1) that a catch tears the whole net to 0 and frees this insect (-1 = never; libelle 0.4).</summary>
+        public float netTearChance = -1f;
 
         // J3a: Beute flieht. Benamed Constants: Bemerk-Abstand und Fluchtdauer.
         private static readonly float noticeDistance = 2.5f; // m
@@ -222,6 +225,26 @@ namespace Spinnenspiel
             else
             {
                 web.ApplyCatch();
+            }
+
+            // T2: A libelle may tear the whole net (durability to 0) and cut itself free right away.
+            if (netTearChance >= 0f && Random.value < netTearChance)
+            {
+                if (web.Durability != null)
+                {
+                    web.Durability.TearNet();
+                }
+
+                Vector3 away = web.PlaneNormal * 0.08f;
+                if (Vector3.Dot(away, transform.position - web.Layout.Hub) < 0f)
+                {
+                    away = -away;
+                }
+
+                State = InsectState.Flying;
+                transform.position += away;
+                _ignoreWebsUntil = Time.time + 2f;
+                CaughtIn = null;
             }
             System.Action<FlyingInsect, OrbWeb> handler = AnyCaught;
             if (handler != null)

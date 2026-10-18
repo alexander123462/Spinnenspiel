@@ -186,6 +186,16 @@ namespace Spinnenspiel.EditorTools
                 insektenSpawner.beetleTemplate = kaeferVorlage;
             }
 
+            // T2: Libelle-Vorlage → der Tag-Spawner mischt sehr rare Libelles in (3 %).
+            GameObject libelleVorlage = InsectBuilder.CreateLibelle();
+            if (libelleVorlage != null)
+            {
+                libelleVorlage.name = "Vorlage_Libelle";
+                libelleVorlage.transform.SetParent(insekten.transform, false);
+                libelleVorlage.SetActive(false);
+                insektenSpawner.libelleTemplate = libelleVorlage;
+            }
+
             GameObject insekten2 = new GameObject("Insekten_Motte");
             InsectSpawner motteSpawner = insekten2.AddComponent<InsectSpawner>();
             motteSpawner.count = 4;

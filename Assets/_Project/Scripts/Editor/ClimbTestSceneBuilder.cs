@@ -101,6 +101,16 @@ namespace Spinnenspiel.EditorTools
                 insektenSpawner.beetleTemplate = kaeferVorlage;
             }
 
+            // T2: Libelle-Vorlage → der Tag-Spawner mischt sehr rare Libelles in (3 %).
+            GameObject libelleVorlage = InsectBuilder.CreateLibelle();
+            if (libelleVorlage != null)
+            {
+                libelleVorlage.name = "Vorlage_Libelle";
+                libelleVorlage.transform.SetParent(insekten.transform, false);
+                libelleVorlage.SetActive(false);
+                insektenSpawner.libelleTemplate = libelleVorlage;
+            }
+
             EnsureScenesFolder();
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScenePath);
             // Vorhandene Build-Szenen behalten, Klettertest nur ergaenzen.

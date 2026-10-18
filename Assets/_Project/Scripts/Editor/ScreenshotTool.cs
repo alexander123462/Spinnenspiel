@@ -447,5 +447,62 @@ namespace Spinnenspiel.EditorTools
             Object.DestroyImmediate(target);
             Object.DestroyImmediate(image);
         }
+
+        /// <summary>
+        /// T2: Proof image of the Libelle (Dragonfly). Builds the Klettertest scene, activates the
+        /// Libelle-Vorlage (libelleTemplate) as a real insect and renders it close-up to
+        /// Logs/ci/shot_libelle.png so its primitive model (long slim body + head + 4 wings) can be verified.
+        /// </summary>
+        [MenuItem("Spinnenspiel/Debug/Libelle-Kontrolldbild rendern")]
+        public static void CaptureLibelle()
+        {
+            const string scenePath = "Assets/_Project/Scenes/Klettertest.unity";
+            EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            InsectSpawner spawner = Object.FindFirstObjectByType<InsectSpawner>();
+            if (spawner == null || spawner.libelleTemplate == null)
+            {
+                Debug.LogError("[Spinnenspiel] Screenshot: Spawner oder Libelle-Vorlage fehlt (Klettertest).");
+                return;
+            }
+
+            GameObject libelle = Object.Instantiate(spawner.libelleTemplate, new Vector3(5.4f, 0.7f, 1.0f), Quaternion.identity);
+            libelle.name = "ShotLibelle";
+            libelle.SetActive(true);
+            FlyingInsect insect = libelle.GetComponent<FlyingInsect>();
+            if (insect != null)
+            {
+                insect.home = libelle.transform.position; // stay put for the shot
+            }
+
+            GameObject camGo = new GameObject("LibelleShotCamera");
+            Camera cam = camGo.AddComponent<Camera>();
+            cam.clearFlags = CameraClearFlags.Skybox;
+
+            RenderTexture target = new RenderTexture(1200, 900, 24, RenderTextureFormat.ARGB32);
+            target.antiAliasing = 4;
+            Texture2D image = new Texture2D(1200, 900, TextureFormat.RGB24, false);
+
+            Vector3 c = libelle.transform.position;
+            cam.transform.position = c + new Vector3(0.05f, 0.16f, -0.05f); // high 3/4-top view: all 4 wings spread out
+            cam.transform.LookAt(c);
+            cam.nearClipPlane = 0.01f;
+            cam.farClipPlane = 20f;
+            cam.targetTexture = target;
+            cam.Render();
+            RenderTexture.active = target;
+            image.ReadPixels(new Rect(0, 0, 1200, 900), 0, 0);
+            image.Apply();
+            RenderTexture.active = null;
+            cam.targetTexture = null;
+
+            string folder = Path.Combine(Directory.GetCurrentDirectory(), "Logs", "ci");
+            Directory.CreateDirectory(folder);
+            File.WriteAllBytes(Path.Combine(folder, "shot_libelle.png"), image.EncodeToPNG());
+            Debug.Log("[Spinnenspiel] Libelle-Kontrolldbild: shot_libelle.png");
+
+            Object.DestroyImmediate(camGo);
+            Object.DestroyImmediate(target);
+            Object.DestroyImmediate(image);
+        }
     }
 }
