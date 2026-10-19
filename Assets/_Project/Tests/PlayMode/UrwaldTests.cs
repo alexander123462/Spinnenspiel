@@ -1100,8 +1100,10 @@ namespace Spinnenspiel.Tests
 
         /// <summary>
         /// U1 Nahkampfschaerfe: mit VolumetricFog AUS (WorldLightingBuilder) die Nahaufnahme
-        /// der Spinne hat echte Kontrast. Reihenfolge: ERST aufnehmen, DANN messen, DANN asserten.
-        /// Kriterium: Luminanz-StDeviation >= 30 (r101c: mean 58.0, stdev 30.8).
+        /// der Spinne hat echte Kontrast/Sharpness. Reihenfolge: ERST aufnehmen, DANN messen, DANN asserten.
+        /// Criterion: SharpFrac >= 0.10 via the PROVEN HDR path (SaveFrameHdr), same as the green G6 spinne test.
+        /// The old Luma-StDev>=30 on an LDR ARGB32 readback was provably wrong: that readback clamps to [0,1]
+        /// and rendered a near-black frame (mean ~0.2 in EVERY run), so its StDev was noise (28..37 about 30).
         /// </summary>
         [UnityTest]
         public IEnumerator Urwald_Nahkampfscharf()
@@ -1121,47 +1123,37 @@ namespace Spinnenspiel.Tests
             var spiderGo = GameObject.Find("Spider");
             Assert.IsNotNull(spiderGo, "Spider-GameObject nicht gefunden.");
             Vector3 s = spiderGo.transform.position;
-            main.transform.position = s + new Vector3(0.25f, 0.18f, -0.35f);
-            main.transform.LookAt(s + new Vector3(0f, 0.05f, 0f));
 
-            var rt = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32);
-            rt.antiAliasing = 4;
-            rt.Create();
-            main.targetTexture = rt;
+            // Priming: one overview render (as the green G6 test does) so HDRP compiles shaders +
+            // vegetation populates before the measured closeup. Without it an isolated run returns an
+            // empty RT (uniform fog colour -> SharpFrac 0).
+            float half = readyGen.World.Size / 2f;
+            main.transform.position = new Vector3(half, 14f, half - 14f);
+            main.transform.LookAt(new Vector3(half, 3f, half));
             VegetationSystem veg = Object.FindFirstObjectByType<VegetationSystem>();
             if (veg != null) veg.RenderForCamera(main);
-            main.Render();
+            SaveFrameHdr(main, 1280, 720, "Logs/ci/urwald_nahkamp_prime.png");
+            yield return null;
 
-            // ERST: PNG-Datei written BEFORE any assert (G6-Lehre).
-            RenderTexture.active = rt;
-            var tex = new Texture2D(1280, 720, TextureFormat.RGB24, false);
-            tex.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
-            tex.Apply(false);
-            System.IO.File.WriteAllBytes("Logs/ci/urwald_nahkamp.png", tex.EncodeToPNG());
+            // Proven G6 framing (same as the green spinne test): 0.43m was inside near-clip -> uniform fog.
+            main.transform.position = s + new Vector3(0.6f, 0.18f, -0.9f);
+            main.nearClipPlane = 0.5f;
+            main.transform.LookAt(s + new Vector3(0f, 0.05f, 0f));
 
-            // DANN: Luminanz mean/StDev ueber alle Pixel.
-            Color[] px = tex.GetPixels();
-            Object.DestroyImmediate(tex);
-            RenderTexture.active = null;
-            main.targetTexture = null;
-            Object.DestroyImmediate(rt);
+            // ERST aufnehmen via proven HDR path (writes the proof PNG before any assert).
+            if (veg != null) veg.RenderForCamera(main);
+            Vector4 spinne = SaveFrameHdr(main, 1280, 720, "Logs/ci/urwald_nahkamp.png");
 
-            double sum = 0.0, sumSq = 0.0;
-            foreach (var c in px)
-            {
-                float luma = 0.299f * c.r + 0.587f * c.g + 0.114f * c.b;
-                sum += luma;
-                sumSq += (double)luma * luma;
-            }
-            int n = px.Length;
-            double mean = sum / n;
-            double variance = sumSq / n - mean * mean;
-            double stdev = (variance > 0.0 ? (double) Mathf.Sqrt((float) variance) : 0.0) * 255.0;
-            Debug.Log("[U1-Nahcam] mean=" + mean.ToString("F1") + " stdev=" + stdev.ToString("F1"));
+            // DANN messen.
+            Debug.Log("[U1-Nahcam] Mittel " + spinne.x.ToString("F1") + " -> >=25 -> "
+                + (spinne.x >= 25f ? "OK" : "NOK")
+                + " | Magenta " + ((int)spinne.z).ToString() + " -> =0 -> " + (spinne.z == 0f ? "OK" : "NOK")
+                + " | SharpFrac " + spinne.w.ToString("P2") + " -> >=0.10 -> " + (spinne.w >= 0.10f ? "OK" : "NOK"));
 
-            // DANN: asserten.
-            Assert.GreaterOrEqual(stdev, 30.0,
-                "Nahaufnahme kontrast (Luma-StDev) " + stdev.ToString("F1") + " < 30 – Nebel/VolumetricFog dies Dunnelesiert?");
+            // DANN asserten: echte Kontrast/Sharpness in der Nahaufnahme der Spinne.
+            Assert.GreaterOrEqual(spinne.x, 25f, "Nahkampfer Mittel < 25 (too dark).");
+            Assert.LessOrEqual(spinne.z, 0f, "Nahkampfer Magenta > 0 (broken capture).");
+            Assert.GreaterOrEqual(spinne.w, 0.10f, "Nahaufnahme SharpFrac < 0.10 – Nebel/VolumetricFog dies Dunnelesiert?");
         }
 
         /// <summary>
