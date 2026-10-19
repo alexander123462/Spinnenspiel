@@ -455,6 +455,165 @@ namespace Spinnenspiel.Tests
             Assert.LessOrEqual(mean, budget, "Worst-case scenario CPU-Work above 16.7*1.15 ms budget: " + mean.ToString("F2") + " ms.");
         }
 
+        /// <summary>
+        /// T10: Worst case for the NEW systems: 1 Wespe, 1 Libelle, 1 Kaefer guaranteed alive,
+        /// 8 Tag-Insekten, 3 vollstaendig Netze with Netztropfen under Regen, Fang-Wackeln (CameraShake
+        /// + Zupfton via FangFeedback) and Musik (DangerMusic + JungleAmbientAudio) simultaneously, plus a
+        /// Nacht-&gt;Tag-Uebergang during the measurement (MorningFired fires). Median CPU-Work (not mean,
+        /// like M7.6) &lt;= old worst-case budget (16.7*1.15) x 1.15; Konsolenfehler = 0. The old
+        /// Performance_WorstCaseScenarioUnderBudget stays untouched as the baseline test.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Performance_WorstCaseNewSystemsUnderBudget()
+        {
+            JungleWorldGenerator.NextSeed = 4242;
+            _wcConsoleErrors = 0;
+            Application.logMessageReceived += OnWcLog;
+
+            SceneManager.LoadScene("Urwald");
+            yield return null;
+            yield return WaitReady();
+            Assert.IsNotNull(readyGen, "Welt (Seed 4242) not ready.");
+            JungleWorldGenerator gen = readyGen;
+
+            SpiderMovement spider = Object.FindFirstObjectByType<SpiderMovement>();
+            Assert.IsNotNull(spider, "No SpiderMovement in Urwald.");
+            DayNightCycle cycle = Object.FindFirstObjectByType<DayNightCycle>();
+            Assert.IsNotNull(cycle, "No DayNightCycle in scene (Nacht/Tag must run).");
+            Assert.IsNotNull(WeatherController.Instance, "No active WeatherController (Regen must run).");
+
+            // Musik: the audio-systems must sit in the scene (DangerMusic reacts to the Wespe).
+            Assert.IsNotNull(Object.FindFirstObjectByType<DangerMusic>(), "No DangerMusic in scene (Musik must run).");
+            Assert.IsNotNull(Object.FindFirstObjectByType<JungleAmbientAudio>(), "No JungleAmbientAudio in scene.");
+            Assert.IsNotNull(Object.FindFirstObjectByType<CameraShake>(), "No CameraShake (Fang-Wackeln must run).");
+
+            // Frosch: the generator places frogs near water.
+            Assert.GreaterOrEqual(gen.FrogCount, 1, "No Frosch in the world.");
+
+            // The day-spawner carries Kaefer/Libelle templates (T1/T2 from the builder).
+            InsectSpawner daySpawner = null;
+            foreach (InsectSpawner sp in Object.FindObjectsByType<InsectSpawner>(FindObjectsSortMode.None))
+            {
+                if (!sp.activeAtNight)
+                {
+                    sp.count = 8; // 8 Tag-Insekten
+                    if (daySpawner == null && sp.beetleTemplate != null && sp.libelleTemplate != null)
+                    {
+                        daySpawner = sp;
+                    }
+                }
+                else
+                {
+                    sp.count = 0;
+                }
+            }
+            Assert.IsNotNull(daySpawner, "No day-spawner with Kaefer/Libelle templates.");
+
+            Vector3 spiderPos = spider.transform.position;
+
+            // Guaranteed 1 Kaefer + 1 Libelle alive (worst case: the rare species exist).
+            GameObject kaeferGo = Object.Instantiate(daySpawner.beetleTemplate, spiderPos + new Vector3(0.8f, 1.1f, 0.4f), Quaternion.identity);
+            kaeferGo.SetActive(true);
+            FlyingInsect kaefer = kaeferGo.GetComponent<FlyingInsect>();
+            Assert.IsNotNull(kaefer, "Kaefer-Template without FlyingInsect.");
+            kaefer.home = kaefer.transform.position;
+
+            GameObject libelleGo = Object.Instantiate(daySpawner.libelleTemplate, spiderPos + new Vector3(-0.8f, 1.2f, 0.4f), Quaternion.identity);
+            libelleGo.SetActive(true);
+            FlyingInsect libelle = libelleGo.GetComponent<FlyingInsect>();
+            Assert.IsNotNull(libelle, "Libelle-Template without FlyingInsect.");
+            libelle.home = libelle.transform.position;
+
+            // 1 Wespe (S7): a live Wasp near the spider drives DangerMusic + its own flight/AI.
+            GameObject waspGo = new GameObject("WorstCaseWespe");
+            Wasp wasp = waspGo.AddComponent<Wasp>();
+            Vector3 waspPos = spiderPos + new Vector3(2.5f, 1.0f, 0f);
+            wasp.transform.position = waspPos;
+            wasp.home = waspPos;
+
+            // 3 vollstaendig Netze, each with Netztropfen (WebRainDrips) -> Tropfen while raining.
+            for (int n = 0; n < 3; n++)
+            {
+                Vector3 hub = spiderPos + new Vector3(1.5f + 2.5f * n, 0.9f, 1.5f);
+                Vector3[] anchors =
+                {
+                    hub + new Vector3(0f, 1.1f, -1.1f),
+                    hub + new Vector3(0f, 1.1f, 1.1f),
+                    hub + new Vector3(0f, -1.1f, 1.1f),
+                    hub + new Vector3(0f, -1.1f, -1.1f),
+                };
+                OrbWeb web = WebBuildDemo.CreateWebAt(anchors, null, "WCNet" + n);
+                Assert.IsNotNull(web, "No net for index " + n);
+                web.SetProgress(OrbWeb.WebStage.Done, 1f);
+
+                GameObject dripGo = new GameObject("WCNet" + n + "_Drips");
+                WebRainDrips drips = dripGo.AddComponent<WebRainDrips>();
+                drips.web = web;
+            }
+
+            // Regen ACTIVE before the measurement (same fast-forward as the old K8 test).
+            float rainDeadline = Time.time + 130f;
+            while (WeatherController.Instance != null && WeatherController.Instance.Rain01 < 0.8f && Time.time < rainDeadline)
+            {
+                yield return new WaitForSeconds(0.5f);
+            }
+            float rainNow = WeatherController.Instance != null ? WeatherController.Instance.Rain01 : 0f;
+
+            // Nacht->Tag-Uebergang DURING the measurement: short day length + jump to just before
+            // sunrise (0.25) -> MorningFired fires, day-factor ramps, sun-rotation runs.
+            cycle.dayLengthMinutes = 4f;
+            cycle.SetDayProgress(0.23f);
+
+            yield return new WaitForSeconds(1f);
+            int flying = Object.FindObjectsByType<FlyingInsect>(FindObjectsSortMode.None).Length;
+            Debug.Log("[WC2] scenario: insects=" + flying + " nets=3 frogs=" + gen.FrogCount
+                + " wasp=1 dayLenMin=4 rain01=" + rainNow.ToString("F2"));
+
+            yield return MeasureCpuMedianMs(300);
+            float median = _lastMedianCpuMs;
+            float budget = 16.7f * 1.15f * 1.15f; // old worst-case budget x 1.15 (T10)
+            Debug.Log("[WC2] Median CPU-Work-Framezeit " + median.ToString("F2") + " ms -> Budget "
+                + budget.ToString("F2") + " ms (16.7*1.15*1.15) -> " + (median <= budget ? "OK" : "NOK"));
+
+            Assert.GreaterOrEqual(rainNow, 0.8f, "Regen not active during scenario: rain01=" + rainNow.ToString("F2") + ".");
+            Assert.AreEqual(_wcConsoleErrors, 0, "Konsolenfehler im worst-case-Neu-Systemen Durchlauf != 0.");
+            Assert.LessOrEqual(median, budget, "New-systems worst case CPU-Work median above budget: " + median.ToString("F2") + " ms.");
+        }
+
+        /// <summary>Counts console errors/exceptions while the T10 test runs.</summary>
+        private int _wcConsoleErrors;
+
+        private void OnWcLog(string msg, string stack, LogType type)
+        {
+            if (type == LogType.Error || type == LogType.Exception) _wcConsoleErrors++;
+        }
+
+        /// <summary>Median CPU-Work-ms per Frame via FrameTimingManager; result in _lastMedianCpuMs.</summary>
+        private float _lastMedianCpuMs = -1f;
+
+        private IEnumerator MeasureCpuMedianMs(int samples)
+        {
+            FrameTiming[] timing = new FrameTiming[8];
+            var cpuSamples = new System.Collections.Generic.List<float>(2048);
+            for (int i = 0; i < samples; i++)
+            {
+                FrameTimingManager.CaptureFrameTimings();
+                uint got = FrameTimingManager.GetLatestTimings((uint)timing.Length, timing);
+                for (int t = 0; t < (int)got; t++)
+                {
+                    float cpuWorkMs = (float)(timing[t].cpuFrameTime - timing[t].cpuMainThreadPresentWaitTime);
+                    if (cpuWorkMs > 0.0)
+                    {
+                        cpuSamples.Add(cpuWorkMs);
+                    }
+                }
+                yield return null;
+            }
+            Assert.Greater(cpuSamples.Count, samples / 2, "Too few valid FrameTiming samples.");
+            cpuSamples.Sort();
+            _lastMedianCpuMs = cpuSamples[cpuSamples.Count / 2];
+        }
+
         [UnityTest]
         public IEnumerator Urwald_GeneratesWorldFromSeed()
         {
