@@ -437,7 +437,7 @@
   - Schritt 1: Messen mit der Galerie (Q1_Galerie, Spinne_spiel): Mittelwert der Spinnenpixel (Bounding-Box) und Kontrast zum Boden melden, dann Materialwerte aendern (Material-Slots nach NAMEN, AGENTS.md beachten).
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': Mittelwert der Spinne in Spinne_spiel mindestens 20 Prozent hoeher als vorher; Anteil ueberbelichteter Pixel (Wert > 250) in der Spinnen-Box unter 2 Prozent; Farbton bleibt braun (kein Magenta, Magenta < 0.5 Prozent).
   - Schritt 3: gezielt testen, einmal voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] T9 Spielstand erweitern. SaveGame sichert zusaetzlich: Schwierigkeitsstufe (S1), Tageszaehler und Tagesziele (S8), Netz-Haltbarkeit (S6), Haeutungszustand (T4), Wachstumsstufe. Versionsnummer erhoehen, alte Staende bleiben ladbar (Standardwerte).
+- [x] T9 Spielstand erweitern. SaveGame sichert zusaetzlich: Schwierigkeitsstufe (S1), Tageszaehler und Tagesziele (S8), Netz-Haltbarkeit (S6), Haeutungszustand (T4), Wachstumsstufe. Versionsnummer erhoehen, alte Staende bleiben ladbar (Standardwerte). [7a1127f]
   - Schritt 1: Erweiterung im bestehenden SaveGame-Payload mit Version 3 (oder naechste freie), Laden alter Version mit Defaults.
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': Roundtrip: alle neuen Felder identisch nach Laden; Laden eines Standes der vorigen Version ergibt Standardwerte ohne Fehler; unbekannte Version gibt Meldung (wie bisher, J6) und keinen Absturz.
   - Schritt 3: gezielt testen, einmal voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
