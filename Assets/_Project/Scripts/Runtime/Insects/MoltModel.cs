@@ -22,6 +22,23 @@ namespace Spinnenspiel
         /// <summary>True while a molt runs.</summary>
         public bool IsMolting { get; private set; }
 
+        /// <summary>T9: remaining molt seconds, readable for the savegame (0 when not molting).</summary>
+        public float RemainingSeconds => _remaining;
+
+        /// <summary>T9: restore a saved molt state (remaining > 0 -> molting again).</summary>
+        public void Restore(float remainingSeconds)
+        {
+            if (remainingSeconds > 0f)
+            {
+                IsMolting = true;
+                _remaining = Mathf.Min(remainingSeconds, moltDuration);
+            }
+            else
+            {
+                Reset();
+            }
+        }
+
         /// <summary>Start one molt (called on a GrowthStage increase).</summary>
         public void Begin()
         {

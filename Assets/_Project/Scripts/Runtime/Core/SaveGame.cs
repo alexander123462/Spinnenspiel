@@ -9,8 +9,12 @@ namespace Spinnenspiel
     {
         [SerializeField] private string _fileName = "spinspiel_save.json";
 
-        /// <summary>J6: Format-Version in dem Dateikopf; aeltere staende mit unbekannt Version nicht loaden.</summary>
-        private const int SaveVersion = 1;
+        /// <summary>
+        /// J6: Format-Version in dem Dateikopf; aeltere staende mit unbekannt Version nicht loaden.
+        /// T9: v2 adds difficulty is already in v1; v3 (here) adds day/goals, web durability,
+        /// molt state and growth. v1/v2 staende stay loadable with standard values.
+        /// </summary>
+        private const int SaveVersion = 3;
 
         /// <summary>J6: Energie der Spinne (100 = volle, 0 = tot). Save/Load must roundtrip exactly.</summary>
         public float Energy = 100f;
@@ -94,6 +98,31 @@ namespace Spinnenspiel
                 payload.radiusCounts.Add(web.Layout.RadiusCount);
                 payload.spiralSpacings.Add(web.Layout.SpiralSpacing);
                 payload.freeZoneRadii.Add(web.Layout.FreeZoneRadius);
+                // T9 (S6): the durability of each built web travels with the save.
+                payload.webDurability.Add(web.Durability != null ? web.Durability.Durability
+                    : NetDurabilityModel.maxDurability);
+                payload.webTornFlags.Add(web.Durability != null && web.Durability.Torn ? 1 : 0);
+            }
+            // T9 (S8): the day counter and daily goals travel with the save.
+            var dailyGoals = GetComponent<Spinnenspiel.DailyGoals>();
+            if (dailyGoals != null)
+            {
+                payload.dayNumber = dailyGoals.Goals.DayNumber;
+                payload.goalSeed = dailyGoals.Goals.Seed;
+                if (dailyGoals.Goals.Completed != null)
+                {
+                    foreach (bool done in dailyGoals.Goals.Completed)
+                    {
+                        payload.goalCompletedFlags.Add(done ? 1 : 0);
+                    }
+                }
+            }
+            // T9 (T4 + growth): eaten count and the pending molt window travel with the save.
+            var growth = GetComponent<SpiderGrowth>();
+            if (growth != null)
+            {
+                payload.growthEatenCount = growth.EatenCount;
+                payload.moltRemaining = growth.MoltRemaining;
             }
             var json = JsonUtility.ToJson(payload);
             try
@@ -134,7 +163,9 @@ namespace Spinnenspiel
             }
             var payload = JsonUtility.FromJson<SavePayload>(File.ReadAllText(FilePath));
             // J6: unknown version in the file head -> warning, but never a crash.
-            if (payload.version != SaveVersion)
+            // T9: v1/v2 staende stay loadable — JsonUtility leaves the new fields at their
+            // defaults (0 / empty), which decode to standard values below.
+            if (payload.version < 1 || payload.version > SaveVersion)
             {
                 Debug.LogWarning("SaveGame: save file has unknown version " + payload.version
                     + ", expected " + SaveVersion + ". Not loaded.", this);
@@ -175,6 +206,34 @@ namespace Spinnenspiel
                 web.Build(new OrbWebLayout(anchors, payload.radiusCounts[i],
                     payload.spiralSpacings[i], payload.freeZoneRadii[i]));
                 web.SetProgress(OrbWeb.WebStage.Done, 1f);
+                // T9 (S6): restore the saved durability exactly; a legacy file (no entry)
+                // keeps the fresh full durability from Build.
+                if (payload.webDurability.Count > i)
+                {
+                    web.Durability.RestoreFromSave(payload.webDurability[i],
+                        payload.webTornFlags.Count > i && payload.webTornFlags[i] != 0);
+                }
+            }
+            // T9 (S8): restore day counter + daily goals; a legacy file (dayNumber == 0)
+            // keeps the standard fresh day, which DailyGoals.Start() rolls.
+            var dailyGoals = GetComponent<Spinnenspiel.DailyGoals>();
+            if (dailyGoals != null && payload.dayNumber > 0)
+            {
+                var flags = new bool[payload.goalCompletedFlags.Count];
+                for (int f = 0; f < flags.Length; f++)
+                {
+                    flags[f] = payload.goalCompletedFlags[f] != 0;
+                }
+                dailyGoals.Goals.RestoreFromSave(
+                    payload.goalSeed != 0 ? payload.goalSeed : DailyGoalsModel.defaultGoalSeed,
+                    payload.dayNumber, flags);
+            }
+            // T9 (T4 + growth): restore eaten count and a pending molt window; a legacy
+            // file (both zero) keeps the standard fresh spider.
+            var growth = GetComponent<SpiderGrowth>();
+            if (growth != null && (payload.growthEatenCount > 0 || payload.moltRemaining > 0f))
+            {
+                growth.Restore(payload.growthEatenCount, payload.moltRemaining);
             }
         }
 
@@ -195,6 +254,16 @@ namespace Spinnenspiel
         public float bestTime;
         public int bestEaten;
         public int bestWebs;
+        /// <summary>T9: day counter and daily goals of the saved partie (0/empty on older files -> defaults).</summary>
+        public int dayNumber;
+        public int goalSeed;
+        public List<int> goalCompletedFlags = new List<int>();
+        /// <summary>T9: per built web the durability value and torn flag (index-aligned with webAnchorCounts).</summary>
+        public List<float> webDurability = new List<float>();
+        public List<int> webTornFlags = new List<int>();
+        /// <summary>T9: growth state of the spider (eaten count + pending molt seconds; 0 -> defaults).</summary>
+        public int growthEatenCount;
+        public float moltRemaining;
         public List<int> webAnchorCounts = new List<int>();
         public List<int> radiusCounts = new List<int>();
         public List<float> spiralSpacings = new List<float>();

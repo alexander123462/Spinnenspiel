@@ -51,6 +51,20 @@ namespace Spinnenspiel
         /// <summary>True per goal index once it was completed and rewarded.</summary>
         public bool[] Completed;
 
+        /// <summary>T9: restore a saved day state — re-roll the goals of (seed, day) deterministically, then apply the saved completion flags.</summary>
+        public void RestoreFromSave(int savedSeed, int savedDayNumber, bool[] completedFlags)
+        {
+            RollGoals(savedSeed, savedDayNumber);
+            if (completedFlags == null)
+            {
+                return;
+            }
+            for (var i = 0; i < Completed.Length && i < completedFlags.Length; i++)
+            {
+                Completed[i] = completedFlags[i];
+            }
+        }
+
         /// <summary>Catches counted since the last roll (drives CatchInsects).</summary>
         private int _catchProgress;
 

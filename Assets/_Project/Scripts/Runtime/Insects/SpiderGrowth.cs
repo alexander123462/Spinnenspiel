@@ -131,6 +131,29 @@ namespace Spinnenspiel
         /// <summary>T4: number of completed molts (for tests/diagnose).</summary>
         public int MoltsCompleted { get; private set; }
 
+        /// <summary>T9: remaining seconds of a running molt (0 when not molting), for the savegame.</summary>
+        public float MoltRemaining => _molt != null ? _molt.RemainingSeconds : 0f;
+
+        /// <summary>
+        /// T9: restore a saved growth state — eaten count applied WITHOUT a new molt, plus the
+        /// pending molt window (movement re-blocked for the remaining seconds).
+        /// </summary>
+        public void Restore(int savedEatenCount, float moltRemaining)
+        {
+            EatenCount = Mathf.Max(0, savedEatenCount);
+            int steps = insectsPerStep > 0 ? EatenCount / insectsPerStep : 0;
+            ApplyGrowth(Mathf.Min(1f + growthPerStep * steps, maxScale));
+            if (_molt == null)
+            {
+                _molt = new MoltModel();
+            }
+            _molt.Restore(moltRemaining);
+            if (_molt.IsMolting && _movement != null)
+            {
+                _movement.SetStun(_molt.RemainingSeconds + 0.25f);
+            }
+        }
+
         private void ApplyGrowth(float scale)
         {
             GrowthScale = scale;

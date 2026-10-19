@@ -25,7 +25,24 @@ namespace Spinnenspiel
 
         private void Start()
         {
-            Goals.RollGoals(DailyGoalsModel.defaultGoalSeed, 1);
+            // T9: a loaded save already restored the day state (DayNumber >= 1) — rolling again
+            // here would overwrite it. Roll only for a fresh partie.
+            if (Goals.DayNumber == 0)
+            {
+                Goals.RollGoals(DailyGoalsModel.defaultGoalSeed, 1);
+            }
+            // T9: counters restored from a save must NOT feed the day goals again — the glue
+            // tracks only events NEWER than Start.
+            _growth = transform.GetComponent<SpiderGrowth>();
+            if (_growth != null)
+            {
+                _seenEaten = _growth.EatenCount;
+            }
+            var energy = transform.GetComponent<SpiderEnergy>();
+            if (energy != null)
+            {
+                _seenStings = energy.GetModel() != null ? energy.GetModel().StingCount : 0;
+            }
         }
 
         /// <summary>Builder/Test: hook the sunrise event of the cycle to the day roll.</summary>

@@ -70,5 +70,12 @@ namespace Spinnenspiel
             Durability = maxDurability;
             tornFlag = false;
         }
+
+        /// <summary>T9: restore a saved durability state exactly (value + torn flag), for the savegame.</summary>
+        public void RestoreFromSave(float value, bool torn)
+        {
+            Durability = value;
+            tornFlag = torn;
+        }
     }
 }
