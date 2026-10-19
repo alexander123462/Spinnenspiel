@@ -99,6 +99,12 @@ namespace Spinnenspiel
             return ok;
         }
 
+        /// <summary>T11: kind of the last damage that hit the spider (Hunger = none yet).</summary>
+        public DeathCauseKind LastDamageKind = DeathCauseKind.Hunger;
+
+        /// <summary>T11: Time.time of the last damage (-1 = never).</summary>
+        public float LastDamageTime = -1f;
+
         /// <summary>S7: A wasp sting takes energy off the spider (delegates to the model).</summary>
         public void ApplySting(float amount)
         {
@@ -108,6 +114,7 @@ namespace Spinnenspiel
             }
             _model.ApplySting(amount);
             Energy = _model.Energy;
+            MarkDamage(DeathCauseKind.Wespe);
         }
 
         /// <summary>T3: A frog tongue-strike takes energy off the spider (delegates to the model).</summary>
@@ -119,6 +126,38 @@ namespace Spinnenspiel
             }
             _model.ApplyStrike(amount);
             Energy = _model.Energy;
+            MarkDamage(DeathCauseKind.Frosch);
+        }
+
+        /// <summary>T11: a bird strike takes energy off the spider (delegates to the model).</summary>
+        public void ApplyBirdStrike(float amount)
+        {
+            if (_model == null)
+            {
+                return;
+            }
+            _model.ApplyStrike(amount);
+            Energy = _model.Energy;
+            MarkDamage(DeathCauseKind.Vogel);
+        }
+
+        /// <summary>T11: a fall takes energy off the spider (delegates to the model).</summary>
+        public void ApplyFallDamage(float amount)
+        {
+            if (_model == null)
+            {
+                return;
+            }
+            _model.ApplyStrike(amount);
+            Energy = _model.Energy;
+            MarkDamage(DeathCauseKind.Sturz);
+        }
+
+        /// <summary>T11: remember which source dealt the last damage and when (for the death cause).</summary>
+        private void MarkDamage(DeathCauseKind kind)
+        {
+            LastDamageKind = kind;
+            LastDamageTime = UnityEngine.Time.time;
         }
 
         /// <summary>Energy as fraction 0..1 (for HUD / consequences).</summary>
@@ -136,6 +175,8 @@ namespace Spinnenspiel
             }
             _model.Reset();
             Energy = _model.Energy;
+            LastDamageKind = DeathCauseKind.Hunger;
+            LastDamageTime = -1f;
         }
 
         /// <summary>The pure model (read by tests/consequences).</summary>

@@ -19,6 +19,7 @@ namespace Spinnenspiel
         private SaveGame _save;
         private SpiderEnergy _energy;
         private int _seenBuiltWebs;
+        private float _seenDamageTime = -1f;
 
         public bool DeathTriggered { get => Stats.DeathShown; }
 
@@ -92,6 +93,15 @@ namespace Spinnenspiel
                 _seenBuiltWebs = built;
             }
 
+            // T11: feed damage events from SpiderEnergy (last source + when) into the model,
+            // translated into survival-time so the 10 s window matches real time.
+            if (_energy != null && _energy.LastDamageTime > _seenDamageTime)
+            {
+                var elapsedSinceHit = UnityEngine.Time.time - _energy.LastDamageTime;
+                Stats.OnDamage(_energy.LastDamageKind, Stats.SurvivalTime - elapsedSinceHit);
+                _seenDamageTime = _energy.LastDamageTime;
+            }
+
             // Tod: Hunger full (SpiderHunger 1.0) ODER Energie leer (J2c, SpiderEnergy 0).
             if ((_hunger != null && _hunger.Hunger >= 0.999f)
                 || (_energy != null && _energy.Energy <= 0f))
@@ -123,6 +133,7 @@ namespace Spinnenspiel
                 _hunger.Hunger = 0f;
             }
             _seenBuiltWebs = 0;
+            _seenDamageTime = -1f;
         }
 
         private void OnGUI()

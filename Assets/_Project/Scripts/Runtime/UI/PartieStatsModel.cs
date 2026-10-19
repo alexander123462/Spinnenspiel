@@ -2,6 +2,16 @@ using UnityEngine;
 
 namespace Spinnenspiel
 {
+    /// <summary>T11: possible causes of death (damage sources plus hunger/energy loss).</summary>
+    public enum DeathCauseKind
+    {
+        Hunger,
+        Vogel,
+        Wespe,
+        Frosch,
+        Sturz
+    }
+
     /// <summary>
     /// K6: Pure-Logic model for the end-of-partie statistics (no MonoBehaviour, testable directly).
     /// Tracks survival time, eaten insects and built webs, plus the best values over earlier
@@ -27,6 +37,16 @@ namespace Spinnenspiel
         public int BestWebs;
 
         public bool DeathShown;
+
+        // T11 Todesursache: the last damage source plus WHEN it hit (in SurvivalTime
+        // seconds). At the death the cause is the last damage inside the window,
+        // otherwise Hunger (energy/hunger ran out on its own).
+        public DeathCauseKind LastDamageKind = DeathCauseKind.Hunger;
+        public float LastDamageTime = -1000f;
+        public DeathCauseKind DeathCause = DeathCauseKind.Hunger;
+
+        /// <summary>T11: window in seconds — damage this fresh at the death still counts as its cause.</summary>
+        public static readonly float deathCauseWindowSeconds = 10f;
 
         /// <summary>One second passed while alive (the MonoBehaviour feeds Time.deltaTime).</summary>
         public void TickAlive(float dt)
@@ -55,6 +75,19 @@ namespace Spinnenspiel
             DayWarnings++;
         }
 
+        /// <summary>T11: a damage event hit the spider now (at SurvivalTime) from the given source.</summary>
+        public void OnDamage(DeathCauseKind kind)
+        {
+            OnDamage(kind, SurvivalTime);
+        }
+
+        /// <summary>T11: damage at an explicit survival-time (the MonoBehaviour knows the exact moment).</summary>
+        public void OnDamage(DeathCauseKind kind, float atTime)
+        {
+            LastDamageKind = kind;
+            LastDamageTime = atTime;
+        }
+
         /// <summary>S5: morning reached — snapshot the day that just ended, zero the day counters (totals keep rising).</summary>
         public void ResetDay()
         {
@@ -70,6 +103,16 @@ namespace Spinnenspiel
         public void ReportDeath()
         {
             DeathShown = true;
+            // T11: cause = last damage inside the window, else Hunger.
+            if (SurvivalTime - LastDamageTime <= deathCauseWindowSeconds
+                && LastDamageKind != DeathCauseKind.Hunger)
+            {
+                DeathCause = LastDamageKind;
+            }
+            else
+            {
+                DeathCause = DeathCauseKind.Hunger;
+            }
             if (SurvivalTime > BestSurvivalTime)
             {
                 BestSurvivalTime = SurvivalTime;
@@ -97,6 +140,9 @@ namespace Spinnenspiel
             LastDayEaten = 0;
             LastDayWebs = 0;
             LastDayWarnings = 0;
+            DeathCause = DeathCauseKind.Hunger;
+            LastDamageKind = DeathCauseKind.Hunger;
+            LastDamageTime = -1000f;
         }
 
         /// <summary>Load best values from an earlier save (restart of the application keeps them).</summary>
@@ -143,12 +189,35 @@ namespace Spinnenspiel
             return ticks.ToArray();
         }
 
+        /// <summary>
+        /// T11: one sentence naming the cause of death (DeathCause). Non-empty for every
+        /// cause — single source of truth for the death screen and the tests.
+        /// </summary>
+        public string DeathCauseSentence()
+        {
+            switch (DeathCause)
+            {
+                case DeathCauseKind.Vogel:
+                    return "Cause of death: a bird struck the spider.";
+                case DeathCauseKind.Wespe:
+                    return "Cause of death: a wasp stung the spider.";
+                case DeathCauseKind.Frosch:
+                    return "Cause of death: a frog caught the spider.";
+                case DeathCauseKind.Sturz:
+                    return "Cause of death: the spider fell down.";
+                case DeathCauseKind.Hunger:
+                default:
+                    return "Cause of death: hunger - the spider ran out of energy.";
+            }
+        }
+
         /// <summary>The exact display line for the death screen (single source of truth for UI and tests).</summary>
         public string FormatLine()
         {
             return "Time " + SurvivalTime.ToString("F1") + "s | Eaten " + EatenCount
                 + " | Webs " + WebsBuilt
-                + " | Best " + BestSurvivalTime.ToString("F1") + "s / " + BestEaten + " / " + BestWebs;
+                + " | Best " + BestSurvivalTime.ToString("F1") + "s / " + BestEaten + " / " + BestWebs
+                + " | " + DeathCauseSentence();
         }
 
         /// <summary>
