@@ -107,7 +107,7 @@ namespace Spinnenspiel
 
             wasp.home = pos;
             LiveWasp = wasp;
-            _nextSpawnAt = Time.time + respawnInterval / Mathf.Max(GameDifficulty.BirdThreatMultiplier(), 0.01f);
+            _nextSpawnAt = Time.time + respawnInterval / Mathf.Max(GameDifficulty.HazardFrequencyMultiplier(), 0.01f);
         }
 
         private float GroundHeight(Vector3 point)

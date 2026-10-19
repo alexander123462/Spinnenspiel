@@ -105,26 +105,28 @@ namespace Spinnenspiel
         /// <summary>T11: Time.time of the last damage (-1 = never).</summary>
         public float LastDamageTime = -1f;
 
-        /// <summary>S7: A wasp sting takes energy off the spider (delegates to the model).</summary>
+        /// <summary>S7: A wasp sting takes energy off the spider (delegates to the model).
+        /// T12: the S1 difficulty damage multiplier scales the Wespe sting.</summary>
         public void ApplySting(float amount)
         {
             if (_model == null)
             {
                 return;
             }
-            _model.ApplySting(amount);
+            _model.ApplySting(amount * GameDifficulty.HazardDamageMultiplier());
             Energy = _model.Energy;
             MarkDamage(DeathCauseKind.Wespe);
         }
 
-        /// <summary>T3: A frog tongue-strike takes energy off the spider (delegates to the model).</summary>
+        /// <summary>T3: A frog tongue-strike takes energy off the spider (delegates to the model).
+        /// T12: the S1 difficulty damage multiplier scales the Frosch strike.</summary>
         public void ApplyStrike(float amount)
         {
             if (_model == null)
             {
                 return;
             }
-            _model.ApplyStrike(amount);
+            _model.ApplyStrike(amount * GameDifficulty.HazardDamageMultiplier());
             Energy = _model.Energy;
             MarkDamage(DeathCauseKind.Frosch);
         }

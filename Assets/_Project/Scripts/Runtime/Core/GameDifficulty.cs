@@ -31,6 +31,18 @@ namespace Spinnenspiel
         private static readonly float birdNormal = 1.0f;
         private static readonly float birdHard = 1.6f;
 
+        /// <summary>T12: Frequency multiplier for the new hazards (Wespe / Frosch / Libelle).
+        /// Higher = more of them out, so spawn intervals divide down and shares scale up.</summary>
+        private static readonly float hazardFrequencyRelaxed = 0.5f;
+        private static readonly float hazardFrequencyNormal = 1.0f;
+        private static readonly float hazardFrequencyHard = 1.6f;
+
+        /// <summary>T12: Damage multiplier for the new hazards (Wespe / Frosch sting, Frosch strike).
+        /// Higher = each hit takes more energy.</summary>
+        private static readonly float hazardDamageRelaxed = 0.7f;
+        private static readonly float hazardDamageNormal = 1.0f;
+        private static readonly float hazardDamageHard = 1.3f;
+
         /// <summary>Runtime-selected level (default Normal; set by menu/save/settings).</summary>
         public static Level selectedLevel = Level.Normal;
 
@@ -61,6 +73,24 @@ namespace Spinnenspiel
             return level == Level.Hard ? birdHard : birdNormal;
         }
 
+        public static float HazardFrequencyMultiplierOf(Level level)
+        {
+            if (level == Level.Relaxed)
+            {
+                return hazardFrequencyRelaxed;
+            }
+            return level == Level.Hard ? hazardFrequencyHard : hazardFrequencyNormal;
+        }
+
+        public static float HazardDamageMultiplierOf(Level level)
+        {
+            if (level == Level.Relaxed)
+            {
+                return hazardDamageRelaxed;
+            }
+            return level == Level.Hard ? hazardDamageHard : hazardDamageNormal;
+        }
+
         public static float DrainMultiplier()
         {
             return DrainMultiplierOf(selectedLevel);
@@ -74,6 +104,16 @@ namespace Spinnenspiel
         public static float BirdThreatMultiplier()
         {
             return BirdThreatMultiplierOf(selectedLevel);
+        }
+
+        public static float HazardFrequencyMultiplier()
+        {
+            return HazardFrequencyMultiplierOf(selectedLevel);
+        }
+
+        public static float HazardDamageMultiplier()
+        {
+            return HazardDamageMultiplierOf(selectedLevel);
         }
 
         /// <summary>Human-readable name of a level (menu display).</summary>

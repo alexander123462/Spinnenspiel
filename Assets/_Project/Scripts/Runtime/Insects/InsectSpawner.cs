@@ -301,17 +301,25 @@ namespace Spinnenspiel
             // S2: Ist ein Muecke-Vorlage set? Dann ~MosquitoShare der Spawns are mosquitoes.
             // T1: Ist ein Kaefer-Vorlage set? Dann ~BeetleShare (10 %) der day-spawns are beetles (drawn first).
             // T2: Ist ein Libelle-Vorlage set? Dann ~LibelleShare (3 %) der day-spawns are libelles (drawn first).
+            // T12: die Haeufigkeit-Multiplikator der S1-Difficulty scales the very-rare libelle share;
+            //      the beetle/mosquito bands start above the scaled libelle band so they stay disjoint.
+            float libelleBand = LibelleModel.libelleShare * GameDifficulty.HazardFrequencyMultiplier();
+            if (libelleBand > 1f)
+            {
+                libelleBand = 1f;
+            }
+
             GameObject chosenTemplate = template;
             double speciesRoll = rng.NextDouble();
-            if (libelleTemplate != null && LibelleModel.IsLibelleRoll(speciesRoll))
+            if (libelleTemplate != null && speciesRoll < libelleBand)
             {
                 chosenTemplate = libelleTemplate;
             }
-            else if (beetleTemplate != null && speciesRoll < LibelleShare + BeetleShare)
+            else if (beetleTemplate != null && speciesRoll < libelleBand + BeetleShare)
             {
                 chosenTemplate = beetleTemplate;
             }
-            else if (mosquitoTemplate != null && speciesRoll < LibelleShare + BeetleShare + MosquitoShare)
+            else if (mosquitoTemplate != null && speciesRoll < libelleBand + BeetleShare + MosquitoShare)
             {
                 chosenTemplate = mosquitoTemplate;
             }
