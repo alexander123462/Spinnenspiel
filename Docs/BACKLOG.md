@@ -428,7 +428,7 @@
   - Schritt 1: Intensitaets-Modell (rein: Eingaben = Gefahrenzustaende, Ausgabe = Intensitaet mit Anstieg 1 s, Abfall 10 s), Anbindung an die Klangflaeche (Lautstaerke/Filter).
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': ohne Gefahr 0.2 +-0.02; 1 s nach Gefahrenbeginn mindestens 0.7; 10 s nach Gefahrenende wieder unter 0.3; mit Lautstaerke 0 keine Ausgabe.
   - Schritt 3: gezielt testen, einmal voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] T7 Morgennebel. Die Nebeldichte folgt der Tageszeit: morgens (Tagesfortschritt 0.05 bis 0.2) 2.0 x dichter als mittags, abends 1.4 x, nachts 1.0 x. Eine Funktion FogFactor(dayProgress), im DayNightCycle angewendet.
+- [x] T7 Morgennebel. Die Nebeldichte folgt der Tageszeit: morgens (Tagesfortschritt 0.05 bis 0.2) 2.0 x dichter als mittags, abends 1.4 x, nachts 1.0 x. Eine Funktion FogFactor(dayProgress), im DayNightCycle angewendet. [feee154]
   - Schritt 1: Kurve als reine Funktion mit Test, Anwendung auf die Nebeldichte (Volume-Override ueber das vorhandene Volume, keine neue Szene).
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': FogFactor(0.1) / FogFactor(0.5) = 2.0 +-0.1; FogFactor(0.75) = 1.4 +-0.1; stetig (Sprung zwischen benachbarten Werten < 0.05); Beweisbild morgens vs mittags aus der Galerie-Aufnahme (saubere Aufnahme, Motion Blur aus), Mittelwert morgens heller und kontrastaermer.
   - Schritt 3: gezielt testen, einmal voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
