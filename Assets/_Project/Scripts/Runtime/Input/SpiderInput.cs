@@ -142,6 +142,7 @@ namespace Spinnenspiel
             _zoomAction.Enable();
             _silkAction.Enable();
             _releaseAction.Enable();
+            _jumpAction.Enable();
             _repairAction.Enable();
         }
 
