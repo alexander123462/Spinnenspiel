@@ -114,6 +114,8 @@ namespace Spinnenspiel.EditorTools
             GameObject dayNight = new GameObject("Tag/Nacht");
             DayNightCycle dayCycle = dayNight.AddComponent<DayNightCycle>();
             dayCycle.sun = Object.FindFirstObjectByType<Light>();
+            // T7 Morgennebel: the cycle drives the fog volume built by WorldLightingBuilder.
+            dayCycle.fogVolumeComponent = WorldLightingBuilder.LastBuiltFog;
             new GameObject("Sky Ambient").AddComponent<SkyAmbientUpdater>();
             new GameObject("Jungle Ambience").AddComponent<JungleAmbientAudio>();
             new GameObject("Debug Overlay").AddComponent<DebugOverlay>();

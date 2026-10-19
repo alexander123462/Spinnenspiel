@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Rendering.HighDefinition;
 
 namespace Spinnenspiel
 {
@@ -65,6 +66,58 @@ namespace Spinnenspiel
         [Tooltip("Sun tint at night (moonlight)")]
         private Color moonTint = new Color(0.8f, 0.85f, 1f);
 
+        // T7 Morgennebel: Nebeldensity follows the time of day. The factor multiplies
+        // the baseline fog density (2.0 = twice as dense as noon). Piecewise-linear keys
+        // keep the curve continuous (no jumps; sampled on a fine grid the adjacent values
+        // differ by well under 0.05). Morning plateau 0.05..0.2, evening ramp to 1.4 at 0.75.
+        private static readonly float[] fogKeysT = { 0f, 0.05f, 0.2f, 0.35f, 0.7f, 0.75f, 0.85f, 0.9f, 1f };
+        private static readonly float[] fogKeysV = { 1f, 2f, 2f, 1f, 1f, 1.4f, 1.4f, 1f, 1f };
+
+        /// <summary>T7: Nebelfactor at a day progress (0 = midnight, 0.5 = noon).
+        /// Morning (0.05..0.2) 2.0x denser than noon, evening 1.4x, night ~1.0x.</summary>
+        public static float FogFactor(float dayProgress)
+        {
+            float t = dayProgress - Mathf.Floor(dayProgress);
+            for (int i = 0; i < fogKeysT.Length - 1; i++)
+            {
+                if (t <= fogKeysT[i + 1])
+                {
+                    float span = fogKeysT[i + 1] - fogKeysT[i];
+                    float u = span > 0f ? (t - fogKeysT[i]) / span : 0f;
+                    return Mathf.Lerp(fogKeysV[i], fogKeysV[i + 1], u);
+                }
+            }
+            return fogKeysV[fogKeysV.Length - 1];
+        }
+
+        /// <summary>T7: The HDRP Fog volume driven by the cycle (its meanFreePath is
+        /// divided by the fog factor: smaller path = denser fog). Set by the Builder.</summary>
+        [Tooltip("HDRP Fog volume whose meanFreePath follows the day (set by the Builder)")]
+        public Fog fogVolumeComponent;
+
+        private float fogBaseMeanFreePath = -1f; // baseline read once from the volume
+        private float fogBaseDensity = -1f; // baseline RenderSettings.fogDensity (visible when volumetric off)
+        private bool fogMissingWarned;
+
+        /// <summary>T7: The current scaled meanFreePath of the wired fog volume, or -1 when
+        /// no fog volume is wired. Exposed as a plain float so Tests (no HDRP dependency)
+        /// can assert the curve really drives the scene's fog.</summary>
+        public float CurrentFogMeanFreePath()
+        {
+            if (fogVolumeComponent == null || !fogVolumeComponent.meanFreePath.overrideState)
+            {
+                return -1f;
+            }
+            return fogVolumeComponent.meanFreePath.value;
+        }
+
+        /// <summary>T7: The baseline (noon) meanFreePath captured from the volume, or -1
+        /// when no fog volume is wired.</summary>
+        public float CurrentFogBaseline()
+        {
+            return fogBaseMeanFreePath;
+        }
+
         private void Start()
         {
             dayFraction = startDayFraction - Mathf.Floor(startDayFraction);
@@ -78,6 +131,15 @@ namespace Spinnenspiel
                     Debug.LogWarning("[Spinnenspiel] DayNightCycle: sun not set and RenderSettings.sun empty.");
                 }
             }
+            // T7: capture the baseline fog distance once so the runtime curve scales it.
+            if (fogVolumeComponent != null && fogVolumeComponent.meanFreePath.overrideState)
+            {
+                fogBaseMeanFreePath = fogVolumeComponent.meanFreePath.value;
+            }
+            if (RenderSettings.fog)
+            {
+                fogBaseDensity = RenderSettings.fogDensity;
+            }
         }
 
         /// <summary>Tests/Screenshot: Jump to a day progress (0 = midnight, 0.5 = noon).</summary>
@@ -87,6 +149,7 @@ namespace Spinnenspiel
             DayProgress = dayFraction;
             // S5: a Test-Jump is not a natural sunrise — no event, only the baseline moves.
             lastDayFraction = dayFraction;
+            ApplyFog();
         }
 
         private void Update()
@@ -106,6 +169,8 @@ namespace Spinnenspiel
                 }
             }
             lastDayFraction = dayFraction;
+
+            ApplyFog();
 
             if (sun == null) return;
 
@@ -142,6 +207,40 @@ namespace Spinnenspiel
             {
                 ambientTimer = 0f;
                 DynamicGI.UpdateEnvironment();
+            }
+        }
+
+        /// <summary>T7: Scales the HDRP Fog volume's meanFreePath by the fog factor.
+        /// A higher factor means denser fog, so the light path gets SHORTER (divided).
+        /// No-op when no fog volume is wired (e.g. unit-style setups without volumes).</summary>
+        private void ApplyFog()
+        {
+            float factor = FogFactor(DayProgress);
+            // HDRP: the visible fog is either the volumetric Fog volume (meanFreePath) or, when
+            // volumetric fog is off (Urwald uses the classic exponential-squared fog for near-field
+            // sharpness, see U1), RenderSettings.fogDensity. Scale BOTH so the curve always shows.
+            if (fogVolumeComponent != null && fogVolumeComponent.meanFreePath.overrideState)
+            {
+                if (fogBaseMeanFreePath <= 0f)
+                {
+                    fogBaseMeanFreePath = fogVolumeComponent.meanFreePath.value;
+                }
+                if (fogBaseMeanFreePath > 0f)
+                {
+                    float scaled = fogBaseMeanFreePath / Mathf.Max(factor, 0.01f);
+                    fogVolumeComponent.meanFreePath.Override(scaled);
+                }
+            }
+            if (RenderSettings.fog)
+            {
+                if (fogBaseDensity <= 0f)
+                {
+                    fogBaseDensity = RenderSettings.fogDensity;
+                }
+                if (fogBaseDensity > 0f)
+                {
+                    RenderSettings.fogDensity = fogBaseDensity * factor;
+                }
             }
         }
     }
