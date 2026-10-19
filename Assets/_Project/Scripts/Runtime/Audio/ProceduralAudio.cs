@@ -356,6 +356,52 @@ namespace Spinnenspiel
             return _alarm;
         }
 
+        private static AudioClip _musicBed;
+
+        /// <summary>T6: calm background music bed for the dynamic-danger track.
+        /// A slow, low drone (root-like fifth) with a gentle swell every 4 s; deterministic
+        /// seamless loop. The DangerMusic component drives its volume by intensity.</summary>
+        public static AudioClip DangerMusicBed()
+        {
+            if (_musicBed != null)
+            {
+                return _musicBed;
+            }
+
+            const float seconds = 12f;
+            int length = Mathf.CeilToInt(seconds * SampleRate);
+            float[] data = new float[length];
+
+            // Low sustained fifth (root + third): two soft sine layers with slow formant drift.
+            const float rootA = 96f, rootB = 144f;
+            for (int i = 0; i < length; i++)
+            {
+                float t = i / (float)SampleRate;
+                float swell = 0.7f + 0.3f * Mathf.Sin(t * Mathf.PI * 2f * 0.25f);
+                float a = Mathf.Sin(2f * Mathf.PI * rootA * t) * 0.16f;
+                float b = Mathf.Sin(2f * Mathf.PI * rootB * t * (1f + 0.004f * Mathf.Sin(t * 9f))) * 0.1f;
+                data[i] = (a + b) * swell * 0.6f;
+            }
+
+            // Sparse high chime (a distant bell-tone) for colour, low amplitude.
+            System.Random random = new System.Random(616);
+            int chimes = 5;
+            for (int c = 0; c < chimes; c++)
+            {
+                int start = random.Next(0, length - Mathf.CeilToInt(1.4f * SampleRate));
+                float frequency = 520f + (float)random.NextDouble() * 260f;
+                for (int i = 0; i < Mathf.FloorToInt(1.3f * SampleRate) && start + i < length; i++)
+                {
+                    float t = i / (float)SampleRate;
+                    data[start + i] += Mathf.Sin(2f * Mathf.PI * frequency * t) * 0.05f * Mathf.Exp(-t / 0.4f);
+                }
+            }
+
+            data = Crossfade(data, SampleRate / 2);
+            _musicBed = Create("Music_DangerBed", data);
+            return _musicBed;
+        }
+
         /// <summary>S4: kurzes Knacken/Schmatz (Crunch) — two bite-hits: bright snap plus muffled chew.</summary>
         public static AudioClip Crunch()
         {

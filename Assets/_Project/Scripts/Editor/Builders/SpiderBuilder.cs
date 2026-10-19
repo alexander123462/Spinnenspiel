@@ -114,6 +114,9 @@ namespace Spinnenspiel.EditorTools
             // T5: Alarm-Ruf at the pre-warning (2 descending tones, volume from GameSettings).
             root.AddComponent<Spinnenspiel.BirdAlarmCall>();
 
+            // T6: Dynamic danger music — calm bed, intensity rises to 0.8 during danger.
+            root.AddComponent<Spinnenspiel.DangerMusic>();
+
             // Hunger (t73a1): steigt langsam, sinkt beim Fressen.
             root.AddComponent<SpiderHunger>();
 

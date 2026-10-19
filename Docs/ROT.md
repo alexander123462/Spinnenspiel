@@ -11,3 +11,5 @@ committen. Wird ein Punkt dieser Liste gruen, Zeile hier entfernen und im selben
 Commit mitnehmen.
 
 (Baseline currently empty: RedPreview_WhenSpotGoesBad made deterministic and green in R7.)
+
+- Spinnenspiel.Tests.DayNightTests.J5_TagAndNacht_LightAndInsectsFollowCycle — rot auch ohne T6 (Overseer-Lauf t6base: "Day Mittel > 200" 260; frueher "Day insects still out at night" 3>2). Eigener Backlog-Punkt noetig.
