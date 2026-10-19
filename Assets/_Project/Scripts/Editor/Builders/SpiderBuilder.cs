@@ -248,7 +248,10 @@ namespace Spinnenspiel.EditorTools
             mat.SetFloat("_AlphaCutoffEnable", 0f);    // Kein Cutout
             mat.SetFloat("_DoubleSidedEnable", doubleSided ? 1f : 0f);
             mat.SetFloat("_Smoothness", 0.42f);
-            mat.color = Color.white;
+            // T8 Lesbarkeit: Grundhelligkeit +20 % (HDRP/Lit hat kein Rim-Shader-Parameter,
+            // darum ein schwacher warm Specular-Ton als Rim-Effect an den Randschicht).
+            mat.SetColor("_BaseColor", new Color(1.2f, 1.2f, 1.2f, 1f));
+            mat.SetColor("_SpecularColor", new Color(1.0f, 0.95f, 0.86f, 1f));
 
             HDMaterial.ValidateMaterial(mat);
             EditorUtility.SetDirty(mat);
