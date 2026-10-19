@@ -317,6 +317,45 @@ namespace Spinnenspiel
             return _pluck;
         }
 
+        /// <summary>T5: Frequenz der Vogel-Alarm-Ruf an normalized time t01 (0..1).
+        /// Two descending glissandi: tone 1 high, tone 2 lower -> strictly decreasing over the call.</summary>
+        public static float AlarmFrequencyAt(float t01)
+        {
+            const float fTop = 900f, fMid = 620f, fBottom = 430f;
+            if (t01 < 0.5f)
+            {
+                return Mathf.Lerp(fTop, fMid, t01 * 2f);
+            }
+            return Mathf.Lerp(fMid, fBottom, (t01 - 0.5f) * 2f);
+        }
+
+        /// <summary>T5: Vogel-Alarm-Ruf: two descending tones from AlarmFrequencyAt (Vorwarnung cry).</summary>
+        public static AudioClip BirdAlarmCall()
+        {
+            if (_alarm != null)
+            {
+                return _alarm;
+            }
+
+            const float duration = 0.5f;
+            int length = Mathf.CeilToInt(duration * SampleRate);
+            float[] data = new float[length];
+            for (int i = 0; i < length; i++)
+            {
+                float t01 = i / (float)length;
+                float t = i / (float)SampleRate;
+                float frequency = AlarmFrequencyAt(t01);
+                // Two distinct tones: a short dip in the middle marks the tone boundary.
+                float toneSplit = 1f - 0.35f * Mathf.Sin(Mathf.PI * Mathf.Clamp01((t01 - 0.5f) * 2f + 0.5f));
+                float phase = 2f * Mathf.PI * frequency * t * (1f + 0.015f * Mathf.Sin(t * 40f));
+                float envelope = Mathf.Sin(Mathf.Min(t01, 0.999f) * Mathf.PI);
+                data[i] = Mathf.Sin(phase) * envelope * toneSplit * 0.5f;
+            }
+
+            _alarm = Create("Bird_AlarmCall", data);
+            return _alarm;
+        }
+
         /// <summary>S4: kurzes Knacken/Schmatz (Crunch) — two bite-hits: bright snap plus muffled chew.</summary>
         public static AudioClip Crunch()
         {
@@ -360,6 +399,7 @@ namespace Spinnenspiel
 
         private static AudioClip _pluck;
         private static AudioClip _crunch;
+        private static AudioClip _alarm;
 
         private static float[] Crossfade(float[] data, int samples)
         {

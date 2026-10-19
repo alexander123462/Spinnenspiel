@@ -1,6 +1,7 @@
 using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Events;
 using UnityEngine.Rendering.HighDefinition;
 
 namespace Spinnenspiel.EditorTools
@@ -108,7 +109,10 @@ namespace Spinnenspiel.EditorTools
             root.AddComponent<SpiderWebPlacer>();
 
             // J4: Vogel-Predator — greift laenge Zeit im Freien unter offenem Himmel.
-            root.AddComponent<Spinnenspiel.BirdThreat>();
+            BirdThreat birdThreat = root.AddComponent<Spinnenspiel.BirdThreat>();
+
+            // T5: Alarm-Ruf at the pre-warning (2 descending tones, volume from GameSettings).
+            root.AddComponent<Spinnenspiel.BirdAlarmCall>();
 
             // Hunger (t73a1): steigt langsam, sinkt beim Fressen.
             root.AddComponent<SpiderHunger>();
