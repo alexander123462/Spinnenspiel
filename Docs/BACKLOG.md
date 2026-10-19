@@ -432,7 +432,8 @@
   - Schritt 1: Kurve als reine Funktion mit Test, Anwendung auf die Nebeldichte (Volume-Override ueber das vorhandene Volume, keine neue Szene).
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': FogFactor(0.1) / FogFactor(0.5) = 2.0 +-0.1; FogFactor(0.75) = 1.4 +-0.1; stetig (Sprung zwischen benachbarten Werten < 0.05); Beweisbild morgens vs mittags aus der Galerie-Aufnahme (saubere Aufnahme, Motion Blur aus), Mittelwert morgens heller und kontrastaermer.
   - Schritt 3: gezielt testen, einmal voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] T8 Spinne besser lesbar. Die Spinne ist in der Galerie dunkel und hebt sich schlecht vom Boden ab. Leichte Aufhellung der Spinnenmaterialien (MAT_SpiderCarapace, MAT_SpiderAbdomenScan, MAT_SpiderLegScan: Grundhelligkeit +20 Prozent, schwacher Rim-Ton), nicht ueberbelichten.
+- [x] T8 Spinne besser lesbar. Die Spinne ist in der Galerie dunkel und hebt sich schlecht vom Boden ab. Leichte Aufhellung der Spinnenmaterialien (MAT_SpiderCarapace, MAT_SpiderAbdomenScan, MAT_SpiderLegScan: Grundhelligkeit +20 Prozent, schwacher Rim-Ton), nicht ueberbelichten.
+  - Overseer: die 3 Regressionen sind NICHT von T8 (auch ohne T8 rot, Lauf t8basefull, Ursache vermutlich T7-Nebel) -> Docs/ROT.md. T8 Commit: f0ae383
   - Schritt 1: Messen mit der Galerie (Q1_Galerie, Spinne_spiel): Mittelwert der Spinnenpixel (Bounding-Box) und Kontrast zum Boden melden, dann Materialwerte aendern (Material-Slots nach NAMEN, AGENTS.md beachten).
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': Mittelwert der Spinne in Spinne_spiel mindestens 20 Prozent hoeher als vorher; Anteil ueberbelichteter Pixel (Wert > 250) in der Spinnen-Box unter 2 Prozent; Farbton bleibt braun (kein Magenta, Magenta < 0.5 Prozent).
   - Schritt 3: gezielt testen, einmal voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.

@@ -195,3 +195,5 @@ T5 Vogelruf [5c6a957]: Vorwarnung-Vogel now plays a synthetic alarm call (Proced
 - T6 Dynamische Musik [057640f]: vom Overseer committet. Blocker J5 (DayNightTests) ist auch ohne T6 rot (Lauf t6base) -> Docs/ROT.md. Voll-CI t6full 208/209 (nur J5).
 
 T7 Morgennebel [feee154]: FogFactor(dayProgress) in DayNightCycle scales Nebel (HDRP Fog meanFreePath + RenderSettings.fogDensity); Morgen 0.05-0.2 = 2.0x, Abend 1.4x, Nacht 1.0x. MorgennebelTests 2/2 green; CI r114 118/118. Proof: Logs/ci/t7-noon.png vs t7-nebel-compare.png (equal sunlight 0.7 vs 0.3, denser fog visibly washes background; StDev 18.4 -> 20.8, path ratio 1.33).
+
+T8 Spinne lesbar [f0ae383]: Overseer committet. SpiderBuilder _BaseColor 1.2 + warmer _SpecularColor; SpiderReadabilityTests gruen. Die 3 Regressionen (G6 SharpFrac, Nahkampfscharf, E1 Wasser) sind auch ohne T8 rot (t8basefull) -> ROT.md, Verdacht T7-Nebel. Voll-CI t8full 208/212 (J5 + 3 ROT).
