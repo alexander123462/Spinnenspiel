@@ -441,15 +441,15 @@
   - Schritt 1: Erweiterung im bestehenden SaveGame-Payload mit Version 3 (oder naechste freie), Laden alter Version mit Defaults.
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': Roundtrip: alle neuen Felder identisch nach Laden; Laden eines Standes der vorigen Version ergibt Standardwerte ohne Fehler; unbekannte Version gibt Meldung (wie bisher, J6) und keinen Absturz.
   - Schritt 3: gezielt testen, einmal voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] T10 Leistungs-Absicherung. Performance_WorstCaseScenarioUnderBudget um die neuen Systeme erweitern (Kaefer, Libelle, Wespe, Frosch, Netztropfen, Fang-Wackeln, Musik) als NEUEN Test, der alte bleibt.
+- [x] T10 Leistungs-Absicherung. Performance_WorstCaseScenarioUnderBudget um die neuen Systeme erweitern (Kaefer, Libelle, Wespe, Frosch, Netztropfen, Fang-Wackeln, Musik) als NEUEN Test, der alte bleibt. [3e9b62c]
   - Schritt 1: Szenario aufbauen (je 1 Wespe/Libelle/Frosch, 8 Insekten, 3 Netze, Regen, Nacht->Tag-Uebergang), mittlere Frametime messen (Median, nicht Mittel, wie bei M7.6).
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': Median-Frametime <= Budget des bestehenden Tests x 1.15; Konsolenfehler = 0; bei NOK die teuerste Systemgruppe nennen und die billigste wirksame Gegenmassnahme umsetzen.
   - Schritt 3: gezielt testen, einmal voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] T11 Todesursache in der Statistik. Beim Tod zeigt DeathStats die Ursache (Hunger, Vogel, Wespe, Frosch, Sturz) mit einem Satz. Die letzte Schadensquelle wird gemerkt (Zeitfenster 10 s).
+- [x] T11 Todesursache in der Statistik. Beim Tod zeigt DeathStats die Ursache (Hunger, Vogel, Wespe, Frosch, Sturz) mit einem Satz. Die letzte Schadensquelle wird gemerkt (Zeitfenster 10 s). [236943d]
   - Schritt 1: Ursachenmodell (rein): Schadensereignisse mit Quelle, Ursache = letzte Quelle der letzten 10 s, sonst Hunger.
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': Tod 3 s nach Wespenstich -> Ursache Wespe; Tod durch Energie 0 ohne Schaden -> Hunger; Schaden vor 15 s und dann Hunger-Tod -> Hunger; Text fuer jede Ursache nicht leer.
   - Schritt 3: gezielt testen, einmal voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] T12 Schwierigkeit wirkt auf die neuen Gefahren. Die Multiplikatoren aus S1 gelten auch fuer Wespe, Frosch und Libelle (Haeufigkeit: 0.5 / 1.0 / 1.6) und fuer den Schaden (0.7 / 1.0 / 1.3).
+- [x] T12 Schwierigkeit wirkt auf die neuen Gefahren. Die Multiplikatoren aus S1 gelten auch fuer Wespe, Frosch und Libelle (Haeufigkeit: 0.5 / 1.0 / 1.6) und fuer den Schaden (0.7 / 1.0 / 1.3). [1227fc6]
   - Schritt 1: Multiplikator an den Spawn-/Schadensstellen von S7, T2, T3 einsetzen, nichts anderes umbauen.
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': erwartete Wespenzahl pro 10 Minuten bei Hart / bei Normal = 1.6 +-0.1; Froschschaden bei Entspannt = 17.5 +-1 (25 x 0.7); Stufe Normal aendert nichts gegenueber vorher.
   - Schritt 3: gezielt testen, einmal voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
