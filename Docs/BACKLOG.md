@@ -418,7 +418,7 @@
   - Schritt 1: Haeutungs-Modell (rein: Zustand, Dauer, Schadensfaktor), Kopplung an SpiderGrowth/SpiderMovement (nur ein Sperrschalter fuer Bewegung, nichts umbauen).
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': bei Stufenwechsel 5 +-0.2 s keine Bewegung (gemessene Geschwindigkeit 0); Schaden waehrend Haeutung = 2.0 x normal; danach GrowthScale um 8 Prozent groesser; keine Haeutung ohne Stufenwechsel.
   - Schritt 3: gezielt testen, einmal voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
-- [ ] T5 Vogelruf als Warnung. Bei der Vorwarnung des Vogels (BirdThreat, 8 s im Freien) ein hoerbarer Ruf (synthetisch aus ProceduralAudio, 2 absteigende Toene), Lautstaerke aus GameSettings. Einmal pro Vorwarnung.
+- [x] T5 Vogelruf als Warnung. Bei der Vorwarnung des Vogels (BirdThreat, 8 s im Freien) ein hoerbarer Ruf (synthetisch aus ProceduralAudio, 2 absteigende Toene), Lautstaerke aus GameSettings. Einmal pro Vorwarnung. [5c6a957]
   - Schritt 1: Ruf-Klang in ProceduralAudio (rein: Frequenzverlauf als Funktion), Ausloesung ueber das vorhandene Vorwarn-Ereignis.
   - Schritt 2: Kriterien als Zeilen 'Wert -> Kriterium -> OK/NOK': Ruf wird genau einmal pro Vorwarnung abgespielt (Zaehler); Frequenz am Anfang groesser als am Ende (absteigend); Lautstaerke 0 wenn Lautstaerke-Einstellung 0.
   - Schritt 3: gezielt testen, einmal voller CI-Lauf, Commit nach dem Gate, git push origin hdrp.
