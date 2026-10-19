@@ -31,6 +31,9 @@ namespace Spinnenspiel
         /// <summary>S1: difficulty multiplier on the drain rate (1 = Normal).</summary>
         public float difficultyMultiplier = 1f;
 
+        /// <summary>T4: multiplier on hazard damage while molting (2 = doppelt verwundbar, set by SpiderGrowth).</summary>
+        public float hazardDamageMultiplier = 1f;
+
         /// <summary>Current energy (0..maxEnergy).</summary>
         public float Energy;
 
@@ -47,6 +50,7 @@ namespace Spinnenspiel
         {
             Energy = startEnergy;
             StingCount = 0;
+            hazardDamageMultiplier = 1f;
         }
 
         /// <summary>Advance one tick by dt seconds at the given activity.</summary>
@@ -88,7 +92,7 @@ namespace Spinnenspiel
             }
             StingCount++;
 
-            Energy -= amount;
+            Energy -= amount * hazardDamageMultiplier;
             if (Energy < 0f)
             {
                 Energy = 0f;
@@ -107,7 +111,7 @@ namespace Spinnenspiel
                 return;
             }
 
-            Energy -= amount;
+            Energy -= amount * hazardDamageMultiplier;
             if (Energy < 0f)
             {
                 Energy = 0f;

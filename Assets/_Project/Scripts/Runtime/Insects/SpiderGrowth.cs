@@ -29,10 +29,21 @@ namespace Spinnenspiel
         private SpiderPredation _predation;
         private Vector3 _baseLocalScale = Vector3.one;
 
+        [Tooltip("Movement component that gets blocked during a molt (single switch: SetStun).")]
+        [SerializeField] private SpiderMovement _movement;
+
+        /// <summary>T4 Haeutungs-Model: after a stage change the spider molts for 5 s.</summary>
+        private MoltModel _molt;
+
         private void Awake()
         {
             _predation = GetComponent<SpiderPredation>();
             _baseLocalScale = transform.localScale;
+            _molt = new MoltModel();
+            if (_movement == null)
+            {
+                _movement = GetComponent<SpiderMovement>();
+            }
         }
 
         private void OnEnable()
@@ -66,8 +77,59 @@ namespace Spinnenspiel
             if (Mathf.Abs(target - GrowthScale) > 0.0001f)
             {
                 ApplyGrowth(target);
+                // T4: a new growth stage triggers a molt (movement blocked, damage x2).
+                BeginMolt();
             }
         }
+
+        /// <summary>T4: the molt blocks movement for 5 s and doubles hazard damage.</summary>
+        private void BeginMolt()
+        {
+            _molt.Begin();
+            // Single switch for movement: the existing stun blocks all input-driven motion.
+            // +0.25 s margin so the stun can never expire while a molt tick is still pending.
+            if (_movement != null)
+            {
+                _movement.SetStun(MoltModel.moltDuration + 0.25f);
+            }
+            // Hazard damage x2 while molting (read by SpiderEnergyModel).
+            SpiderEnergy energy = GetComponent<SpiderEnergy>();
+            if (energy != null)
+            {
+                energy.GetModel().hazardDamageMultiplier = MoltModel.damageFactorWhileMolting;
+            }
+        }
+
+        private void Update()
+        {
+            if (!_molt.IsMolting)
+            {
+                return;
+            }
+            if (_molt.Tick(Time.deltaTime))
+            {
+                return; // still molting: no movement, doubled hazard damage
+            }
+            // Molt over: hazard damage back to normal.
+            MoltsCompleted++;
+            SpiderEnergy energy = GetComponent<SpiderEnergy>();
+            if (energy != null)
+            {
+                energy.GetModel().hazardDamageMultiplier = 1f;
+            }
+        }
+
+        /// <summary>T4: true while the spider is molting (movement blocked, damage x2).</summary>
+        public bool IsMolting => _molt != null && _molt.IsMolting;
+
+        /// <summary>T4: hazard damage multiplier right now (2 while molting, else 1).</summary>
+        public float DamageFactor()
+        {
+            return _molt != null ? _molt.DamageFactor() : 1f;
+        }
+
+        /// <summary>T4: number of completed molts (for tests/diagnose).</summary>
+        public int MoltsCompleted { get; private set; }
 
         private void ApplyGrowth(float scale)
         {
@@ -77,6 +139,18 @@ namespace Spinnenspiel
             {
                 leg.SetGrowth(scale);
             }
+        }
+
+        /// <summary>T4 Haeutung: show "Haeutung" at the screen edge while the molt runs.</summary>
+        private void OnGUI()
+        {
+            if (!_molt.IsMolting)
+            {
+                return;
+            }
+            GUI.color = new Color(1f, 0.85f, 0.4f, 0.9f);
+            GUI.Label(new Rect(Screen.width - 230f, Screen.height * 0.5f, 200f, 24f), "Haeutung");
+            GUI.color = Color.white;
         }
     }
 }
