@@ -577,6 +577,14 @@ namespace Spinnenspiel
                 transform.position = p;
             }
 
+            // B3: Sicherheitsnetz gegen die Terrain-Unterseite. Ist die Koerpermittelpunkt
+            // mehr als TERRAIN_FLOOR_TOLERANZ UNTER der Terrainhoehe, wird die Spinne sofort
+            // auf die Terrainoberflaeche gesetzt und up wieder zu Welt-up abgleichen. Unter dem
+            // Terrain der Terrain-Raycast (GroundBelow/Sense) trifft nichts, so die Sperren aus
+            // B2 wirken nicht mehr und die Spinne laeuft kopfueber an der Unterseite (Alex:
+            // Baumstemk im Boden steckt -> Kugelwurf kein Blocker -> Spinne unter Terrain).
+            EnforceTerrainFloor();
+
             _lastVelocity = (transform.position - oldPos) / dt;
         }
 
@@ -585,6 +593,51 @@ namespace Spinnenspiel
         {
             return Physics.Raycast(transform.position, Vector3.down, out RaycastHit gh, 1.0f, sensor.mask, QueryTriggerInteraction.Ignore)
                 && gh.collider is TerrainCollider;
+        }
+
+        /// <summary>
+        /// B3: Sicherheitsnetz. SampleHeight gibt die Terrainhoehe INSENSATE, so es wirkt auch
+        /// UNTER dem Terrain (wo der Terrain-Raycast GroundBelow/Sense trifft nichts). Liegt der
+        /// Koerpermittelpunkt mehr als TERRAIN_FLOOR_TOLERANZ (0.05 m) UNTER der Terrainoberflaeche,
+        /// wird die Spinne per SettleOnTerrain sofort auf die Terrainoberflaeche gesetzt, up wieder
+        /// zu Welt-up abgleichen und die Unterseite NEVER als haftable surface: _surfaceNormal=up,
+        /// _attached=true so der naechste Frame ein normale Erdoberflaenhaftung neust. Ein Baumstemk
+        /// im Boden steckt oder ein Luecke im TrunkCapsule kann nicht mehr schneiden den Spinne
+        /// unter Terrain; entlanglaufen (SphereCast-Blocker) bleibt der primary path.
+        /// </summary>
+        private void EnforceTerrainFloor()
+        {
+            Terrain terr = Terrain.activeTerrain;
+            if (terr == null)
+            {
+                return;
+            }
+
+            Vector3 p = transform.position;
+            float terrainY = terr.SampleHeight(p) + terr.transform.position.y;
+            const float tolerance = 0.05f;
+            if (p.y >= terrainY - tolerance)
+            {
+                return;
+            }
+
+            // Unter der Terrain: auf die Oberflaeche setzen (SettleOnTerrain rases the center so
+            // the collider bottom rests on the surface + clearance), up back to world-up.
+            Vector3 settled = SettleOnTerrain(new Vector3(p.x, terrainY, p.z));
+            transform.position = settled;
+            // up back to world-up: project forward onto the horizontal plane; if that degenerates
+            // (forward ~ vertical while climbing), fall back to the current right axis.
+            Vector3 fwd = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
+            if (fwd.sqrMagnitude < 1e-6f)
+            {
+                fwd = Vector3.ProjectOnPlane(transform.right, Vector3.up);
+                fwd = fwd.sqrMagnitude < 1e-6f ? Vector3.forward : fwd;
+            }
+            transform.rotation = Quaternion.LookRotation(fwd.normalized, Vector3.up);
+            _surfaceNormal = Vector3.up;
+            _attached = true;
+            _lastSurfaceTime = Time.time;
+            _vel = Vector3.zero;
         }
 
         /// <summary>B2: Nahe am Boden ist eine nach unten zeigende Hindernisflaeche (Unterseite von
