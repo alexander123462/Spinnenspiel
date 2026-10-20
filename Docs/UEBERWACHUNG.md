@@ -5,3 +5,6 @@ Ursache: Hermes sah 3 neue rote Tests und blockierte; Basislauf ohne T8 zeigt di
 
 ## 2026-10-20 00:51 B4 (Overseer)
 Ursache: Hermes' Test trieb das echte OS-Keyboard in -batchmode per QueueStateEvent + manuellem InputSystem.Update() -> Action feuert nie (Harness-Problem, kein Beleg fuer Spielfehler). Spielcode-Pfad JumpPressed->TryTriggerJump schluessig, Physik ok (0,47 m). Hermes' Release/Jump-Zusammenlegung unbegruendet. Getan: Hermes-Aenderungen in git stash "Hermes B4" gesichert; B4 ersetzt durch B4a (InputTestFixture-Harness), B4b (Sprung per echter Leertaste), B4c (Zustand aus Alex' Antwort); Fragen in Docs/ALEX-FRAGEN.md. Kein CI-Lauf, kein Code-Commit.
+
+## 2026-10-20 Overseer WALD1
+Ursache: Hermes' WaldVergleichTests.cs hatte mehrere Compile-Fehler (nicht nur Zeile 107: Parametername `out`, Math.max/min, Environment.LineFeed, PixelFormat, RGBtoHSB, LoadScene-Namespace, fehlendes UnityTest-Using, `.Count` auf Arrays). Danach: Ordner Logs/ci/wald fehlte, Standort in Richtung 240 grad ohne trockenen Punkt (Abstand 8->4->0 m), Lauf 1 wich von Lauf 2 ab (Aufwaermlauf, Sonne eingefroren, Toleranz 3 %). Selbst behoben, Commit 0e20a09, WALD1 [x]. Zwei Urwald-Reds in ROT.md ergaenzt.
