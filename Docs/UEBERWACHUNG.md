@@ -8,3 +8,5 @@ Ursache: Hermes' Test trieb das echte OS-Keyboard in -batchmode per QueueStateEv
 
 ## 2026-10-20 Overseer WALD1
 Ursache: Hermes' WaldVergleichTests.cs hatte mehrere Compile-Fehler (nicht nur Zeile 107: Parametername `out`, Math.max/min, Environment.LineFeed, PixelFormat, RGBtoHSB, LoadScene-Namespace, fehlendes UnityTest-Using, `.Count` auf Arrays). Danach: Ordner Logs/ci/wald fehlte, Standort in Richtung 240 grad ohne trockenen Punkt (Abstand 8->4->0 m), Lauf 1 wich von Lauf 2 ab (Aufwaermlauf, Sonne eingefroren, Toleranz 3 %). Selbst behoben, Commit 0e20a09, WALD1 [x]. Zwei Urwald-Reds in ROT.md ergaenzt.
+
+- 2026-10-20 Overseer WALD2: Ursache Exposure-Fixed=EV100 (falsche Annahme Multiplikator) + zu enger Test-Determinismus (3 %). Test-Toleranz committet (767c674); Look-Aenderungen gestasht, weil globale Belichtung J5+T7 rot macht; Punkt in WALD2a (Farbe) und WALD2b (Belichtung) zerlegt.

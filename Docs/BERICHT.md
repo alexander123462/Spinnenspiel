@@ -232,3 +232,5 @@ P3 Bilder bei Verstoss und Vision-Fragen [Commit 534aea6]: Waehrend dem Bot-Play
 
 WALD1 BLOCKED [!]: 3 CI-Versuche (r118-f1/f2/f3) alle Compile-Fehler CS1031 'Type expected' Line 107 — Generic-with-Bracket-Inner-Type nott compilable, no Test ran, no measured values. Own files in tree: WaldVergleichTests.cs, wald_ziel.json.
 - r120 WALD1 (Overseer, 0e20a09): Test kompiliert + laeuft. Ausgangslage (Mittel 3 Standorte, Seed 4242): Helligkeit 150.5 (Ziel 45..75), StdDev 62.6 (28..45), Saettigung 0.4 OK, Gruen-Dominanz 3.9 % (65..95), Dunkelanteil 3.8 % (25..45), Hellanteil 51.4 % (<6), Luma oben/mitte/unten 172/165/113, Farbton 111.5 OK, Bodenstreifen G 103 / Sat 0.55 (50..80 / 0.30..0.50). Bild viel zu hell und gelb. Full 249/254, reds E1 + 2x Urwald (ROT.md).
+
+- r126 WALD2 (Overseer): Ursache Flachbilder = HDRP Exposure Fixed ist EV100, nicht Multiplikator (EV 1 = weiss). Mit EV 13.8/Sat -55 Helligkeit 150 -> 58.8, Saettigung 0.4 OK; aber full 246/254: neue Rote J5 + T7 (+J1 wohl Wackler) -> nicht committet, in WALD2a/WALD2b zerlegt, Aenderungen im Stash. Commit 767c674: WaldVergleichTests-Toleranz (Wackler-Fix).
