@@ -13,5 +13,3 @@ Commit mitnehmen.
 (Baseline currently empty: RedPreview_WhenSpotGoesBad made deterministic and green in R7.)
 
 - Spinnenspiel.Tests.UrwaldTests.E1_WaterProofImageIsSharp — SharpFrac 1.3%<10%, rot auch ohne T8 (t8basefull); Verdacht T7 Nebel.
-- Spinnenspiel.Tests.UrwaldTests.Urwald_GeneratesWorldFromSeed — G6 spinne SharpFrac 3.4%<10%, rot seit r116 (gleiche Ursache wie E1: Nebel).
-- Spinnenspiel.Tests.UrwaldTests.Urwald_Nahkampfscharf — Nahaufnahme SharpFrac 3.9%<10%, rot seit r116 (Nebel).
