@@ -37,6 +37,12 @@ namespace Spinnenspiel.Tests
         private UnityEngine.InputSystem.Controls.KeyControl[] keys; // 0 W, 1 S, 2 A, 3 D, 4 Shift, 5 Space, 6 N
         private bool[] pressedKey = new bool[7];
 
+        // P3: clean playtest images (max 3 per seed at violations, plus every 20 s).
+        private const string BildDir = "Logs/playtest/bild_";
+        private int _p3ViolationShots;
+        private float _p3LastShotS;
+        private HashSet<int> _p3ImageSeeds = new HashSet<int>();
+
         private IEnumerator WaitReady()
         {
             readyGen = null;
@@ -113,6 +119,21 @@ namespace Spinnenspiel.Tests
             }
         }
 
+        /// <summary>P3: one clean image from the player perspective (SpiderCamera on Camera.main):
+        /// 3 frames rest so HDRP has no motion smear, then SaveFrameHdr-style capture into
+        /// Logs/playtest/bild_<seed>_<zeit>.png. Pixel rules run inside the grabber.</summary>
+        private IEnumerator CapturePlaytestImage(int seed, float t)
+        {
+            yield return null; yield return null; yield return null;
+            var cam = UnityEngine.Camera.main;
+            if (cam != null)
+            {
+                int zeit = (int)(t + 0.5f);
+                PlaytestImageGrabber.CaptureFrame(cam, 640, 360, BildDir + seed + "_" + zeit + ".png");
+                _p3ImageSeeds.Add(seed);
+            }
+        }
+
         /// <summary>Nearest tree trunk to `from` within maxDist. The Urwald builder names
         /// the collider "TrunkCapsule" (CapsuleCollider); Testwelt uses "Trunk" (MeshCollider
         /// + SurfaceTag). Both are accepted as trunks.</summary>
@@ -163,6 +184,11 @@ namespace Spinnenspiel.Tests
             Assert.IsNotNull(mv, "Seed " + seed + ": SpiderMovement missing.");
             placer = mv.GetComponent<SpiderWebPlacer>();
             AddWaechter();
+
+            // P3: clean-volume once per seed (Motion Blur off for the playtest images).
+            PlaytestImageGrabber.EnsureCleanVolume();
+            _p3ViolationShots = 0;
+            _p3LastShotS = -20f;
 
             if (saveReplay)
             {
@@ -253,6 +279,17 @@ namespace Spinnenspiel.Tests
                 }
 
                 t += Time.deltaTime;
+
+                // P3: clean image on new violations (max 3 per seed) and every 20 s.
+                bool newViolation = waechter != null && waechter.ReportsSeen > _p3ViolationShots && _p3ViolationShots < 3;
+                bool intervalDue = t - _p3LastShotS >= 20f;
+                if (newViolation || intervalDue)
+                {
+                    _p3ViolationShots += newViolation ? 1 : 0;
+                    _p3LastShotS = t;
+                    yield return CapturePlaytestImage(seed, t);
+                }
+
                 yield return null;
             }
 
@@ -388,6 +425,10 @@ namespace Spinnenspiel.Tests
             }
 
             CriteriaLine("Seeds in summary.txt = " + seedCount, "at least 6 seeds", seedCount >= 6);
+
+            // P3 criterion: at least one clean playtest image per seed was saved.
+            int imagesCovered = _p3ImageSeeds.Count;
+            CriteriaLine("playtest bild_ seeds covered = " + imagesCovered, "at least 1 image per seed (6)", imagesCovered >= 6);
 
             // Criterion: whole playtest below 10 minutes wall time.
             float elapsedS = Time.realtimeSinceStartup - _firstTestStartS;

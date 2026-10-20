@@ -18,6 +18,9 @@ namespace Spinnenspiel
         public bool IsActive { get; private set; }
         public int CheckedFrames { get; private set; }
 
+        // P3: how many violations this run actually wrote (image trigger for the bot test).
+        public int ReportsSeen { get; private set; }
+
         private const string LogPath = "Logs/playtest/verstoesse.jsonl";
         private const float R6IntervalS = 0.25f;
         private const float R6ProbeLen = 0.8f;
@@ -83,7 +86,7 @@ namespace Spinnenspiel
                 float terrainY = terr.SampleHeight(pos) + terr.transform.position.y;
                 if (VerstossRulesModel.R1_BelowTerrain(pos.y, terrainY))
                 {
-                    _protocol.Report(0, t, seed, pos.x, pos.y, pos.z);
+                    ReportViolation(0, t, seed, pos);
                 }
             }
 
@@ -91,7 +94,7 @@ namespace Spinnenspiel
             float upDot = Vector3.Dot(_move.transform.up, _move.SurfaceNormal);
             if (VerstossRulesModel.R2_BadSlope(upDot, climbAllowed))
             {
-                _protocol.Report(1, t, seed, pos.x, pos.y, pos.z);
+                                    ReportViolation(1, t, seed, pos);
             }
 
             // R3: input active but no progress for more than 5 s.
@@ -108,7 +111,7 @@ namespace Spinnenspiel
                 float travelled = Vector3.Distance(pos, _idlePos);
                 if (VerstossRulesModel.R3_NoProgress(input.SqrMagnitude(), travelled, t - _idleStart))
                 {
-                    _protocol.Report(2, t, seed, pos.x, pos.y, pos.z);
+                                        ReportViolation(2, t, seed, pos);
                 }
             }
 
@@ -118,14 +121,14 @@ namespace Spinnenspiel
             float fallSpeed = _move.IsGrounded ? 0f : Mathf.Max(0f, -_move.Velocity.y);
             if (VerstossRulesModel.R4_PositionOrSpeedInvalid(pos.x, pos.y, pos.z, fallSpeed))
             {
-                _protocol.Report(3, t, seed, pos.x, pos.y, pos.z);
+                                    ReportViolation(3, t, seed, pos);
             }
 
             // R5: frame time spike over 100 ms.
             float frameMs = Time.deltaTime * 1000f;
             if (VerstossRulesModel.R5_FrameSpike(frameMs))
             {
-                _protocol.Report(4, t, seed, pos.x, pos.y, pos.z);
+                                    ReportViolation(4, t, seed, pos);
             }
 
             // R6: body centre inside a tree collider (downcast into wood colliders).
@@ -135,7 +138,7 @@ namespace Spinnenspiel
                 _r6Timer = R6IntervalS;
                 if (InsideTreeCollider(pos))
                 {
-                    _protocol.Report(5, t, seed, pos.x, pos.y, pos.z);
+                                        ReportViolation(5, t, seed, pos);
                 }
             }
         }
@@ -175,6 +178,16 @@ namespace Spinnenspiel
             }
 
             return false;
+        }
+
+        private static void Unused() { }
+
+        /// <summary>P3: counts written violations so the bot test can trigger images.</summary>
+        private bool ReportViolation(int ruleIndex, float t, int seed, Vector3 pos)
+        {
+            bool written = _protocol.Report(ruleIndex, t, seed, pos.x, pos.y, pos.z);
+            if (written) ReportsSeen++;
+            return written;
         }
 
         private void Start()
