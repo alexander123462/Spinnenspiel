@@ -25,14 +25,14 @@ namespace Spinnenspiel.EditorTools
             Light sun = sunObject.AddComponent<Light>();
             sun.type = LightType.Directional;
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.85f;
+            sun.shadowStrength = WaldLook.SunShadowStrength; // WALD2a3: shadow strength from one place (0.78, not black)
             sun.shadowNormalBias = 0.3f;
             sun.shadowBias = 0.02f;
             sun.intensity = 1.35f;
             // HDRP: physikalische Lichtstaerken (Lux) + Volumetrische Dimmung fuer Lichtstrahlen.
             var hd = sun.GetComponent<HDAdditionalLightData>(); if (hd == null) hd = sun.gameObject.AddComponent<HDAdditionalLightData>();
-            sun.lightUnit = LightUnit.Lux; sun.intensity = 100000f; sun.useColorTemperature = true; sun.colorTemperature = 5600f; sun.shadows = LightShadows.Soft; hd.volumetricDimmer = 1f;
-            sun.color = new Color(1f, 0.93f, 0.82f);
+            sun.lightUnit = LightUnit.Lux; sun.intensity = 100000f; sun.useColorTemperature = true; sun.colorTemperature = 5600f; sun.shadows = LightShadows.Soft; hd.volumetricDimmer = 1f; // WALD2a3: Lux stays at 100000 (Lux-dimming without fixed exposure is ineffective / belongs to WALD2b)
+            sun.color = WaldLook.SunColor; // WALD2a3: only the sun color moves, from WaldLook (not baseline 1/0.93/0.82)
             RenderSettings.sun = sun;
 
             if (ScanSky.IsAvailable())

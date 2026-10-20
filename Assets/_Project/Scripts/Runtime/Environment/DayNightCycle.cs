@@ -66,6 +66,12 @@ namespace Spinnenspiel
         [Tooltip("Sun tint at night (moonlight)")]
         private Color moonTint = new Color(0.8f, 0.85f, 1f);
 
+        // WALD2a3: daytime sun color from the Builder (WaldLook.SunColor), so the runtime
+        // cycle does not overwrite it with a hardcoded value. Default stays at the old
+        // baseline so runtime-created components (tests) keep their behaviour.
+        [Tooltip("Sun tint during day (from WaldLook)")]
+        public Color daySunColor = new Color(1f, 0.93f, 0.82f);
+
         // T7 Morgennebel: Nebeldensity follows the time of day. The factor multiplies
         // the baseline fog density (2.0 = twice as dense as noon). Piecewise-linear keys
         // keep the curve continuous (no jumps; sampled on a fine grid the adjacent values
@@ -200,7 +206,7 @@ namespace Spinnenspiel
             CurrentNightFactor = 1f - dayFactor;
             sun.intensity = Mathf.Lerp(moonLux, dayLux, dayFactor);
             sun.color = Color.Lerp(
-                new Color(1f, 0.93f, 0.82f), moonTint, 1f - dayFactor);
+                daySunColor, moonTint, 1f - dayFactor);
 
             ambientTimer += Time.deltaTime;
             if (ambientTimer >= ambientUpdateSeconds)
