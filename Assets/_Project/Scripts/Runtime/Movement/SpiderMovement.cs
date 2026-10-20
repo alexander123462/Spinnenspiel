@@ -304,6 +304,23 @@ namespace Spinnenspiel
             CurrentWeb = null;
         }
 
+        /// <summary>B4c: Am Seil (Dragline) Leertaste = fallen lassen: abspring from the rope,
+        /// free fall until a surface is hit. Without this the rope state was a dead state where
+        /// space did neither jump nor let go (Alex: "Leertaste drucken, nothing happens").</summary>
+        public void DropFromRope()
+        {
+            if (!IsOnRope)
+            {
+                return;
+            }
+
+            IsOnRope = false;
+            _attached = false;
+            _vel = Vector3.zero;
+            _ropeVel = Vector3.zero;
+            _boardCooldownUntil = Time.time + 1f;
+        }
+
         /// <summary>
         /// Faden aktiv loslassen: Fadenbezug entfernen und Haftung aufheben, damit die Spinne fällt,
         /// bis sie wieder auf einer Oberfläche landet.

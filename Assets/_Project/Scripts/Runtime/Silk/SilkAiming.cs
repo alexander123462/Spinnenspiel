@@ -64,6 +64,12 @@ namespace Spinnenspiel
             {
                 movement.LetGo();
             }
+            // B4c: Am Seil (Dragline, neither thread nor web) Leertaste = fallen lassen too —
+            // otherwise the rope was a dead state where space did nothing.
+            else if (input != null && input.ReleasePressed && movement != null && movement.IsOnRope)
+            {
+                movement.DropFromRope();
+            }
         }
 
         private void UpdateAim()
