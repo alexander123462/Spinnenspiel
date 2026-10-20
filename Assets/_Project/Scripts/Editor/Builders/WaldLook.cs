@@ -11,7 +11,7 @@ namespace Spinnenspiel.EditorTools
     public static class WaldLook
     {
         // --- Nebel (T7-Morgennebel bleibt: meanFreePath-Basewert, DayNightCycle scales it). ---
-        public static Color FogAlbedo = new Color(0.64f, 0.73f, 0.68f); // gruenlich-kuehl PADER bright (baseline ~0.75): a dark fog washes the Nahaufnahme (SharpFrac->0)
+        public static Color FogAlbedo = new Color(0.74f, 0.84f, 0.72f); // WALD2a2 Versuch 3: gruenlich-kuehl, Brightness ~ Baseline (0.75/0.82/0.75)
         public static float FogMeanFreePath = 60f; // Base-Nebeldistanz (Noon)
         public static float FogDensity = 0.012f; // A2-Base (T7-Curve multiplies); WALD2 keeps Nebeldense, only colors move
 
