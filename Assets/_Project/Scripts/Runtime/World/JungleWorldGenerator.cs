@@ -43,6 +43,8 @@ namespace Spinnenspiel
         public int RockCount { get; private set; }
         public int FrogCount { get; private set; }
         public int YoungConiferCount { get; private set; }
+        public int MoosShellCount { get; private set; }
+        public int MoosCardCount { get; private set; }
 
         // WALD6: Vegetation-Konfiguration (Builder copies from WaldLook; defaults = old behaviour).
         public bool giantLeavesOn = true;   // Riesenblaetter in/ut the forest
@@ -52,6 +54,14 @@ namespace Spinnenspiel
         public float fernScatterFactor = 1f; // Farn-Scatter-Patch chance per cell (x)
         public bool youngConifersOn = false; // Jungbaeumchen/Nadelwedel Gebuesch on/off
         public float bushFactor = 1f;       // Busche haeufigkeit (probability+cap x)
+        // WALD7: Moos-Konfiguration (Builder copies from WaldLook).
+        public bool moosOn = true;          // Moos shells/cards in/ut
+        public float moosBaseHeightM = 1.5f; // unterste Stamm-Meterage mit Moos
+
+        /// <summary>WALD7: Set by CreateTree for the LAST created tree (trunk base world pos +
+        /// capsule radius), consumed right after CreateTree in the planting loop.</summary>
+        private Vector3 _lastTrunkBaseWorld = Vector3.zero;
+        private float _lastTrunkRadius = -1f;
 
         private void Awake()
         {
@@ -125,6 +135,10 @@ namespace Spinnenspiel
 
             // 4) Bäume
             Transform treesRoot = new GameObject("Bäume").transform;
+            // WALD7: ONE shell mesh per tree variant (shared by all instances of that variant).
+            var moosShellMesh = moosOn ? JunglePlantFactory.MoosBaseShell(Seed * 31 + 5) : null;
+            var moosCardMesh = moosOn ? JunglePlantFactory.MoosCapCards(Seed * 31 + 7) : null;
+            GameObject moosRoot = new GameObject("Moos"); // static-batched later, world-unit parent
             var placed = new Dictionary<Vector2Int, List<Vector3>>(); // 3-m-Zellen, Mindestdistanz 2,2 m
             for (int gx = 2; gx < size - 1; gx += 2)
             {
@@ -164,6 +178,22 @@ namespace Spinnenspiel
                     Transform tree = CreateTree(new Vector3(x, y, z), rot, scale, variant, treesRoot);
                     if (tree == null) continue;
                     Trees.Add(tree);
+
+                    // WALD7: Moos-Shell um dem Stamm-Fuss — ONE shared shell-mesh per variant +
+                    // ONE shared MAT_Moos (Alpha-Cutout with v-gradient), no material per object.
+                    // Base/radius come from CreateTree's planted trunk (R6 capsule data).
+                    if (moosOn && library.moosMat != null && _lastTrunkRadius > 0f)
+                    {
+                        float r = _lastTrunkRadius * 1.12f + 0.04f; // hair off the bark
+                        GameObject sh = new GameObject("MoosBase");
+                        sh.transform.SetParent(moosRoot.transform, false); // unscaled root -> world units
+                        sh.transform.position = _lastTrunkBaseWorld + Vector3.up * 0.05f; // into the ground
+                        sh.transform.rotation = Quaternion.Euler(0f, rot, 0f);
+                        sh.transform.localScale = new Vector3(r, moosBaseHeightM, r);
+                        sh.AddComponent<MeshFilter>().sharedMesh = moosShellMesh;
+                        sh.AddComponent<MeshRenderer>().sharedMaterial = library.moosMat;
+                        MoosShellCount++;
+                    }
 
                     if (!placed.TryGetValue(cell, out List<Vector3> list))
                     {
@@ -661,9 +691,25 @@ namespace Spinnenspiel
                 if (NearAny(treePos, new Vector3(x, 0f, z), 1.5f)) continue;
                 if (NearSpawn(x, z, 2.0f)) continue;
                 float h = World.Height(x, z);
-                CreateProp(totholz.transform, library.logs[placedLogs % Math.Min(3, library.logs.Length)],
+                var logMesh = library.logs[placedLogs % Math.Min(3, library.logs.Length)];
+                float logScale = 0.8f + World.Hash01(0, i, 45) * 0.4f;
+                CreateProp(totholz.transform, logMesh,
                     library.logMat, new Vector3(x, h - 0.05f, z),
-                    World.Hash01(0, i, 44) * 360f, 0.8f + World.Hash01(0, i, 45) * 0.4f, SurfaceType.Wood);
+                    World.Hash01(0, i, 44) * 360f, logScale, SurfaceType.Wood);
+                // WALD7: Moos-Karten on the UPPER side of the Totholz (same shared MAT_Moos).
+                if (moosOn && library.moosMat != null && moosCardMesh != null)
+                {
+                    Bounds lb = logMesh.bounds;
+                    GameObject card = new GameObject("MoosCap");
+                    card.transform.SetParent(moosRoot.transform, false);
+                    card.transform.position = new Vector3(x, h - 0.05f + lb.max.y * logScale + 0.02f, z);
+                    card.transform.rotation = Quaternion.Euler(0f, World.Hash01(0, i, 46) * 360f, 0f);
+                    card.transform.localScale = new Vector3(lb.extents.x * 2f * logScale * 0.55f,
+                        1f, lb.extents.z * 2f * logScale * 0.55f);
+                    card.AddComponent<MeshFilter>().sharedMesh = moosCardMesh;
+                    card.AddComponent<MeshRenderer>().sharedMaterial = library.moosMat;
+                    MoosCardCount++;
+                }
                 placedLogs++;
             }
             LogCount = placedLogs;
@@ -1229,6 +1275,8 @@ namespace Spinnenspiel
             // A CapsuleCollider along the trunk axis gives a convex blocker on the SAME layer the
             // sensor/movement mask queries (layer 0). Child of colNode -> inherits the planting
             // dropLocal shift automatically, so it stays glued to the planted trunk.
+            _lastTrunkBaseWorld = Vector3.zero; // WALD7: reset per tree, set below when wood valid
+            _lastTrunkRadius = -1f;
             if (woodSub >= 0)
             {
                 Bounds tb = lod0.GetSubMesh(woodSub).bounds;
@@ -1243,6 +1291,10 @@ namespace Spinnenspiel
                 cap.direction = 1; // Y-Axis (Stemachse)
                 UnityEngine.Debug.Log("[R6] TrunkCapsule variant=" + variant + " radius->" + tradius.ToString("F3")
                     + " height->" + theight.ToString("F3") + " convex->true");
+                // WALD7: Moos-Shell-Anker = real planted trunk base (colNode already carries
+                // the planting shift) and the capsule radius.
+                _lastTrunkBaseWorld = colNode.transform.TransformPoint(new Vector3(tb.center.x, tb.min.y, tb.center.z));
+                _lastTrunkRadius = tradius;
             }
 
             var lod = tree.AddComponent<LODGroup>();

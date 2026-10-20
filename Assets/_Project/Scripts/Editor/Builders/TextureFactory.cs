@@ -156,6 +156,24 @@ namespace Spinnenspiel.EditorTools
                 Mathf.Abs(Mathf.Sin((u * 18f + TileNoise(u, v, 3f, 2, 1f) * 4f) * Mathf.PI)) * 0.6f + TileNoise(u, v, 24f, 3, 6.1f) * 0.4f, 5f);
         }
 
+        /// <summary>WALD7: Moos-Atlas — speckled moss greens (hue ~80..110 deg) with an ALPHA gradient
+        /// over v (v=0 solid at the Stamm-Fuss, fading to transparent toward v=1). The cutout shape
+        /// comes from the texture (noise speckles + fade), so Alpha-Cutout is the right trick here.</summary>
+        public static Texture2D Moos()
+        {
+            return Generate("T_Moos", 512, (u, v) =>
+            {
+                float blotch = TileNoise(u, v, 6f, 4, 77f);          // moos clumps
+                float fine = TileNoise(u, v, 20f, 3, 91f);           // fine structure
+                Color deep = new Color(0.16f, 0.38f, 0.13f);         // hue ~125 desat -> moos dark
+                Color bright = new Color(0.42f, 0.66f, 0.24f);       // hellgruen, hue ~97 deg
+                Color c = Color.Lerp(deep, bright, blotch * 0.7f + fine * 0.3f);
+                float fade = Mathf.Clamp01((1f - v) * 1.5f);         // v=0 solid -> v~0.7 gone (out upward)
+                float speck = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.32f, 0.62f, blotch * 0.6f + fine * 0.4f));
+                return new Color(c.r, c.g, c.b, fade * speck);
+            }, true);
+        }
+
         /// <summary>Blatt-Atlas: mehrere Blätter mit Alpha auf einer Karte (für Busch- und Baumkarten).</summary>
         public static Texture2D LeafCluster()
         {

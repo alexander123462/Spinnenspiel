@@ -59,6 +59,8 @@ namespace Spinnenspiel.EditorTools
             lib.bark = ScanBark(LoadMaterial("MAT_TreeBark"));
             lib.logMat = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_dead_tree_trunk.mat", LoadMaterial("MAT_Bark"));
             lib.rockMat = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_mossy_rock.mat", LoadMaterial("MAT_Rock"));
+            // WALD7: ONE shared Moos-Material (Alpha-Cutout with v-gradient) for all shells/cards.
+            lib.moosMat = MoosMaterial();
             lib.fern = ScanMesh("Assets/_Project/Art/Scans/Models/fern_02/fern_02_1k.fbx", LoadMesh("VM_Fern"));
             // G4: Scan-Farn/-Strauch wirken mitteleuropäisch-braun → grün getönte Kopien (Originale bleiben unverändert).
             lib.fernMat = TropischMaterial(ScanMaterial("Assets/_Project/Art/Scans/Materials/M_fern_02.mat", LoadMaterial("MAT_Fern")), "MAT_FernTropisch");
@@ -114,6 +116,9 @@ namespace Spinnenspiel.EditorTools
             gen.fernScatterFactor = WaldLook.FernScatterFactor;
             gen.youngConifersOn = WaldLook.YoungConifersOn;
             gen.bushFactor = WaldLook.BushFactor;
+            // WALD7: Moos config (one shared MAT_Moos for all shells/cards).
+            gen.moosOn = WaldLook.MoosOn;
+            gen.moosBaseHeightM = WaldLook.MoosBaseHeightM;
 
             new GameObject("Wind").AddComponent<WindController>();
             // Weather: deterministic dry/rain cycle driving the audio crossfade.
@@ -1139,6 +1144,31 @@ namespace Spinnenspiel.EditorTools
                 mats.Add(TropischMaterial(src, "MAT_" + id + "Tropisch"));
             }
             return mats.ToArray();
+        }
+
+        /// <summary>WALD7: MAT_Moos — ONE shared Alpha-Cutout Material (hellgruen T_Moos with v-gradient
+        /// alpha). Shells and cards all point at this single material; no per-object mats.</summary>
+        private static Material MoosMaterial()
+        {
+            string path = MatFolder + "MAT_Moos.mat";
+            Texture2D albedo = TextureFactory.Moos();
+            Material fresh = Spinnenspiel.Rendering.PipelineMaterials.Lit(WaldLook.MoosColor, albedo);
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(fresh, 0.15f); // matte like bark
+            Spinnenspiel.Rendering.PipelineMaterials.SetAlphaClip(fresh, 0.5f);   // cutout shape from texture
+            Spinnenspiel.Rendering.PipelineMaterials.SetDoubleSided(fresh, true);
+            fresh.SetFloat("_DoubleSidedNormalMode", 2f); // Flip (see Q2: Mirror lit backside black)
+            fresh.SetVector("_DoubleSidedConstants", new Vector4(1f, 1f, 1f, 0f));
+            Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (existing != null)
+            {
+                existing.CopyPropertiesFromMaterial(fresh);
+                EditorUtility.SetDirty(existing);
+                AssetDatabase.SaveAssets();
+                return existing;
+            }
+            AssetUtil.EnsureFolder("Assets/_Project/Art/Generated/Materials");
+            AssetDatabase.CreateAsset(fresh, path);
+            return fresh;
         }
 
         private static Material TropischMaterial(Material src, string name)

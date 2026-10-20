@@ -38,7 +38,12 @@ namespace Spinnenspiel.EditorTools
         public static float SwordFernFactor = 2.6f; // Unterholz-Farne (Farn_Grund): probability+cap multiplier
         public static float GroundFernFactor = 2.6f; // Grundfarne (Farn_Tropisch fern_1..5): probability multiplier
         public static float FernScatterFactor = 2.5f; // Farn-Scatter-Patches (Farn_Scatter) per cell
-        public static bool YoungConifersOn = true;  // WALD6: Jungbaeumchen/Nadelwedel as Gebuesch
+        public static bool YoungConifersOn = true;  // WALD6: Jungbaeumchen/Nadelwedel Gebuesch on/off
         public static float BushFactor = 1.3f;      // Busche (Busch1/shrub_02): dichter
+
+        // --- WALD7: Moos an Stamm-Base und Totholz-Oberseite (one shared material, no per-object mats). ---
+        public static bool MoosOn = true;           // Moos shells/cards in/ut
+        public static float MoosBaseHeightM = 1.5f; // unterste Stamm-Meterage mit Moos (nach oben auslaufend)
+        public static Color MoosColor = new Color(0.30f, 0.62f, 0.22f); // hellgruen, Farbton ca. 97 Grad (HSV 80..110)
     }
 }

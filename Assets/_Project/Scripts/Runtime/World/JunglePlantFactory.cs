@@ -286,6 +286,99 @@ namespace Spinnenspiel
         }
 
         /// <summary>
+        /// WALD7: Moos-Shell um dem Stamm-Fuss — UNIT-Mesh (Radius 1, Hoehe 1, Y-Axis), per Tree
+        /// scaled to the Trunk-Radius. V-Coordinate = Hoehe (0 = Fuss, 1 = Oberedge), so die
+        /// alpha-Gradient der Moos-Textur fades the shell out upward. One shared mesh+material:
+        /// Unity auto-batches, no new material per object.
+        /// </summary>
+        public static Mesh MoosBaseShell(int seed)
+        {
+            var rng = new System.Random(seed);
+            float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+
+            int sides = 14;
+            List<Vector3> verts = new List<Vector3>();
+            List<Vector3> normals = new List<Vector3>();
+            List<Vector2> uvs = new List<Vector2>();
+            List<int> tris = new List<int>();
+
+            for (int s = 0; s < sides; s++)
+            {
+                float a0 = s / (float)sides * Mathf.PI * 2f;
+                float a1 = (s + 1) / (float)sides * Mathf.PI * 2f;
+                // slight radius wobble per side -> organic moos edge
+                float r0 = 1f + R(-0.06f, 0.06f);
+                float r1 = 1f + R(-0.06f, 0.06f);
+                Vector3 p0b = new Vector3(Mathf.Cos(a0) * r0, 0f, Mathf.Sin(a0) * r0);
+                Vector3 p1b = new Vector3(Mathf.Cos(a1) * r1, 0f, Mathf.Sin(a1) * r1);
+                Vector3 n0 = new Vector3(Mathf.Cos(a0), 0f, Mathf.Sin(a0));
+                Vector3 n1 = new Vector3(Mathf.Cos(a1), 0f, Mathf.Sin(a1));
+                int i0 = verts.Count;
+                verts.Add(p0b); normals.Add(n0); uvs.Add(new Vector2(s / (float)sides, 0f));
+                verts.Add(new Vector3(p0b.x, 1f, p0b.z)); normals.Add(n0); uvs.Add(new Vector2(s / (float)sides, 1f));
+                verts.Add(p1b); normals.Add(n1); uvs.Add(new Vector2((s + 1) / (float)sides, 0f));
+                verts.Add(new Vector3(p1b.x, 1f, p1b.z)); normals.Add(n1); uvs.Add(new Vector2((s + 1) / (float)sides, 1f));
+                tris.Add(i0); tris.Add(i0 + 2); tris.Add(i0 + 1);
+                tris.Add(i0 + 1); tris.Add(i0 + 2); tris.Add(i0 + 3);
+            }
+
+            Mesh m = new Mesh();
+            m.SetVertices(verts);
+            m.SetNormals(normals);
+            m.SetUVs(0, uvs);
+            m.SetTriangles(tris, 0);
+            m.RecalculateBounds();
+            return m;
+        }
+
+        /// <summary>
+        /// WALD7: Moos-Karten-Patch for the UPPER side of Totholz — UNIT-Mesh (X/Z in -1..1,
+        /// Y 0..0.25), per Log scaled to the top-face extent. Cards are up-facing quads with
+        /// slight tilt; UV v stays below the gradient fade -> fully green. Deterministic from seed.
+        /// </summary>
+        public static Mesh MoosCapCards(int seed)
+        {
+            var rng = new System.Random(seed);
+            float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+
+            var verts = new List<Vector3>();
+            var norms = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>();
+
+            int cards = rng.Next(5, 8);
+            for (int c = 0; c < cards; c++)
+            {
+                float cx = R(-0.6f, 0.6f), cz = R(-0.6f, 0.6f);
+                float half = R(0.22f, 0.42f);
+                float ang = R(0f, Mathf.PI * 2f);
+                float tilt = R(0.05f, 0.18f); // slight up-tilt at the far edge -> volume hint
+                Vector3 ax = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+                Vector3 side = new Vector3(-ax.z, 0f, ax.x);
+                Vector3 p0 = new Vector3(cx, R(0.02f, 0.06f), cz);
+                Vector3 p1 = p0 + ax * half;
+                Vector3 q0 = p0 + side * half * 0.7f;
+                Vector3 q1 = p1 + side * half * 0.7f + Vector3.up * tilt;
+                int b = verts.Count;
+                float u0 = R(0.15f, 0.6f), v0 = R(0.05f, 0.25f); // below the fade -> solid green
+                verts.Add(p0); verts.Add(q0); verts.Add(q1); verts.Add(p1 + Vector3.up * tilt);
+                uvs.Add(new Vector2(u0, v0)); uvs.Add(new Vector2(u0 + 0.3f, v0));
+                uvs.Add(new Vector2(u0 + 0.3f, v0 + 0.2f)); uvs.Add(new Vector2(u0, v0 + 0.2f));
+                for (int k = 0; k < 4; k++) norms.Add(Vector3.up);
+                tris.Add(b); tris.Add(b + 1); tris.Add(b + 2);
+                tris.Add(b); tris.Add(b + 2); tris.Add(b + 3);
+            }
+
+            var m = new Mesh { name = "MoosCapCards_" + seed };
+            m.SetVertices(verts);
+            m.SetNormals(norms);
+            m.SetUVs(0, uvs);
+            m.SetTriangles(tris, 0);
+            m.RecalculateBounds();
+            return m;
+        }
+
+        /// <summary>
         /// WALD6: Jungbaeumchen/Nadelwedel (Coniferen-Saling) as Gebuesch, deterministic from seed.
         /// Central stem + 3-5 whorls of needle twigs (thin cones), total height normalised to ~1 m
         /// so the generator can scale it to 0.5..2 m. Real geometry -> opaque material (no cutout).

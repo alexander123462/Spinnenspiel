@@ -82,6 +82,9 @@ namespace Spinnenspiel
         public Material logMat;
         public Material rockMat;
 
+        /// <summary>WALD7: ONE shared Moos-Material (MAT_Moos) for all shells/cards — no per-object mats.</summary>
+        public Material moosMat;
+
         /// <summary>Reihenfolge: Earth, Grass, Mud, Rock.</summary>
         public TerrainLayer[] terrainLayers;
 
