@@ -29,5 +29,16 @@ namespace Spinnenspiel.EditorTools
         // --- Belichtung fest (Auto-Histogram blew out die Scene) und Sattierung senken. ---
         public static float FixedExposureEV = 13.8f; // HDRP Fixed = EV100 (kein Multiplikator!): 1 = voellig ueberbelichtet (flache 164er Bilder, r120). Sonne 75000 lx -> ca. EV 13. Iterate per messung.txt.
         public static float SaturationPercent = -12f; // WALD2a1: mild de-sat of brown earth tones (HDRP percent, baseline was +10)
+
+        // --- WALD6: Vegetation-Konfiguration der Waldbereich (Tropen-Typen an/aus, Haeufigkeiten). ---
+        // UrwaldSceneBuilder these values onto the JungleWorldGenerator copy, so the runtime
+        // world and the tests read ONE config. Baseline (all-on, factors 1) = old behaviour.
+        public static bool GiantLeavesOn = false;   // WALD6: Riesenblaetter out of the forest
+        public static bool TreeFernsOn = false;     // WALD6: Palmen-Baumfarne (Farn_Baum) out
+        public static float SwordFernFactor = 2.6f; // Unterholz-Farne (Farn_Grund): probability+cap multiplier
+        public static float GroundFernFactor = 2.6f; // Grundfarne (Farn_Tropisch fern_1..5): probability multiplier
+        public static float FernScatterFactor = 2.5f; // Farn-Scatter-Patches (Farn_Scatter) per cell
+        public static bool YoungConifersOn = true;  // WALD6: Jungbaeumchen/Nadelwedel as Gebuesch
+        public static float BushFactor = 1.3f;      // Busche (Busch1/shrub_02): dichter
     }
 }

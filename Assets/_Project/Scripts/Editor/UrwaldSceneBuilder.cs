@@ -106,6 +106,14 @@ namespace Spinnenspiel.EditorTools
             GameObject generator = new GameObject("Weltgenerator");
             var gen = generator.AddComponent<JungleWorldGenerator>();
             gen.library = lib;
+            // WALD6: Vegetation-Konfiguration from WaldLook (ONE place), runtime reads the copy.
+            gen.giantLeavesOn = WaldLook.GiantLeavesOn;
+            gen.treeFernsOn = WaldLook.TreeFernsOn;
+            gen.swordFernFactor = WaldLook.SwordFernFactor;
+            gen.groundFernFactor = WaldLook.GroundFernFactor;
+            gen.fernScatterFactor = WaldLook.FernScatterFactor;
+            gen.youngConifersOn = WaldLook.YoungConifersOn;
+            gen.bushFactor = WaldLook.BushFactor;
 
             new GameObject("Wind").AddComponent<WindController>();
             // Weather: deterministic dry/rain cycle driving the audio crossfade.

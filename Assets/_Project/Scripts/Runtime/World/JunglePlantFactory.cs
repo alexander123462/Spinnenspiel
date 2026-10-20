@@ -284,5 +284,75 @@ namespace Spinnenspiel
             m.RecalculateBounds();
             return m;
         }
+
+        /// <summary>
+        /// WALD6: Jungbaeumchen/Nadelwedel (Coniferen-Saling) as Gebuesch, deterministic from seed.
+        /// Central stem + 3-5 whorls of needle twigs (thin cones), total height normalised to ~1 m
+        /// so the generator can scale it to 0.5..2 m. Real geometry -> opaque material (no cutout).
+        /// </summary>
+        public static Mesh YoungConifer(int seed)
+        {
+            var rng = new System.Random(seed);
+            float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            var norms = new List<Vector3>();
+
+            // Central stem: 6-sided cone from y=0 to y=1, thin at top.
+            const int sides = 6;
+            for (int s = 0; s < sides; s++)
+            {
+                float a0 = s * (Mathf.PI * 2f / sides);
+                float a1 = (s + 1) * (Mathf.PI * 2f / sides);
+                float rB = 0.02f, rT = 0.006f;
+                int b = verts.Count;
+                verts.Add(new Vector3(Mathf.Cos(a0) * rB, 0f, Mathf.Sin(a0) * rB));
+                verts.Add(new Vector3(Mathf.Cos(a1) * rB, 0f, Mathf.Sin(a1) * rB));
+                verts.Add(new Vector3(Mathf.Cos(a1) * rT, 1f, Mathf.Sin(a1) * rT));
+                verts.Add(new Vector3(Mathf.Cos(a0) * rT, 1f, Mathf.Sin(a0) * rT));
+                Vector3 n = new Vector3(Mathf.Cos((a0 + a1) * 0.5f), 0.2f, Mathf.Sin((a0 + a1) * 0.5f)).normalized;
+                for (int k = 0; k < 4; k++) norms.Add(n);
+                tris.Add(b); tris.Add(b + 1); tris.Add(b + 2);
+                tris.Add(b); tris.Add(b + 2); tris.Add(b + 3);
+            }
+
+            // Needle twigs: whorls at 4 heights, each twig a thin tapered quad-strip pair (billon).
+            int whorls = rng.Next(3, 6);
+            for (int w = 0; w < whorls; w++)
+            {
+                float y = 0.25f + w * (0.7f / Mathf.Max(1, whorls - 1)) * 0.95f;
+                float len = R(0.18f, 0.34f) * (1.15f - y * 0.6f);
+                int twigs = rng.Next(5, 8);
+                float baseAng = rng.Next(0, 360) * Mathf.Deg2Rad;
+                for (int t = 0; t < twigs; t++)
+                {
+                    float ang = baseAng + t * (Mathf.PI * 2f / twigs) + R(-0.15f, 0.15f);
+                    float dx = Mathf.Cos(ang), dz = Mathf.Sin(ang);
+                    float rise = R(0.12f, 0.3f) * len;
+                    float wHalf = R(0.012f, 0.024f);
+                    int b = verts.Count;
+                    Vector3 p0 = new Vector3(dx * 0.02f, y, dz * 0.02f);
+                    Vector3 p1 = new Vector3(dx * len, y + rise, dz * len);
+                    Vector3 sideV = new Vector3(-dz, 0f, dx) * wHalf;
+                    verts.Add(p0 - sideV); verts.Add(p0 + sideV);
+                    verts.Add(p1 + sideV + Vector3.up * 0.004f); verts.Add(p1 - sideV + Vector3.up * 0.004f);
+                    for (int k = 0; k < 4; k++) norms.Add(Vector3.up);
+                    tris.Add(b); tris.Add(b + 1); tris.Add(b + 2);
+                    tris.Add(b); tris.Add(b + 2); tris.Add(b + 3);
+                }
+            }
+
+            var m = new Mesh { name = "YoungConifer_" + seed };
+            m.SetVertices(verts);
+            m.SetTriangles(tris, 0);
+            m.SetNormals(norms);
+            // Flat UV (texture centre): no per-vertex mapping needed, tint comes from MPB _BaseColor.
+            var uvs = new Vector2[verts.Count];
+            for (int u = 0; u < uvs.Length; u++) uvs[u] = new Vector2(0.5f, 0.5f);
+            m.SetUVs(0, uvs);
+            m.RecalculateBounds();
+            return m;
+        }
     }
 }

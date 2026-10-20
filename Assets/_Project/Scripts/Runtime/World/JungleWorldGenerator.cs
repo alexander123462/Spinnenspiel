@@ -42,6 +42,16 @@ namespace Spinnenspiel
         public int LogCount { get; private set; }
         public int RockCount { get; private set; }
         public int FrogCount { get; private set; }
+        public int YoungConiferCount { get; private set; }
+
+        // WALD6: Vegetation-Konfiguration (Builder copies from WaldLook; defaults = old behaviour).
+        public bool giantLeavesOn = true;   // Riesenblaetter in/ut the forest
+        public bool treeFernsOn = true;     // Palmen-Baumfarne in/ut
+        public float swordFernFactor = 1f;  // Unterholz-Farne haeufigkeit (probability+cap x)
+        public float groundFernFactor = 1f; // Grundfarne haeufigkeit (probability x)
+        public float fernScatterFactor = 1f; // Farn-Scatter-Patch chance per cell (x)
+        public bool youngConifersOn = false; // Jungbaeumchen/Nadelwedel Gebuesch on/off
+        public float bushFactor = 1f;       // Busche haeufigkeit (probability+cap x)
 
         private void Awake()
         {
@@ -172,11 +182,11 @@ namespace Spinnenspiel
             BushCount = PlaceGridVariants(unterholz.transform, size, 1.0f,
                 VariantMeshes(library.bush, library.bushVariants), VariantMats(library.bushMat, library.bushVariantMats),
                 (i, j, x, z) => World.Height(x, z) >= JungleWorld.WaterLevel + 0.2f
-                    && World.Hash01(i, j, 13) < World.Density(x, z) * 0.6f,
-                (i, j) => 0.7f + World.Hash01(i, j, 14) * 0.7f, 1500);
+                    && World.Hash01(i, j, 13) < World.Density(x, z) * 0.6f * bushFactor,
+                (i, j) => 0.7f + World.Hash01(i, j, 14) * 0.7f, Mathf.RoundToInt(1500 * bushFactor));
             FernCount = PlaceGrid(unterholz.transform, size, 0.6f, library.fern, library.fernMat,
-                (i, j, x, z) => World.Hash01(i, j, 23) < World.Density(x, z) * 0.7f,
-                (i, j) => 0.8f + World.Hash01(i, j, 24) * 0.8f, 1500);
+                (i, j, x, z) => World.Hash01(i, j, 23) < Mathf.Min(1f, World.Density(x, z) * 0.7f * swordFernFactor),
+                (i, j) => 0.8f + World.Hash01(i, j, 24) * 0.8f, Mathf.RoundToInt(1500 * swordFernFactor));
             ReedCount = PlaceGrid(unterholz.transform, size, 0.7f, library.reed, library.reedMat,
                 (i, j, x, z) => World.Height(x, z) >= JungleWorld.WaterLevel - 0.3f
                     && World.Height(x, z) <= JungleWorld.WaterLevel + 0.2f
@@ -185,7 +195,8 @@ namespace Spinnenspiel
 
             // Riesenbläter (Blender, 3 Varianten): groß tropische Blattschnitte mit
             // Cutout-Maske und Normal. Im selben statischen Batching wie das restliche Unterholz.
-            if (library.giantLeaves != null && library.giantLeafMats != null)
+            // WALD6: giantLeavesOn=false -> Riesenblaetter ut dem Waldbereich.
+            if (giantLeavesOn && library.giantLeaves != null && library.giantLeafMats != null)
             {
                 int giantN = 0;
                 int gcells = Mathf.FloorToInt(size / 2.0f);
@@ -212,12 +223,50 @@ namespace Spinnenspiel
                 }
                 GiantLeafCount = giantN;
             }
+
+            // WALD6: Schwertfarne in Gruppen an Staemmen entlang: 2-4 per Tree, 0.35-1.25 m um Stamm-Fuss.
+            // Inside Unterholz (counted in PlantColliderCount, Static-Batched below).
+            for (int tIdx = 0; tIdx < Trees.Count; tIdx++)
+            {
+                Vector3 tp = Trees[tIdx].position;
+                float tx = tp.x, tz = tp.z;
+                if (tx < 1f || tx > size - 1f || tz < 1f || tz > size - 1f) continue;
+                int per = 2 + Mathf.FloorToInt(World.Hash01(tIdx, 7, 301) * 3f); // 2..4
+                for (int k = 0; k < per; k++)
+                {
+                    float ang = World.Hash01(tIdx, k, 302) * Mathf.PI * 2f;
+                    float r = 0.35f + World.Hash01(tIdx, k, 303) * 0.9f; // 0.35..1.25 m
+                    float x = tx + Mathf.Cos(ang) * r, z = tz + Mathf.Sin(ang) * r;
+                    if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
+                    if (NearSpawn(x, z, 1.0f)) continue;
+                    if (!IsDryFlat(World, x, z)) continue;
+                    float rot = World.Hash01(tIdx, k, 304) * 360f;
+                    float scale = 0.8f + World.Hash01(tIdx, k, 305) * 0.9f; // skaliert Gebuesch-Hoehe
+                    AddPlant(unterholz.transform, library.fern, library.fernMat,
+                        new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale);
+                    PlantColliderCount++;
+                }
+            }
+
+            // WALD6: Jungbaeumchen/Nadelwedel als Gebuesch (fedrige Coniferen-Zweige, 0.5-2 m).
+            if (youngConifersOn && library.bushMat != null)
+            {
+                var coniferMeshes = new System.Collections.Generic.List<Mesh>(3);
+                for (int v = 0; v < 3; v++) coniferMeshes.Add(JunglePlantFactory.YoungConifer(Seed * 17 + v + 1));
+                YoungConiferCount = PlaceGridVariants(unterholz.transform, size, 1.0f,
+                    coniferMeshes.ToArray(), VariantMats(library.bushMat, library.bushVariantMats),
+                    (i, j, x, z) => World.Height(x, z) >= JungleWorld.WaterLevel + 0.2f
+                        && World.Hash01(i, j, 413) < Mathf.Min(1f, World.Density(x, z) * 0.8f * bushFactor),
+                    (i, j) => 0.45f + World.Hash01(i, j, 414) * 1.2f, // 0.45..1.65 -> ~0.5-2 m high
+                    Mathf.RoundToInt(1500 * bushFactor));
+            }
             StaticBatchingUtility.Combine(unterholz);
 
             // Baumfarne (Blender, 3 Varianten): kletterbarer Stamm (Capsule-Collider) + Blattschnitt-Cutout.
             // Kein statisches Batching: jeder Farn trägt einen eigenen Kletter-Collider.
             // Plus 3 garantierte Exemplare 6–10 m vor dem Spawn, in Blickrichtung der Startkamera.
-            if (library.treeFerns != null && library.treeFernLeafMat != null && library.treeFernStemMat != null)
+            // WALD6: treeFernsOn=false -> Palmen-Baumfarne ut dem Waldbereich.
+            if (treeFernsOn && library.treeFerns != null && library.treeFernLeafMat != null && library.treeFernStemMat != null)
             {
                 GameObject baumfarne = new GameObject("Baumfarne");
                 int fernN = 0;
@@ -278,7 +327,7 @@ namespace Spinnenspiel
                 {
                     for (int j = 0; j < Mathf.FloorToInt(size / 24f); j++)
                     {
-                        if (World.Hash01(i, j, 101) >= World.Density(i * 24f, j * 24f)) continue;
+                        if (World.Hash01(i, j, 101) >= Mathf.Min(1f, World.Density(i * 24f, j * 24f) * fernScatterFactor)) continue; // WALD6: Scatter haeufiger
                         float ax = 12f + i * 24f + (World.Hash01(i, j, 102) - 0.5f) * 8f;
                         float az = 12f + j * 24f + (World.Hash01(i, j, 103) - 0.5f) * 8f;
                         if (!IsDryFlat(World, ax, az)) continue;
@@ -338,7 +387,7 @@ namespace Spinnenspiel
             {
                 GameObject grundfarne = new GameObject("Grundfarne");
                 int gfN = 0;
-                const int gfMax = 160;
+                int gfMax = Mathf.RoundToInt(160 * groundFernFactor); // WALD6: Grundfarne haeufiger
                 int gcells = Mathf.FloorToInt(size / 6f);
                 for (int i = 0; i < gcells && gfN < gfMax; i++)
                 {
@@ -349,7 +398,7 @@ namespace Spinnenspiel
                         if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
                         if (NearSpawn(x, z, 1.2f)) continue;
                         if (!IsDryFlat(World, x, z)) continue;
-                        if (World.Hash01(i, j, 203) >= World.Density(x, z) * 0.45f) continue;
+                        if (World.Hash01(i, j, 203) >= Mathf.Min(1f, World.Density(x, z) * 0.45f * groundFernFactor)) continue; // WALD6
                         int variant = Mathf.FloorToInt(World.Hash01(i, j, 204) * (float)library.groundFerns.Length);
                         if (variant < 0 || variant >= library.groundFerns.Length) continue;
                         if (library.groundFerns[variant] == null) continue;
@@ -667,8 +716,9 @@ namespace Spinnenspiel
             GenerationSeconds = (float)sw.Elapsed.TotalSeconds;
             IsReady = true;
             UnityEngine.Debug.Log("[Urwald] Seed " + Seed + ": " + TreeCount + " Bäume, "
-                + BushCount + " Büsche, " + FernCount + " Farne, " + ReedCount + " Schilf, " + GiantLeafCount + " Riesenbläter, " + TreeFernCount + " Baumfarne, "
-                + GroundCoverCount + " Bodendecker, "
+                + BushCount + " Büsche, " + FernCount + " Farne, " + ReedCount + " Schilf, "
+                + GiantLeafCount + " Riesenbläter, " + TreeFernCount + " Baumfarne, "
+                + YoungConiferCount + " Jungbaumchen, " + GroundCoverCount + " Bodendecker, "
                 + LianaCount + " Lianen, "
                 + LogCount + " Stämme, " + RockCount + " Steine, "
                 + PlantColliderCount + " Pflanzen-Collider, "

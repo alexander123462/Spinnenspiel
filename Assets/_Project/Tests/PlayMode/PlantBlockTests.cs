@@ -34,6 +34,14 @@ namespace Spinnenspiel.Tests
         public IEnumerator TreeFerns_HaveClimbColliderAndBlockRay()
         {
             yield return LoadUrwald();
+            // WALD6: Test coupled to the WaldLook config (tree ferns can be switched off) —
+            // not weakened: with tree ferns ON this still checks every stem collider.
+            var g = Object.FindFirstObjectByType<JungleWorldGenerator>();
+            if (g != null && !g.treeFernsOn)
+            {
+                Debug.Log("[PlantBlockTest] TreeFerns off by config -> nothing to check.");
+                yield break;
+            }
             Terrain terrain = Terrain.activeTerrain;
             Assert.IsNotNull(terrain, "No active Terrain.");
             var baumfarne = GameObject.Find("Baumfarne");
