@@ -62,10 +62,11 @@ namespace Spinnenspiel.EditorTools
                     RenderSettings.skybox = AssetUtil.ReplaceAsset(sky, Folder + "/MAT_Sky.mat");
                 }
 
+                // WALD2a1: Umgebungslicht (Trilight-Fallback) gruenlich-kuehl ueber WaldLook.
                 RenderSettings.ambientMode = AmbientMode.Trilight;
-                RenderSettings.ambientSkyColor = new Color(0.50f, 0.58f, 0.70f);
-                RenderSettings.ambientEquatorColor = new Color(0.52f, 0.54f, 0.50f);
-                RenderSettings.ambientGroundColor = new Color(0.22f, 0.20f, 0.16f);
+                RenderSettings.ambientSkyColor = WaldLook.AmbientSky;
+                RenderSettings.ambientEquatorColor = WaldLook.AmbientEquator;
+                RenderSettings.ambientGroundColor = WaldLook.AmbientGround;
             }
 
             RenderSettings.fog = true;
@@ -92,7 +93,8 @@ namespace Spinnenspiel.EditorTools
             var exp = profile.Add<Exposure>(true); exp.mode.Override(ExposureMode.AutomaticHistogram); exp.limitMin.Override(0f); exp.limitMax.Override(15f);
             var tm = profile.Add<Tonemapping>(true); tm.mode.Override(TonemappingMode.ACES);
             var bloom = profile.Add<Bloom>(true); bloom.intensity.Override(0.15f);
-            var ca = profile.Add<ColorAdjustments>(true); ca.saturation.Override(10f);
+            // WALD2a1: only saturation via WaldLook (Nebel, Sonne, Exposure stay at baseline).
+            var ca = profile.Add<ColorAdjustments>(true); ca.saturation.Override(WaldLook.SaturationPercent);
             var vig = profile.Add<Vignette>(true); vig.intensity.Override(0.2f);
             var sh = profile.Add<HDShadowSettings>(true); sh.maxShadowDistance.Override(80f);
             var cs = profile.Add<ContactShadows>(true); cs.enable.Override(true);
