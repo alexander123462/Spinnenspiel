@@ -5,3 +5,5 @@
 
 - Spinnenspiel.Tests.UrwaldTests.Urwald_GeneratesWorldFromSeed — G6 spinne SharpFrac 3,4 %..9,9 % <10 %, rot seit r116 auf HEAD, gleiche Ursache wie E1 (Overseer 20.10.).
 - Spinnenspiel.Tests.UrwaldTests.Urwald_Nahkampfscharf — SharpFrac wackelt je Lauf (3,9 %..8,9 % voll, gruen isoliert), rot seit r116 auf HEAD ohne Look-Aenderung (Overseer 20.10.).
+- Spinnenspiel.Tests.UrwaldTests.Urwald_GeneratesWorldFromSeed — G6 spinne SharpFrac 3,4 %..9,9 % <10 %, rot seit r116 auf HEAD (gleiche Ursache wie E1).
+- Spinnenspiel.Tests.UrwaldTests.Urwald_Nahkampfscharf — SharpFrac wackelt je Lauf (3,7 %..8,9 % voll, gruen isoliert), rot seit r116 auf HEAD (Nebel).
