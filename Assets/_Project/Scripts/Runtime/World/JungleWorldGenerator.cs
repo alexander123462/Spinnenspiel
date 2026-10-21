@@ -1278,7 +1278,7 @@ namespace Spinnenspiel
                 // TRUE visual bottom via the MeshCollider's world-space AABB (mc.bounds),
                 // NOT lod0.vertices (PH-FBX isReadable=false -> runtime error spam) and
                 // NOT renderer bounds (stale at creation time, floated 2.5 m unmeasured).
-                float wy0 = mc.bounds.min.y;
+                float wy0 = tree.transform.position.y + lod0.bounds.min.y * scale; // Mesh-Bounds statt mc.bounds (im Player ohne lesbares Mesh ungueltig -> Baeume schwebten)
                 float centerGround = terr.SampleHeight(tree.transform.position) + terr.transform.position.y;
                 float shift = (centerGround - 0.03f) - wy0;
                 float meshWorldH = lod0.bounds.size.y * scale;
@@ -1309,6 +1309,8 @@ namespace Spinnenspiel
                 float tradius = Mathf.Min(tb.extents.x, tb.extents.z);
                 float theight = tb.extents.y * 2f;
                 CapsuleCollider cap = trunk.AddComponent<CapsuleCollider>();
+                // Player-Fix: Holz-Submesh-Bounds enthalten Aeste (Radius bis 9 m -> unsichtbare Waende). Welt-Radius auf 1.5 m begrenzen.
+                tradius = Mathf.Min(tradius, 1.5f / Mathf.Max(scale, 0.01f));
                 cap.radius = tradius;
                 cap.height = Mathf.Max(theight, tradius * 2f + 0.01f);
                 cap.direction = 1; // Y-Axis (Stemachse)
