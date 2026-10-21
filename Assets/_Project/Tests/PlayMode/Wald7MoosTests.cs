@@ -31,7 +31,8 @@ namespace Spinnenspiel.Tests
 
             Debug.Log(string.Format("[WALD7] MoosShellCount={0} -> Kriterium > 0 -> {1}",
                 gen.MoosShellCount, gen.MoosShellCount > 0 ? "OK" : "NOK"));
-            Assert.Greater(gen.MoosShellCount, 0, "No moos shells placed.");
+            // Stamm-Fuss-Huellen sind derzeit aus (standen als gruene Boxen frei in der Welt, 2026-10-21): nur pruefen, wenn eingeschaltet.
+            if (gen.moosShellsOn) Assert.Greater(gen.MoosShellCount, 0, "No moos shells placed.");
             Debug.Log(string.Format("[WALD7] MoosCardCount={0} -> Kriterium > 0 -> {1}",
                 gen.MoosCardCount, gen.MoosCardCount > 0 ? "OK" : "NOK"));
             Assert.Greater(gen.MoosCardCount, 0, "No moos cards placed on Totholz.");
@@ -64,7 +65,7 @@ namespace Spinnenspiel.Tests
             }
             Debug.Log(string.Format("[WALD7] maxShellHeightM={0} -> Kriterium >= 1.3 -> {1}",
                 maxShellH.ToString("F2"), maxShellH >= 1.3f ? "OK" : "NOK"));
-            Assert.GreaterOrEqual(maxShellH, 1.3f, "Moos shell does not reach the configured base height.");
+            if (gen.moosShellsOn) Assert.GreaterOrEqual(maxShellH, 1.3f, "Moos shell does not reach the configured base height.");
 
             // Cards sit above the Totholz top face (moos on the UPPER side).
             var totholz = GameObject.Find("Totholz");

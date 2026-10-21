@@ -56,6 +56,7 @@ namespace Spinnenspiel
         public float bushFactor = 1f;       // Busche haeufigkeit (probability+cap x)
         // WALD7: Moos-Konfiguration (Builder copies from WaldLook).
         public bool moosOn = true;          // Moos shells/cards in/ut
+        public bool moosShellsOn = false;   // Stamm-Fuss-Huellen AUS: standen als gruene Boxen frei in der Welt (Radius/Position falsch, Alex 2026-10-21); neu bauen
         public float moosBaseHeightM = 1.5f; // unterste Stamm-Meterage mit Moos
 
         /// <summary>WALD7: Set by CreateTree for the LAST created tree (trunk base world pos +
@@ -182,7 +183,7 @@ namespace Spinnenspiel
                     // WALD7: Moos-Shell um dem Stamm-Fuss — ONE shared shell-mesh per variant +
                     // ONE shared MAT_Moos (Alpha-Cutout with v-gradient), no material per object.
                     // Base/radius come from CreateTree's planted trunk (R6 capsule data).
-                    if (moosOn && library.moosMat != null && _lastTrunkRadius > 0f)
+                    if (moosOn && moosShellsOn && library.moosMat != null && _lastTrunkRadius > 0f)
                     {
                         float r = _lastTrunkRadius * 1.12f + 0.04f; // hair off the bark
                         GameObject sh = new GameObject("MoosBase");
@@ -693,19 +694,25 @@ namespace Spinnenspiel
                 float h = World.Height(x, z);
                 var logMesh = library.logs[placedLogs % Math.Min(3, library.logs.Length)];
                 float logScale = 0.8f + World.Hash01(0, i, 45) * 0.4f;
-                CreateProp(totholz.transform, logMesh,
+                float logRot = World.Hash01(0, i, 44) * 360f;
+                GameObject logGo = CreateProp(totholz.transform, logMesh,
                     library.logMat, new Vector3(x, h - 0.05f, z),
-                    World.Hash01(0, i, 44) * 360f, logScale, SurfaceType.Wood);
+                    logRot, logScale, SurfaceType.Wood);
                 // WALD7: Moos-Karten on the UPPER side of the Totholz (same shared MAT_Moos).
+                // Fix: Karten an der WELT-Huelle des Stamms ausrichten (gleiche Drehung wie der Stamm, Mitte und Oberkante
+                // aus den echten Renderer-Bounds), sonst liegen lange Streifen quer und schwebend (gruene Baender).
                 if (moosOn && library.moosMat != null && moosCardMesh != null)
                 {
+                    Bounds wb = logGo.GetComponent<MeshRenderer>().bounds;
                     Bounds lb = logMesh.bounds;
                     GameObject card = new GameObject("MoosCap");
                     card.transform.SetParent(moosRoot.transform, false);
-                    card.transform.position = new Vector3(x, h - 0.05f + lb.max.y * logScale + 0.02f, z);
-                    card.transform.rotation = Quaternion.Euler(0f, World.Hash01(0, i, 46) * 360f, 0f);
-                    card.transform.localScale = new Vector3(lb.extents.x * 2f * logScale * 0.55f,
-                        1f, lb.extents.z * 2f * logScale * 0.55f);
+                    card.transform.position = new Vector3(wb.center.x, wb.max.y + 0.02f, wb.center.z);
+                    card.transform.rotation = Quaternion.Euler(0f, logRot, 0f);
+                    // Karten-Mesh ist etwa 2 Einheiten breit: Halbe Stammgroesse einsetzen, Laenge hoechstens 3 m.
+                    float cardX = Mathf.Min(lb.size.x * logScale * 0.5f * 0.55f, 1.5f);
+                    float cardZ = Mathf.Min(lb.size.z * logScale * 0.5f * 0.55f, 1.5f);
+                    card.transform.localScale = new Vector3(cardX, 1f, cardZ);
                     card.AddComponent<MeshFilter>().sharedMesh = moosCardMesh;
                     card.AddComponent<MeshRenderer>().sharedMaterial = library.moosMat;
                     MoosCardCount++;
@@ -1139,7 +1146,7 @@ namespace Spinnenspiel
         }
 
         /// <summary>Stamm/Stein mit Convex-Collider und SurfaceTag erzeugen.</summary>
-        private static void CreateProp(Transform parent, Mesh mesh, Material mat, Vector3 pos, float rotY, float scale, SurfaceType surface)
+        private static GameObject CreateProp(Transform parent, Mesh mesh, Material mat, Vector3 pos, float rotY, float scale, SurfaceType surface)
         {
             GameObject g = new GameObject();
             g.transform.SetParent(parent, false);
@@ -1152,6 +1159,7 @@ namespace Spinnenspiel
             mc.sharedMesh = mesh;
             mc.convex = true;
             g.AddComponent<SurfaceTag>().surfaceType = surface;
+            return g;
         }
 
         private static bool HasNearbyTree(Dictionary<Vector2Int, List<Vector3>> placed, Vector2Int cell, Vector3 pos)
@@ -1294,7 +1302,10 @@ namespace Spinnenspiel
                 // WALD7: Moos-Shell-Anker = real planted trunk base (colNode already carries
                 // the planting shift) and the capsule radius.
                 _lastTrunkBaseWorld = colNode.transform.TransformPoint(new Vector3(tb.center.x, tb.min.y, tb.center.z));
-                _lastTrunkRadius = tradius;
+                // Fix (Alex 2026-10-21): tradius ist die kleinere Halbachse der GANZEN Holz-Submesh (Aeste eingerechnet, mehrere Meter),
+                // nicht der Stamm am Fuss. Die Huelle bekommt daher nur einen Bruchteil, begrenzt auf 0.35..1.2 m, sonst entstehen
+                // riesige gruene Ringe ("Baender").
+                _lastTrunkRadius = Mathf.Clamp(tradius * 0.12f, 0.35f, 1.2f);
             }
 
             var lod = tree.AddComponent<LODGroup>();
