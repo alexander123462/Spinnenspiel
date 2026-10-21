@@ -1177,18 +1177,24 @@ namespace Spinnenspiel.EditorTools
         private static Material TerrainMaterial()
         {
             string path = MatFolder + "MAT_UrwaldTerrain.mat";
+            Shader sh = Shader.Find("HDRP/TerrainLit");
             Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
             if (existing != null)
             {
+                // Varianten mit Normal-/Maskenkarte muessen im Build vorhanden sein (sonst gestrippt).
+                existing.EnableKeyword("_NORMALMAP");
+                existing.EnableKeyword("_MASKMAP");
+                EditorUtility.SetDirty(existing);
                 return existing;
             }
-            Shader sh = Shader.Find("HDRP/TerrainLit");
             if (sh == null)
             {
                 Debug.LogError("[Terrain] Shader HDRP/TerrainLit nicht gefunden.");
                 return null;
             }
             Material m = new Material(sh) { name = "MAT_UrwaldTerrain" };
+            m.EnableKeyword("_NORMALMAP");
+            m.EnableKeyword("_MASKMAP");
             AssetUtil.EnsureFolder("Assets/_Project/Art/Generated/Materials");
             AssetDatabase.CreateAsset(m, path);
             return m;

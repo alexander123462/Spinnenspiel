@@ -112,7 +112,7 @@ namespace Spinnenspiel
 
             GameObject t = Terrain.CreateTerrainGameObject(data);
             t.name = "Urwaldboden";
-            t.GetComponent<Terrain>().drawInstanced = true;
+            t.GetComponent<Terrain>().drawInstanced = false; // Instancing-Varianten fehlen im gebauten Spiel (Boden flach/unsichtbar)
             t.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Ground;
             Terrain terrain = t.GetComponent<Terrain>();
             if (library.terrainMat != null)
