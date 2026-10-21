@@ -148,6 +148,15 @@ namespace Spinnenspiel
             }
         }
 
+        /// <summary>WALD8c: Tests-only switch of the volumetric fog in the wired volume (plain bool
+        /// so the test assembly needs no HDRP reference). False when no volume is wired.</summary>
+        public bool SetVolumetricFogForTests(bool on)
+        {
+            if (fogVolumeComponent == null || !fogVolumeComponent.enableVolumetricFog.overrideState) return false;
+            fogVolumeComponent.enableVolumetricFog.Override(on);
+            return true;
+        }
+
         /// <summary>Tests/Screenshot: Jump to a day progress (0 = midnight, 0.5 = noon).</summary>
         public void SetDayProgress(float progress)
         {

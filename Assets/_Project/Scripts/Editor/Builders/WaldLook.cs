@@ -45,5 +45,9 @@ namespace Spinnenspiel.EditorTools
         public static bool MoosOn = true;           // Moos shells/cards in/ut
         public static float MoosBaseHeightM = 1.5f; // unterste Stamm-Meterage mit Moos (nach oben auslaufend)
         public static Color MoosColor = new Color(0.30f, 0.62f, 0.22f); // hellgruen, Farbton ca. 97 Grad (HSV 80..110)
+
+        // --- WALD8c: Volumetrischer Nebel / Lichtbahnen (Volume-Fog ueber WaldLook-Parameter). ---
+        public static bool VolumetricFogOn = true;        // WALD8c: Volumetric-Fog ON -> volumetrischer Nebel mit Lichtbahnen (anisotropy toward the sun).
+        public static float FogAnisotropy = 0.7f;         // Streuung toward the sun -> visible light shafts (0 = neutral, 1 = strong).
     }
 }

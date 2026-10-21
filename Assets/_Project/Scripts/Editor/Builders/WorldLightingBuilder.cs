@@ -89,7 +89,7 @@ namespace Spinnenspiel.EditorTools
             // U1: VolumetricFog AUS - der Nebel dies Dunnelesier vor allem Nahaufnahmen (Nahkampfschaerfe)
             // und macht die Kontrast (luma-StDev) in den Abnahaengemeter laeuermisstaen fall.
             // WALD2a2: only fog.albedo via WaldLook.FogAlbedo (meanFreePath/Density stay at baseline).
-            var fog = profile.Add<Fog>(true); fog.enabled.Override(true); fog.meanFreePath.Override(60f); fog.maximumHeight.Override(25f); fog.enableVolumetricFog.Override(false); fog.albedo.Override(WaldLook.FogAlbedo);
+            var fog = profile.Add<Fog>(true); fog.enabled.Override(true); fog.meanFreePath.Override(WaldLook.FogMeanFreePath); fog.maximumHeight.Override(25f); fog.enableVolumetricFog.Override(WaldLook.VolumetricFogOn); fog.albedo.Override(WaldLook.FogAlbedo); fog.anisotropy.Override(WaldLook.FogAnisotropy); // WALD8c: Volumetric-Fog ON + Streuung toward the sun -> Lichtbahnen (was off per U1)
             LastBuiltFog = fog; // T7: expose the Fog volume so the DayNightCycle can drive it.
             var exp = profile.Add<Exposure>(true); exp.mode.Override(ExposureMode.AutomaticHistogram); exp.limitMin.Override(0f); exp.limitMax.Override(15f);
             var tm = profile.Add<Tonemapping>(true); tm.mode.Override(TonemappingMode.ACES);
