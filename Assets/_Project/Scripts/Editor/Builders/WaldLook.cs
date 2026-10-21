@@ -11,20 +11,20 @@ namespace Spinnenspiel.EditorTools
     public static class WaldLook
     {
         // --- Nebel (T7-Morgennebel bleibt: meanFreePath-Basewert, DayNightCycle scales it). ---
-        public static Color FogAlbedo = new Color(0.74f, 0.84f, 0.72f); // WALD2a2 Versuch 3: gruenlich-kuehl, Brightness ~ Baseline (0.75/0.82/0.75)
-        public static float FogMeanFreePath = 60f; // Base-Nebeldistanz (Noon)
-        public static float FogDensity = 0.012f; // A2-Base (T7-Curve multiplies); WALD2 keeps Nebeldense, only colors move
+        public static Color FogAlbedo = new Color(0.42f, 0.52f, 0.42f); // WALD9: bright fog painted 50 % of frame white; darker green haze (T7 keeps look)
+        public static float FogMeanFreePath = 95f; // WALD9: 60 -> 95, Nebel thins so the forest reads (messung r114: sat 0.1, green 0 %)
+        public static float FogDensity = 0.004f; // WALD9: 0.012 -> 0.004, frame was blown-out flat (luma 162, bright 87 %)
 
         // --- Sonne: weich, gefiltert, warm-neutral; Schatten nicht ganz schwarz. ---
         public static Color SunColor = new Color(1f, 0.95f, 0.86f);
-        public static float SunIntensityLux = 75000f; // 100000 -> softer (Sonne gefiltret); not too low or the Bildtests lose contrast
-        public static float SunShadowStrength = 0.78f; // 0.85 -> Schatten verioever, nicht schwarz
+        public static float SunIntensityLux = 42000f; // WALD9: 75000 -> 42000, luma mean 149 far above 45..75 target
+        public static float SunShadowStrength = 0.85f; // WALD9: back to 0.85, dark share target 25..45 % needs real shadows
         public static int SunColorTemperatureK = 5400;
 
         // --- Umgebungslicht (Trilight-Fallback; gruenlich-kuehl, NEAR Baseline so the Bildtests keep contrast). ---
-        public static Color AmbientSky = new Color(0.48f, 0.58f, 0.64f);    // Baseline 0.50/0.58/0.70: cooler sky
-        public static Color AmbientEquator = new Color(0.48f, 0.56f, 0.48f); // Baseline 0.52/0.54/0.50: greener horizon
-        public static Color AmbientGround = new Color(0.20f, 0.21f, 0.15f);  // Baseline 0.22/0.20/0.16: slightly greener ground
+        public static Color AmbientSky = new Color(0.34f, 0.44f, 0.50f);    // WALD9: darker sky so luma mean falls toward 45..75
+        public static Color AmbientEquator = new Color(0.34f, 0.46f, 0.36f); // WALD9: greener + darker horizon
+        public static Color AmbientGround = new Color(0.12f, 0.16f, 0.10f);  // WALD9: darker greener ground bounce
 
         // --- Belichtung fest (Auto-Histogram blew out die Scene) und Sattierung senken. ---
         public static float FixedExposureEV = 13.8f; // HDRP Fixed = EV100 (kein Multiplikator!): 1 = voellig ueberbelichtet (flache 164er Bilder, r120). Sonne 75000 lx -> ca. EV 13. Iterate per messung.txt.
@@ -35,11 +35,11 @@ namespace Spinnenspiel.EditorTools
         // world and the tests read ONE config. Baseline (all-on, factors 1) = old behaviour.
         public static bool GiantLeavesOn = false;   // WALD6: Riesenblaetter out of the forest
         public static bool TreeFernsOn = false;     // WALD6: Palmen-Baumfarne (Farn_Baum) out
-        public static float SwordFernFactor = 2.6f; // Unterholz-Farne (Farn_Grund): probability+cap multiplier
-        public static float GroundFernFactor = 2.6f; // Grundfarne (Farn_Tropisch fern_1..5): probability multiplier
-        public static float FernScatterFactor = 2.5f; // Farn-Scatter-Patches (Farn_Scatter) per cell
-        public static bool YoungConifersOn = true;  // WALD6: Jungbaeumchen/Nadelwedel Gebuesch on/off
-        public static float BushFactor = 1.3f;      // Busche (Busch1/shrub_02): dichter
+        public static float SwordFernFactor = 4.0f; // WALD9: 2.6 -> 4.0, green-dominant share was only 11 %
+        public static float GroundFernFactor = 4.0f; // WALD9: 2.6 -> 4.0
+        public static float FernScatterFactor = 3.5f; // WALD9: 2.5 -> 3.5
+        public static bool YoungConifersOn = true;
+        public static float BushFactor = 1.8f;      // WALD9: 1.3 -> 1.8, more green coverage
 
         // --- WALD7: Moos an Stamm-Base und Totholz-Oberseite (one shared material, no per-object mats). ---
         public static bool MoosOn = true;           // Moos shells/cards in/ut
