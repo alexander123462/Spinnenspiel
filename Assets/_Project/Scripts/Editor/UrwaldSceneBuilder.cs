@@ -61,6 +61,7 @@ namespace Spinnenspiel.EditorTools
             lib.rockMat = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_mossy_rock.mat", LoadMaterial("MAT_Rock"));
             // WALD7: ONE shared Moos-Material (Alpha-Cutout with v-gradient) for all shells/cards.
             lib.moosMat = MoosMaterial();
+            lib.terrainMat = TerrainMaterial();
             lib.fern = ScanMesh("Assets/_Project/Art/Scans/Models/fern_02/fern_02_1k.fbx", LoadMesh("VM_Fern"));
             // G4: Scan-Farn/-Strauch wirken mitteleuropäisch-braun → grün getönte Kopien (Originale bleiben unverändert).
             lib.fernMat = TropischMaterial(ScanMaterial("Assets/_Project/Art/Scans/Materials/M_fern_02.mat", LoadMaterial("MAT_Fern")), "MAT_FernTropisch");
@@ -1169,6 +1170,28 @@ namespace Spinnenspiel.EditorTools
             AssetUtil.EnsureFolder("Assets/_Project/Art/Generated/Materials");
             AssetDatabase.CreateAsset(fresh, path);
             return fresh;
+        }
+
+        /// <summary>Terrain-Material (HDRP/TerrainLit) als echtes Asset, das die Bibliothek referenziert. Ohne dieses Asset loest sich
+        /// terrain.materialTemplate im gebauten Spiel zu "Hidden/InternalErrorShader" auf (Boden unsichtbar, Alex 2026-10-21).</summary>
+        private static Material TerrainMaterial()
+        {
+            string path = MatFolder + "MAT_UrwaldTerrain.mat";
+            Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (existing != null)
+            {
+                return existing;
+            }
+            Shader sh = Shader.Find("HDRP/TerrainLit");
+            if (sh == null)
+            {
+                Debug.LogError("[Terrain] Shader HDRP/TerrainLit nicht gefunden.");
+                return null;
+            }
+            Material m = new Material(sh) { name = "MAT_UrwaldTerrain" };
+            AssetUtil.EnsureFolder("Assets/_Project/Art/Generated/Materials");
+            AssetDatabase.CreateAsset(m, path);
+            return m;
         }
 
         private static Material TropischMaterial(Material src, string name)

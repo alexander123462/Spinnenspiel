@@ -115,6 +115,21 @@ namespace Spinnenspiel
             t.GetComponent<Terrain>().drawInstanced = true;
             t.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Ground;
             Terrain terrain = t.GetComponent<Terrain>();
+            if (library.terrainMat != null)
+            {
+                terrain.materialTemplate = library.terrainMat; // sonst Hidden/InternalErrorShader im Player
+            }
+            // Diagnose (Alex 2026-10-21: in der gebauten Version fehlt der Boden): Terrain-Material und Ebenen ins Log schreiben.
+            {
+                Material tm = terrain.materialTemplate;
+                string layers = "";
+                TerrainLayer[] tl = data.terrainLayers;
+                for (int li = 0; tl != null && li < tl.Length; li++)
+                    layers += (tl[li] == null ? "null" : tl[li].name + "[diff=" + (tl[li].diffuseTexture != null ? tl[li].diffuseTexture.name : "null") + "]") + " ";
+                UnityEngine.Debug.Log("[TerrainDiag] materialTemplate=" + (tm == null ? "null" : tm.name + " shader=" + (tm.shader != null ? tm.shader.name : "null") + " supported=" + (tm.shader != null && tm.shader.isSupported))
+                    + " layers=" + layers + " drawHeightmap=" + terrain.drawHeightmap + " size=" + data.size + " pipeline="
+                    + (UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline != null ? UnityEngine.Rendering.GraphicsSettings.currentRenderPipeline.name : "none"));
+            }
 
             // 3) Wasser (E1: Sumpf + Bach per Seed — nur ueber Grundfeucht Areas,
             //    realistic Shoreline; thin MeshCollider so Spinne can wade on it)

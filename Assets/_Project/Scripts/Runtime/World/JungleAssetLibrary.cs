@@ -84,6 +84,8 @@ namespace Spinnenspiel
 
         /// <summary>WALD7: ONE shared Moos-Material (MAT_Moos) for all shells/cards — no per-object mats.</summary>
         public Material moosMat;
+        /// <summary>HDRP/TerrainLit-Material fuer das Gelaende (sonst Fehler-Shader im gebauten Spiel).</summary>
+        public Material terrainMat;
 
         /// <summary>Reihenfolge: Earth, Grass, Mud, Rock.</summary>
         public TerrainLayer[] terrainLayers;
