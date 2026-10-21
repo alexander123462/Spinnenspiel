@@ -57,6 +57,11 @@ namespace Spinnenspiel
         // WALD7: Moos-Konfiguration (Builder copies from WaldLook).
         public bool moosOn = true;          // Moos shells/cards in/ut
         public bool moosShellsOn = false;   // Stamm-Fuss-Huellen AUS: standen als gruene Boxen frei in der Welt (Radius/Position falsch, Alex 2026-10-21); neu bauen
+        public bool redwoodsOn = false;     // WALD4: Mammutbaum-Staemme
+        public float oldTreeShare = 1f;     // Anteil der alten Scan-Baeume (1 = alle)
+        public bool canopyOn = false;       // WALD5: Blaetterdach
+        public int RedwoodCount { get; private set; }
+        public int CanopyCount { get; private set; }
         public float moosBaseHeightM = 1.5f; // unterste Stamm-Meterage mit Moos
 
         /// <summary>WALD7: Set by CreateTree for the LAST created tree (trunk base world pos +
@@ -181,6 +186,7 @@ namespace Spinnenspiel
                     Vector3 flat = new Vector3(x, 0f, z);
                     if (HasNearbyTree(placed, cell, flat)) continue;
 
+                    if (World.Hash01(gx, gz, 77) >= oldTreeShare) continue; // WALD4: alte Baeume duenner
                     int treeVariants = library.phTreeLod0 != null ? library.phTreeLod0.Length : 0;
                     if (treeVariants == 0) continue; // ohne PH-Trees im Library: skip (geloggt frueh unten)
                     int variant = (int)(World.Hash01(gx, gz, 4) * treeVariants) % treeVariants;
@@ -219,6 +225,9 @@ namespace Spinnenspiel
                     list.Add(flat);
                 }
             }
+
+            if (redwoodsOn) BuildRedwoods(terrain, size);
+            if (canopyOn) BuildCanopy(size);
 
             // 5) Unterholz: Büsche, Farne, Schilf (nur Mesh, keine Collider, statisch gebatcht)
             GameObject unterholz = new GameObject("Unterholz");
@@ -1197,6 +1206,102 @@ namespace Spinnenspiel
         /// wood/leaf assigned per GetSubMesh(i).bounds (taller+narrower = Wood, broader = Leaf).
         /// MeshCollider on the LOD1-Mesh (concave), SurfaceTag Wood on root and collider node.
         /// </summary>
+        /// <summary>WALD4: Mammutbaum-Staemme, ca. ein Stamm pro 56 m2, Kapsel-Collider bis in die Erde.</summary>
+        private void BuildRedwoods(Terrain terrain, float size)
+        {
+            if (library.redwoodMat == null) return;
+            var meshes = new Mesh[3];
+            float[] heights = { 48f, 55f, 62f };
+            float[] radii = { 0.9f, 1.1f, 1.3f };
+            for (int i = 0; i < 3; i++) meshes[i] = RedwoodFactory.Trunk(Seed * 13 + i, heights[i], radii[i], 0.45f);
+            Transform root = new GameObject("Mammutbaeume").transform;
+            const float step = 7.5f;
+            for (float gx = 4f; gx < size - 3f; gx += step)
+            {
+                for (float gz = 4f; gz < size - 3f; gz += step)
+                {
+                    int ix = Mathf.RoundToInt(gx), iz = Mathf.RoundToInt(gz);
+                    float x = gx + (World.Hash01(ix, iz, 91) - 0.5f) * step * 0.7f;
+                    float z = gz + (World.Hash01(ix, iz, 92) - 0.5f) * step * 0.7f;
+                    if (x < 2f || x > size - 2f || z < 2f || z > size - 2f) continue;
+                    if (NearSpawn(x, z, 3.0f)) continue;
+                    float h = World.Height(x, z);
+                    if (h < JungleWorld.WaterLevel + 0.4f) continue;
+                    float e = 0.8f;
+                    float dh = Mathf.Max(Mathf.Abs(World.Height(x + e, z) - h), Mathf.Abs(World.Height(x, z + e) - h));
+                    if (Mathf.Atan2(dh, e) * Mathf.Rad2Deg >= 30f) continue;
+                    int v = (int)(World.Hash01(ix, iz, 93) * 3f) % 3;
+                    float y = terrain.SampleHeight(new Vector3(x, 0f, z)) + terrain.transform.position.y;
+                    var go = new GameObject("Mammutbaum");
+                    go.transform.SetParent(root, false);
+                    go.transform.position = new Vector3(x, y, z);
+                    go.transform.rotation = Quaternion.Euler(0f, World.Hash01(ix, iz, 94) * 360f, 0f);
+                    go.AddComponent<MeshFilter>().sharedMesh = meshes[v];
+                    go.AddComponent<MeshRenderer>().sharedMaterial = library.redwoodMat;
+                    go.AddComponent<SurfaceTag>().surfaceType = SurfaceType.Wood;
+                    // Gestapelte Kapseln (je ca. 6 m) statt einer riesigen: Radius folgt dem Stammverlauf (kein unsichtbarer Wand-Kegel oben).
+                    const float seg = 6f;
+                    for (float y0 = -4f; y0 < heights[v]; y0 += seg)
+                    {
+                        float yc = Mathf.Min(y0 + seg * 0.5f, heights[v]);
+                        var capGo = new GameObject("TrunkCapsule");
+                        capGo.transform.SetParent(go.transform, false);
+                        capGo.transform.localPosition = new Vector3(0f, yc, 0f);
+                        var cap = capGo.AddComponent<CapsuleCollider>();
+                        cap.radius = RedwoodFactory.RadiusAt(Mathf.Max(0f, yc), heights[v], radii[v], 0.45f) * 0.92f;
+                        cap.height = seg + 1f;
+                        cap.direction = 1;
+                    }
+                    RedwoodCount++;
+                }
+            }
+            UnityEngine.Debug.Log("[Redwood] " + RedwoodCount + " Staemme");
+        }
+
+        /// <summary>WALD5: Blaetterdach in 38..46 m, Buescheln pro 6-m-Zelle (ca. 10 % Luecken), pro 32-m-Block zu EINEM Mesh vereint.</summary>
+        private void BuildCanopy(float size)
+        {
+            if (library.canopyMat == null) return;
+            var clusters = new Mesh[4];
+            for (int i = 0; i < clusters.Length; i++) clusters[i] = RedwoodFactory.CanopyCluster(Seed * 7 + i);
+            Transform root = new GameObject("Blaetterdach").transform;
+            var blocks = new Dictionary<Vector2Int, List<CombineInstance>>();
+            for (float gx = -6f; gx < size + 6f; gx += 6f)
+            {
+                for (float gz = -6f; gz < size + 6f; gz += 6f)
+                {
+                    int ix = Mathf.RoundToInt(gx), iz = Mathf.RoundToInt(gz);
+                    if (World.Hash01(ix, iz, 95) < 0.10f) continue;
+                    float x = gx + (World.Hash01(ix, iz, 96) - 0.5f) * 4f;
+                    float z = gz + (World.Hash01(ix, iz, 97) - 0.5f) * 4f;
+                    float y = 38f + World.Hash01(ix, iz, 98) * 8f;
+                    var ci = new CombineInstance
+                    {
+                        mesh = clusters[(int)(World.Hash01(ix, iz, 99) * clusters.Length) % clusters.Length],
+                        transform = Matrix4x4.TRS(new Vector3(x, y, z), Quaternion.Euler(0f, World.Hash01(ix, iz, 100) * 360f, 0f), Vector3.one * (0.9f + World.Hash01(ix, iz, 101) * 0.5f))
+                    };
+                    var key = new Vector2Int(Mathf.FloorToInt(x / 32f), Mathf.FloorToInt(z / 32f));
+                    if (!blocks.TryGetValue(key, out var list)) { list = new List<CombineInstance>(); blocks[key] = list; }
+                    list.Add(ci);
+                    CanopyCount++;
+                }
+            }
+            foreach (var kv in blocks)
+            {
+                var mesh = new Mesh { name = "RW_CanopyBlock", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+                mesh.CombineMeshes(kv.Value.ToArray(), true, true);
+                var go = new GameObject("DachBlock");
+                go.transform.SetParent(root, false);
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                var mr = go.AddComponent<MeshRenderer>();
+                mr.sharedMaterial = library.canopyMat;
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            UnityEngine.Debug.Log("[Redwood] Dach " + CanopyCount + " Buescheln in " + blocks.Count + " Bloecken");
+        }
+
+        private readonly Dictionary<int, Vector3> _footprints = new Dictionary<int, Vector3>();
+
         private Transform CreateTree(Vector3 pos, float rotY, float scale, int variant, Transform parent)
         {
             Mesh lod0 = library.phTreeLod0[variant];
@@ -1305,12 +1410,32 @@ namespace Spinnenspiel
                 Bounds tb = lod0.GetSubMesh(woodSub).bounds;
                 GameObject trunk = new GameObject("TrunkCapsule");
                 trunk.transform.SetParent(colNode.transform, false);
-                trunk.transform.localPosition = tb.center;
-                float tradius = Mathf.Min(tb.extents.x, tb.extents.z);
+                // Fussabdruck aus den echten Stamm-Vertices der untersten 2 Welt-Meter (Mesh ist lesbar): Mitte und Radius.
+                Vector3 footC = tb.center; float footR = Mathf.Min(tb.extents.x, tb.extents.z);
+                if (!_footprints.TryGetValue(variant, out Vector3 fp))
+                {
+                    var vs = new List<Vector3>();
+                    lod0.GetVertices(vs);
+                    var idx = lod0.GetIndices(woodSub);
+                    float yLimit = tb.min.y + 2f / Mathf.Max(scale, 0.01f);
+                    Vector2 sum = Vector2.zero; int n = 0;
+                    foreach (int ii in idx) { var vv = vs[ii]; if (vv.y <= yLimit) { sum += new Vector2(vv.x, vv.z); n++; } }
+                    if (n > 8)
+                    {
+                        Vector2 c = sum / n; float rmax = 0f;
+                        foreach (int ii in idx) { var vv = vs[ii]; if (vv.y <= yLimit) rmax = Mathf.Max(rmax, (new Vector2(vv.x, vv.z) - c).magnitude); }
+                        fp = new Vector3(c.x, 0f, c.y); fp.y = rmax;
+                    }
+                    else fp = new Vector3(tb.center.x, Mathf.Min(tb.extents.x, tb.extents.z), tb.center.z);
+                    _footprints[variant] = fp;
+                }
+                footC = new Vector3(fp.x, tb.center.y, fp.z); footR = fp.y;
+                trunk.transform.localPosition = footC;
+                // Echter Fussabdruck, mindestens aber die Bounds-Huelle bis 2.5 m Welt-Radius (die Gehtests brauchen den Abstand zum Stamm; Aeste gehen nicht ein).
+                float tradius = Mathf.Max(footR, Mathf.Min(Mathf.Min(tb.extents.x, tb.extents.z), 2.5f / Mathf.Max(scale, 0.01f)));
+                tradius = Mathf.Min(tradius, 3.5f / Mathf.Max(scale, 0.01f));
                 float theight = tb.extents.y * 2f;
                 CapsuleCollider cap = trunk.AddComponent<CapsuleCollider>();
-                // Player-Fix: Holz-Submesh-Bounds enthalten Aeste (Radius bis 9 m -> unsichtbare Waende). Welt-Radius auf 1.5 m begrenzen.
-                tradius = Mathf.Min(tradius, 1.5f / Mathf.Max(scale, 0.01f));
                 cap.radius = tradius;
                 cap.height = Mathf.Max(theight, tradius * 2f + 0.01f);
                 cap.direction = 1; // Y-Axis (Stemachse)

@@ -625,6 +625,8 @@ MonoBehaviour:
   rockMat: {fileID: 2100000, guid: 40e619c617653cf42bc425b5f167b9f0, type: 2}
   moosMat: {fileID: 2100000, guid: fc297968972e8204d92cb9de0b57bac5, type: 2}
   terrainMat: {fileID: 2100000, guid: 5dfbb265af56b7943b63c40eb975428e, type: 2}
+  redwoodMat: {fileID: 2100000, guid: 3a84c9e9aeab85041ba60739ec470891, type: 2}
+  canopyMat: {fileID: 2100000, guid: 9957e775320820845bb3ada7b51495d7, type: 2}
   terrainLayers:
   - {fileID: 8574412962073106934, guid: 12417b5eee9fdf74eb17385638778cf7, type: 2}
   - {fileID: 8574412962073106934, guid: 414ab6540a5f22642a19fb66ea5e3568, type: 2}

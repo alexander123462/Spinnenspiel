@@ -41,6 +41,11 @@ namespace Spinnenspiel.EditorTools
         public static bool YoungConifersOn = true;
         public static float BushFactor = 1.8f;      // WALD9: 1.3 -> 1.8, more green coverage
 
+        // --- WALD4/5: Mammutbaeume und Blaetterdach (RedwoodFactory). ---
+        public static bool RedwoodsOn = true;
+        public static float OldTreeShare = 1.0f;   // Anteil der alten Scan-Baeume, der bleibt
+        public static bool CanopyOn = true;
+
         // --- WALD7: Moos an Stamm-Base und Totholz-Oberseite (one shared material, no per-object mats). ---
         public static bool MoosOn = true;           // Moos shells/cards in/ut
         public static float MoosBaseHeightM = 1.5f; // unterste Stamm-Meterage mit Moos (nach oben auslaufend)

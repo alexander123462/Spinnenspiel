@@ -62,6 +62,8 @@ namespace Spinnenspiel.EditorTools
             // WALD7: ONE shared Moos-Material (Alpha-Cutout with v-gradient) for all shells/cards.
             lib.moosMat = MoosMaterial();
             lib.terrainMat = TerrainMaterial();
+            lib.redwoodMat = RedwoodMaterial();
+            lib.canopyMat = CanopyMaterial();
             lib.fern = ScanMesh("Assets/_Project/Art/Scans/Models/fern_02/fern_02_1k.fbx", LoadMesh("VM_Fern"));
             // G4: Scan-Farn/-Strauch wirken mitteleuropäisch-braun → grün getönte Kopien (Originale bleiben unverändert).
             lib.fernMat = TropischMaterial(ScanMaterial("Assets/_Project/Art/Scans/Materials/M_fern_02.mat", LoadMaterial("MAT_Fern")), "MAT_FernTropisch");
@@ -120,6 +122,9 @@ namespace Spinnenspiel.EditorTools
             // WALD7: Moos config (one shared MAT_Moos for all shells/cards).
             gen.moosOn = WaldLook.MoosOn;
             gen.moosBaseHeightM = WaldLook.MoosBaseHeightM;
+            gen.redwoodsOn = WaldLook.RedwoodsOn;
+            gen.oldTreeShare = WaldLook.OldTreeShare;
+            gen.canopyOn = WaldLook.CanopyOn;
 
             new GameObject("Wind").AddComponent<WindController>();
             // Weather: deterministic dry/rain cycle driving the audio crossfade.
@@ -1170,6 +1175,43 @@ namespace Spinnenspiel.EditorTools
             AssetUtil.EnsureFolder("Assets/_Project/Art/Generated/Materials");
             AssetDatabase.CreateAsset(fresh, path);
             return fresh;
+        }
+
+        private static Material SaveMat(string name, Material fresh)
+        {
+            string path = MatFolder + name + ".mat";
+            Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (existing != null)
+            {
+                existing.CopyPropertiesFromMaterial(fresh);
+                EditorUtility.SetDirty(existing);
+                AssetDatabase.SaveAssets();
+                return existing;
+            }
+            AssetUtil.EnsureFolder("Assets/_Project/Art/Generated/Materials");
+            AssetDatabase.CreateAsset(fresh, path);
+            return fresh;
+        }
+
+        /// <summary>WALD4: rotbraune Mammutbaum-Rinde mit Normalmap, deckend, matt.</summary>
+        private static Material RedwoodMaterial()
+        {
+            Material m = Spinnenspiel.Rendering.PipelineMaterials.Lit(Color.white, TextureFactory.RedwoodBark());
+            Spinnenspiel.Rendering.PipelineMaterials.SetNormalMap(m, TextureFactory.RedwoodBarkNormal(), 1.4f);
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(m, 0.08f);
+            return SaveMat("MAT_Redwood", m);
+        }
+
+        /// <summary>WALD5: Dach-Blaetter, Alpha-Cutout, doppelseitig.</summary>
+        private static Material CanopyMaterial()
+        {
+            Material m = Spinnenspiel.Rendering.PipelineMaterials.Lit(Color.white, TextureFactory.CanopyLeaves());
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(m, 0.1f);
+            Spinnenspiel.Rendering.PipelineMaterials.SetAlphaClip(m, 0.5f);
+            Spinnenspiel.Rendering.PipelineMaterials.SetDoubleSided(m, true);
+            m.SetFloat("_DoubleSidedNormalMode", 2f);
+            m.SetVector("_DoubleSidedConstants", new Vector4(1f, 1f, 1f, 0f));
+            return SaveMat("MAT_Canopy", m);
         }
 
         /// <summary>Terrain-Material (HDRP/TerrainLit) als echtes Asset, das die Bibliothek referenziert. Ohne dieses Asset loest sich

@@ -86,6 +86,9 @@ namespace Spinnenspiel
         public Material moosMat;
         /// <summary>HDRP/TerrainLit-Material fuer das Gelaende (sonst Fehler-Shader im gebauten Spiel).</summary>
         public Material terrainMat;
+        /// <summary>Mammutbaum-Rinde und Dach-Karten (RedwoodFactory).</summary>
+        public Material redwoodMat;
+        public Material canopyMat;
 
         /// <summary>Reihenfolge: Earth, Grass, Mud, Rock.</summary>
         public TerrainLayer[] terrainLayers;

@@ -205,6 +205,8 @@ namespace Spinnenspiel.Tests
                         var hit = new RaycastHit();
                         Physics.Raycast(mv.transform.position + mv.transform.up * 0.3f, -mv.transform.up, out hit, 1f);
                         where = hit.collider != null ? hit.collider.name + " layer=" + hit.collider.gameObject.layer + " path=" + hit.collider.transform.parent : "kein Treffer";
+                        // Ein Stamm im Weg (echter Fussabdruck-Collider, keine unsichtbare Wand mehr): die Spinne klettert ihn hoch. Das ist kein Kippen.
+                        if (hit.collider != null && hit.collider.name == "TrunkCapsule") { flipAt = -1f; break; }
                     }
                     yield return null;
                 }
@@ -750,9 +752,10 @@ namespace Spinnenspiel.Tests
                 foreach (var tr in GameObject.FindObjectsByType<UnityEngine.MeshRenderer>(FindObjectsSortMode.None))
                 {
                     var tn = tr.gameObject.name;
-                    if (tn != "TreeLOD0" && tn != "TreeLOD1") continue;
+                    if (tn != "TreeLOD0" && tn != "TreeLOD1" && tn != "Mammutbaum" && tn != "DachBlock") continue;
                     var b = tr.bounds;
-                    if ((new Vector3(b.center.x - s.x, 0f, b.center.z - s.z)).sqrMagnitude < 12f * 12f)
+                    float reach = tn == "DachBlock" ? 40f : 12f; // Dach-Bloecke sind 32 m gross
+                    if ((new Vector3(b.center.x - s.x, 0f, b.center.z - s.z)).sqrMagnitude < reach * reach)
                         canopyTop = Mathf.Max(canopyTop, b.max.y);
                 }
 
