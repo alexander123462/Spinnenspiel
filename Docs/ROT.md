@@ -13,4 +13,3 @@ Commit mitnehmen.
 (Baseline currently empty: RedPreview_WhenSpotGoesBad made deterministic and green in R7.)
 
 - Spinnenspiel.Tests.UrwaldTests.E1_WaterProofImageIsSharp — SharpFrac 1.3%<10%, rot auch ohne T8 (t8basefull); Verdacht T7 Nebel.
-- Spinnenspiel.Tests.DayNightTests.J5_TagAndNacht_LightAndInsectsFollowCycle — flackert zwischen 'Day Mittel 260 > 200 (Blendout)' und 'Night Mittel 5 < 10'; ohne Klee-Aenderungen identisch rot (Overseer-Check 2026-10-23, Auto-Exposure/Look); gleiche Wurzel wie die einfarbig grauen Offscreen-Beweisbilder (Mittel=164).

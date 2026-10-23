@@ -7,3 +7,4 @@
 - Spinnenspiel.Tests.UrwaldTests.Urwald_Nahkampfscharf — SharpFrac wackelt je Lauf (3,9 %..8,9 % voll, gruen isoliert), rot seit r116 auf HEAD ohne Look-Aenderung (Overseer 20.10.).
 - Spinnenspiel.Tests.UrwaldTests.Urwald_GeneratesWorldFromSeed — G6 spinne SharpFrac 3,4 %..9,9 % <10 %, rot seit r116 auf HEAD (gleiche Ursache wie E1).
 - Spinnenspiel.Tests.UrwaldTests.Urwald_Nahkampfscharf — SharpFrac wackelt je Lauf (3,7 %..8,9 % voll, gruen isoliert), rot seit r116 auf HEAD (Nebel).
+- Spinnenspiel.Tests.DayNightTests.J5_TagAndNacht_LightAndInsectsFollowCycle — flackert zwischen 'Day Mittel 260 > 200 (Blendout)' und 'Night Mittel 5 < 10'; ohne Klee-Aenderungen identisch rot (Overseer-Check 2026-10-23, Auto-Exposure/Look); gleiche Wurzel wie die einfarbig grauen Offscreen-Beweisbilder (Mittel=164).
