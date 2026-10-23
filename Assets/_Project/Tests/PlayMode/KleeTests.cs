@@ -77,34 +77,46 @@ namespace Spinnenspiel.Tests
                 if (d < 400f) bb.Encapsulate(r.bounds);
             }
             Vector3 spawn = bb.center;
-            foreach (var sr in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
-            {
-                bool sp = false;
-                foreach (var m in sr.sharedMaterials) if (m != null && m.name.StartsWith("MAT_Spider")) sp = true;
-                if (sp) { spawn = sr.bounds.center; break; }
-            }
             Debug.Log("[KLEE1] bbCenter=" + bb.center + " bbSize=" + bb.size + " proofTarget=" + spawn);
             float gy = terrain.SampleHeight(spawn) + terrain.transform.position.y;
-            // Wie Wald7MoosTests: Auge ~1.1 m ueber Grund, ~3 m Abstand, Blick leicht nach unten.
+            // KLEE1b: Aufbau exakt wie der gruene Wald7Moos-Beweis: Auge 1.1 m ueber Grund am
+            // Ziel-XZ, Blick 0.5 m unter die Augenhoehe auf das Ziel. Die Spinne als Ziel lieferte
+            // uniform 164 (dunkles Spinnenmesh fuellte das Bild, Belichtungs-Normierung -> grau).
             Vector3 eye = new Vector3(spawn.x + 2.6f, gy + 1.1f, spawn.z + 1.4f);
             cam.transform.position = eye;
-            cam.transform.LookAt(new Vector3(spawn.x, gy + 0.1f, spawn.z));
+            cam.transform.LookAt(new Vector3(spawn.x, eye.y - 0.5f, spawn.z));
             Debug.Log(string.Format("[KLEE1] cam eye={0} target=({1:F1},{2:F2},{3:F1}) gy={2:F2}",
                 eye, spawn.x, gy, spawn.z));
-            cam.nearClipPlane = 0.05f; cam.farClipPlane = 500f;
+            cam.nearClipPlane = 0.05f; cam.farClipPlane = 120f;
             // Wie die Galerie (Q1): kein TAA/Bewegungsunschaerfe/Nebel, sonst einfarbig grau.
             Q1ObjektGalerieTests.DisableDepthAndMotionBlur();
             Q1ObjektGalerieTests.AddOverrideVolume();
             Q1ObjektGalerieTests.NoTemporalAA(cam);
             Q1ObjektGalerieTests.SetFog(false);
+            // WALD8c schaltete volumetrischen Nebel ein: er flutet die Offscreen-Aufnahme einfarbig.
+            if (cycle != null) cycle.SetVolumetricFogForTests(false);
             yield return null;
             for (int rest = 0; rest < 3; rest++) yield return null; // HDRP resting frames
+            yield return WarmUp(cam);
             var veg = Object.FindFirstObjectByType<VegetationSystem>();
             if (veg != null) veg.RenderForCamera(cam);
             string file = "Logs/ci/klee_teppich.png";
             Vector4 st = UrwaldTests.SaveFrameHdr(cam, 1024, 768, file);
             Debug.Log(string.Format("[KLEE1] proof {0}: Mittel={1} Max={2}",
                 file, st.x.ToString("F0"), st.y.ToString("F0")));
+        }
+
+        /// <summary>KLEE1b: Im ersten Test nach dem Editor-Start rendert die Offscreen-Kamera einfarbig grau,
+        /// solange HDRP-Shader noch asynchron kompilieren. Kleine Probeaufnahmen wiederholen, bis das Bild Kontrast hat.</summary>
+        internal static IEnumerator WarmUp(Camera cam)
+        {
+            for (int i = 0; i < 40; i++)
+            {
+                Vector4 p = UrwaldTests.SaveFrameHdr(cam, 64, 48, "Logs/ci/warmup_probe.png");
+                if (p.y - p.x > 8f) { Debug.Log("[KLEE1] WarmUp nach " + i + " Proben"); yield break; }
+                yield return new WaitForSecondsRealtime(1f);
+            }
+            Debug.Log("[KLEE1] WarmUp ohne Erfolg");
         }
 
         [Test]

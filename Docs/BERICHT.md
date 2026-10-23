@@ -261,3 +261,5 @@ WALD8c [x] (r114, Commit 4626f0e, pushed hdrp): Volumetrischer Nebel/Lichtbahnen
 KLEE1 (2026-10-23, [!] ohne Commit): Klee-Bodenteppich implementiert und gemessen: 4692 Kleepflanzen im 10-m-Umkreis der Spinne, 5647 gesamt in 12 Block-Meshes, alte Bodendecker unveraendert (5989). Gezielte Tests 2/2 gruen. Beweisbild Logs/ci/klee_teppich.png zeigt nur grauen Nebel (Kamera-Problem, unique-Farben=3) - Claude: Screenshot-Setup in KleeTests.cs mit Wald7MoosTests.cs abgleichen (dort farbig, unique=1242).
 
 KLEE1 [x] (Overseer): Klee-Teppich committed; Tests gruen, volle CI nur J5 rot (Vorab-Rot, in ROT.md). Bildkontrolle offen -> KLEE1b (Aufnahme-Pipeline liefert grau, auch Wald7).
+
+KLEE1b [x] (Overseer 2026-10-24): Ursache = HDRP-Shader kompilieren im ersten Test nach Editor-Start asynchron (Offscreen-Bild einfarbig 164) plus volumetrischer Nebel seit WALD8c. Fix: Nebel aus (SetVolumetricFogForTests) und KleeTests.WarmUp (Probeaufnahmen bis Kontrast) in Klee- und Wald7-Test. Unique-Farben klee_teppich 279550, wald7_moos 297382 (>500 OK). Volle CI 257/261: J5 (ROT.md) + Legs_Gait (flaky, einzeln gruen, ROT.md). Bild ueberbelichtet (Offscreen), Klee sichtbar.

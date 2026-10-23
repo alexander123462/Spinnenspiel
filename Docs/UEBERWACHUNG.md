@@ -22,3 +22,5 @@ Ursache: Hermes' WaldVergleichTests.cs hatte mehrere Compile-Fehler (nicht nur Z
 
 ## 2026-10-23 KLEE1 (Overseer)
 Ursache: kein Spielcode-Fehler; Beweisbild grau wegen Aufnahme-Pipeline (auch Wald7 grau). Versuche: Fog/TAA/MB-Override wie Galerie, RenderForCamera, Kamera an Spinne -> weiter uniform 164. J5 per Stash-Gegenprobe auch ohne Klee rot (260,35). Getan: Klee committed, J5 in ROT.md, KLEE1b angelegt.
+
+2026-10-24 KLEE1b (Overseer): Ursache asynchrone HDRP-Shader-Kompilierung im ersten Test + volumetrischer Nebel -> einfarbiges Beweisbild. Getan: Nebel-Aus + WarmUp-Schleife in KleeTests/Wald7MoosTests, voll getestet, J5 und Legs_Gait in ROT.md, Punkt [x].

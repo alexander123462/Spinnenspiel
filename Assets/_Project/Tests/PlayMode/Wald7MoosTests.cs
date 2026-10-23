@@ -115,7 +115,19 @@ namespace Spinnenspiel.Tests
             cam.transform.position = eye;
             cam.transform.LookAt(new Vector3(aimAt.x, eye.y - 0.5f, aimAt.z));
             cam.nearClipPlane = 0.05f; cam.farClipPlane = 120f;
+            // KLEE1b: ohne Q1-Galerie-Setup (Override-Volume, Nebel/TAA aus) flutet der
+            // volumetrische HDRP-Nebel die Offscreen-Aufnahme -> einfarbig grau (Mittel=164).
+            Q1ObjektGalerieTests.DisableDepthAndMotionBlur();
+            Q1ObjektGalerieTests.AddOverrideVolume();
+            Q1ObjektGalerieTests.NoTemporalAA(cam);
+            Q1ObjektGalerieTests.SetFog(false);
+            // WALD8c schaltete volumetrischen Nebel ein: er flutet die Offscreen-Aufnahme einfarbig.
+            if (cycle != null) cycle.SetVolumetricFogForTests(false);
+            yield return null;
             for (int rest = 0; rest < 3; rest++) yield return null; // HDRP resting frames
+            yield return KleeTests.WarmUp(cam);
+            var veg = Object.FindFirstObjectByType<VegetationSystem>();
+            if (veg != null) veg.RenderForCamera(cam);
             string file = "Logs/ci/wald7_moos.png";
             Vector4 st = UrwaldTests.SaveFrameHdr(cam, 1024, 768, file);
             Debug.Log(string.Format("[WALD7] proof {0}: Mittel={1} Max={2}",
