@@ -105,7 +105,7 @@ namespace Spinnenspiel.Tests
             Debug.Log("[Q1] Katalog: " + counts.Count + " Material|Mesh-Kombinationen");
         }
 
-        private static void DisableDepthAndMotionBlur()
+        internal static void DisableDepthAndMotionBlur()
         {
             foreach (var volume in Object.FindObjectsByType<UnityEngine.Rendering.Volume>(FindObjectsSortMode.None))
             {
@@ -118,7 +118,7 @@ namespace Spinnenspiel.Tests
             }
         }
 
-        private static void NoTemporalAA(Camera cam)
+        internal static void NoTemporalAA(Camera cam)
         {
             // HDRP-TAA/Verlauf verschmiert Offscreen-Aufnahmen nach Kamerasprung (Radialstreifen): ausschalten.
             var hd = cam.GetComponent("HDAdditionalCameraData");
@@ -149,7 +149,7 @@ namespace Spinnenspiel.Tests
         }
 
         // Globales Override-Volume: Bewegungsunschaerfe aus (die HDRP-Default-Volume-Profile ist kein Szenen-Volume).
-        private static void AddOverrideVolume()
+        internal static void AddOverrideVolume()
         {
             var go = new GameObject("GalerieOverride");
             var vol = go.AddComponent<UnityEngine.Rendering.Volume>();
@@ -164,7 +164,7 @@ namespace Spinnenspiel.Tests
             if (fog != null) _fogOverride = prof.Add(fog, false);
         }
 
-        private static void SetFog(bool on)
+        internal static void SetFog(bool on)
         {
             if (_fogOverride == null) return;
             var f = _fogOverride.GetType().GetField("enabled");

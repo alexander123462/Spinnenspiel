@@ -64,6 +64,7 @@ namespace Spinnenspiel.EditorTools
             lib.terrainMat = TerrainMaterial();
             lib.redwoodMat = RedwoodMaterial();
             lib.canopyMat = CanopyMaterial();
+            lib.cloverMat = CloverMaterial();
             lib.fern = ScanMesh("Assets/_Project/Art/Scans/Models/fern_02/fern_02_1k.fbx", LoadMesh("VM_Fern"));
             // G4: Scan-Farn/-Strauch wirken mitteleuropäisch-braun → grün getönte Kopien (Originale bleiben unverändert).
             lib.fernMat = TropischMaterial(ScanMaterial("Assets/_Project/Art/Scans/Materials/M_fern_02.mat", LoadMaterial("MAT_Fern")), "MAT_FernTropisch");
@@ -1212,6 +1213,18 @@ namespace Spinnenspiel.EditorTools
             m.SetFloat("_DoubleSidedNormalMode", 2f);
             m.SetVector("_DoubleSidedConstants", new Vector4(1f, 1f, 1f, 0f));
             return SaveMat("MAT_Canopy", m);
+        }
+
+        /// <summary>KLEE1: heller Klee-Teppich — Alpha-Cutout-Blatttextur, doppelseitig (Flip), matt.</summary>
+        private static Material CloverMaterial()
+        {
+            Material m = Spinnenspiel.Rendering.PipelineMaterials.Lit(Color.white, TextureFactory.CloverLeaf());
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(m, 0.12f);
+            Spinnenspiel.Rendering.PipelineMaterials.SetAlphaClip(m, 0.5f);
+            Spinnenspiel.Rendering.PipelineMaterials.SetDoubleSided(m, true);
+            m.SetFloat("_DoubleSidedNormalMode", 2f);
+            m.SetVector("_DoubleSidedConstants", new Vector4(1f, 1f, 1f, 0f));
+            return SaveMat("MAT_Klee", m);
         }
 
         /// <summary>Terrain-Material (HDRP/TerrainLit) als echtes Asset, das die Bibliothek referenziert. Ohne dieses Asset loest sich

@@ -230,6 +230,30 @@ namespace Spinnenspiel.EditorTools
             }, true);
         }
 
+        /// <summary>KLEE1: helles Kleeblatt (3 Herz-Lappen) mit Alpha fuer den Cutout-Teppich.
+        /// Die Mitte (0.28..0.72) ist immer undurchsichtig: CloverFactory-UVs liegen dort.</summary>
+        public static Texture2D CloverLeaf()
+        {
+            return Generate("T_Clover_Leaf", 256, (u, v) =>
+            {
+                float dx = u - 0.5f, dy = v - 0.42f;
+                // Herz-Kontur in Polarkoordinaten (Kerze nach oben).
+                float ang = Mathf.Atan2(dy, dx);
+                float r = Mathf.Sqrt(dx * dx + dy * dy);
+                float theta = Mathf.Abs(ang - Mathf.PI * 0.5f);
+                if (theta > Mathf.PI) theta = 2f * Mathf.PI - theta;
+                float rLeaf = 0.42f * (1f - 0.38f * Mathf.Exp(-(theta * theta) / (0.34f * 0.34f)));
+                float a = r < rLeaf ? 1f : 0f;
+                // Blattrippen: heller Mittelnerv, leichte Adern.
+                float vein = 1f - 0.25f * Mathf.Exp(-(dx * dx) / 0.0006f) * (dy > 0f ? 1f : 0.3f);
+                float n = Mathf.PerlinNoise(u * 9f, v * 9f);
+                Color c = Color.Lerp(new Color(0.30f, 0.55f, 0.16f), new Color(0.52f, 0.76f, 0.30f), n * 0.7f + 0.15f);
+                c *= vein;
+                c.a = a;
+                return c;
+            }, true);
+        }
+
         /// <summary>Blatt-Atlas: mehrere Blätter mit Alpha auf einer Karte (für Busch- und Baumkarten).</summary>
         public static Texture2D LeafCluster()
         {

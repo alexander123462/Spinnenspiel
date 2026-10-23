@@ -62,6 +62,9 @@ namespace Spinnenspiel
         public bool canopyOn = false;       // WALD5: Blaetterdach
         public int RedwoodCount { get; private set; }
         public int CanopyCount { get; private set; }
+        /// <summary>KLEE1: Klee-Instanzen gesamt und im 10-m-Umkreis des Spawnpunkts.</summary>
+        public int CloverCount { get; private set; }
+        public int CloverNearSpawnCount { get; private set; }
         public float moosBaseHeightM = 1.5f; // unterste Stamm-Meterage mit Moos
 
         /// <summary>WALD7: Set by CreateTree for the LAST created tree (trunk base world pos +
@@ -573,6 +576,9 @@ namespace Spinnenspiel
                 }
                 UnityEngine.Debug.Log($"[Jungle] Bodendecker: {groundN} Objekte ({denseAdded} Dense-Grass in clearings, ForestFactor<0.3, step {denseStep} m)");
             }
+
+            // 6c) KLEE1: Klee-Bodenteppich (NUR HINZUGEFUEGT, alte Bodendecker bleiben unveraendert).
+            BuildClover(size);
 
             // 5c) M7-10.5 Spinngscale Debris: cm-sized Laubstreu, Zweiglein, Kieselchen.
             // Fein detail for the spider macro-perspective; no colliders (walk on ground).
@@ -1256,6 +1262,78 @@ namespace Spinnenspiel
                 }
             }
             UnityEngine.Debug.Log("[Redwood] " + RedwoodCount + " Staemme");
+        }
+
+        /// <summary>KLEE1: Klee-Bodenteppich um den Spawnpunkt — Kern 0..6 m dicht (Step 0.16 m),
+        /// Ring 6..14 m locker (Step 0.32 m, ~60 %). Kein Klee in Wasser/Sumpf. 5..12 cm hoch,
+        /// keine Collider, pro 8-m-Block zu EINEM Mesh vereint (wie BuildCanopy).</summary>
+        private void BuildClover(float size)
+        {
+            CloverCount = 0;
+            CloverNearSpawnCount = 0;
+            if (library.cloverMat == null) return;
+
+            var variants = new Mesh[6];
+            for (int i = 0; i < variants.Length; i++) variants[i] = CloverFactory.Clover(Seed * 17 + i);
+
+            Transform root = new GameObject("Klee").transform;
+            var blocks = new Dictionary<Vector2Int, List<CombineInstance>>();
+            const float coreR = 6f, outerR = 14f;
+
+            for (int gi = -88; gi <= 88; gi++)
+            {
+                float gx = _spawnXZ.x + gi * 0.16f;
+                for (int gj = -88; gj <= 88; gj++)
+                {
+                    float gz = _spawnXZ.z + gj * 0.16f;
+                    float dx = gx - _spawnXZ.x, dz = gz - _spawnXZ.z;
+                    float d2 = dx * dx + dz * dz;
+                    if (d2 > outerR * outerR) continue;
+                    bool core = d2 <= coreR * coreR;
+                    // Ring: halbes Raster (nur gerade Zellen) plus Hash-Duenneung; Kern bleibt vollstaendig.
+                    if (!core)
+                    {
+                        if ((gi & 1) != 0 || (gj & 1) != 0) continue;
+                        int hi = Mathf.RoundToInt(gx * 100f), hj = Mathf.RoundToInt(gz * 100f);
+                        if (World.Hash01(hi, hj, 131) < 0.4f) continue;
+                    }
+                    float x = gx + (World.Hash01(Mathf.RoundToInt(gx * 512), Mathf.RoundToInt(gz * 512), 132) - 0.5f) * 0.12f;
+                    float z = gz + (World.Hash01(Mathf.RoundToInt(gx * 512), Mathf.RoundToInt(gz * 512), 133) - 0.5f) * 0.12f;
+                    if (x < 0.5f || x > size - 0.5f || z < 0.5f || z > size - 0.5f) continue;
+                    if (!IsDryFlat(World, x, z)) continue;
+                    if (World.Height(x, z) < JungleWorld.WaterLevel + 0.1f) continue;
+
+                    int hi2 = Mathf.RoundToInt(x * 100f), hj2 = Mathf.RoundToInt(z * 100f);
+                    float scale = 0.05f + World.Hash01(hi2, hj2, 134) * 0.07f; // 5..12 cm
+                    var ci = new CombineInstance
+                    {
+                        mesh = variants[Mathf.FloorToInt(World.Hash01(hi2, hj2, 135) * variants.Length) % variants.Length],
+                        transform = Matrix4x4.TRS(
+                            new Vector3(x, World.Height(x, z) - 0.01f, z),
+                            Quaternion.Euler(0f, World.Hash01(hi2, hj2, 136) * 360f, 0f),
+                            Vector3.one * scale)
+                    };
+                    var key = new Vector2Int(Mathf.FloorToInt(x / 8f), Mathf.FloorToInt(z / 8f));
+                    if (!blocks.TryGetValue(key, out var list)) { list = new List<CombineInstance>(); blocks[key] = list; }
+                    list.Add(ci);
+                    CloverCount++;
+                    if (d2 <= 100f) CloverNearSpawnCount++;
+                }
+            }
+
+            foreach (var kv in blocks)
+            {
+                var mesh = new Mesh { name = "KleeBlock", indexFormat = UnityEngine.Rendering.IndexFormat.UInt32 };
+                mesh.CombineMeshes(kv.Value.ToArray(), true, true);
+                var go = new GameObject("KleeBlock");
+                go.transform.SetParent(root, false);
+                go.AddComponent<MeshFilter>().sharedMesh = mesh;
+                var mr = go.AddComponent<MeshRenderer>();
+                mr.sharedMaterial = library.cloverMat;
+                mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            }
+            UnityEngine.Debug.Log(string.Format("[KLEE1] Klee-Instanzen im 10-m-Umkreis={0} -> Kriterium >= 3000 -> {1}; gesamt={2} in {3} Bloecken",
+                CloverNearSpawnCount, CloverNearSpawnCount >= 3000 ? "OK" : "NOK", CloverCount, blocks.Count));
         }
 
         /// <summary>WALD5: Blaetterdach in 38..46 m, Buescheln pro 6-m-Zelle (ca. 10 % Luecken), pro 32-m-Block zu EINEM Mesh vereint.</summary>

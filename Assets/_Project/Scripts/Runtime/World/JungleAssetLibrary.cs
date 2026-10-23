@@ -89,6 +89,8 @@ namespace Spinnenspiel
         /// <summary>Mammutbaum-Rinde und Dach-Karten (RedwoodFactory).</summary>
         public Material redwoodMat;
         public Material canopyMat;
+        /// <summary>KLEE1: Klee-Bodenteppich (CloverFactory + T_Clover_Leaf, Alpha-Cutout, doppelseitig).</summary>
+        public Material cloverMat;
 
         /// <summary>Reihenfolge: Earth, Grass, Mud, Rock.</summary>
         public TerrainLayer[] terrainLayers;
