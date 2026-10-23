@@ -19,3 +19,6 @@ Ursache: Hermes' WaldVergleichTests.cs hatte mehrere Compile-Fehler (nicht nur Z
 - 2026-10-21 WALD8a (Overseer): Diagnose war fertig, [!] nur wegen Gate (rote Folgetests). Ursache: rohes Texture2D-Cookie aus TextureFactory.Canopy() macht Bild grau (StdDev 0), weisses Cookie normal. Punkt auf [x], Ursache und Loesungshinweis in WALD8b; kein Code-Commit.
 
 - 2026-10-21 WALD8b [!] (Overseer): Cookie funktioniert (Import-Fix wirkt, Bild nicht mehr grau, Diff mit/weiss 5,6 %). Blockade war ein schlechtes Kriterium (StdDev unteres Drittel +25 % bei dichtem, schon kontrastreichem Waldboden mit Auto-Exposure). Zerlegt in WALD8b1 (Import-Fix committen, Mass: nicht flach, Diff >= 4 %) und WALD8b2 (Sichtbarkeit per mittlerer Pixeldifferenz). Code bleibt im Baum fuer WALD8b1; keine CI (kein Code geaendert).
+
+## 2026-10-23 KLEE1 (Overseer)
+Ursache: kein Spielcode-Fehler; Beweisbild grau wegen Aufnahme-Pipeline (auch Wald7 grau). Versuche: Fog/TAA/MB-Override wie Galerie, RenderForCamera, Kamera an Spinne -> weiter uniform 164. J5 per Stash-Gegenprobe auch ohne Klee rot (260,35). Getan: Klee committed, J5 in ROT.md, KLEE1b angelegt.
