@@ -81,6 +81,12 @@ namespace Spinnenspiel
 
         public float Yaw => yaw;
 
+        /// <summary>FOTO1: Kamera-Blickwinkel (Grad nach oben) fuer den Foto-Modus setzen.</summary>
+        public void SetPitch(float grad)
+        {
+            pitch = Mathf.Clamp(grad, minPitch, maxPitch);
+        }
+
         /// <summary>K5: Groeffieffeffe of the spider (1 = start size), 1 if no SpiderGrowth attached.</summary>
         private float Growth => _growth != null ? _growth.GrowthScale : 1f;
 

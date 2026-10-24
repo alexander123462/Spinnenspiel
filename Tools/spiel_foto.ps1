@@ -1,6 +1,13 @@
-# Startet den gebauten Player (Builds\Windows64), wartet, macht ein Foto des Fensters und beendet ihn.
-# Aufruf: powershell -ExecutionPolicy Bypass -File Tools\spiel_foto.ps1 -Out Logs\ci\spiel_foto.png [-Warte 60]
-param([string]$Out = "Logs\ci\spiel_foto.png", [int]$Warte = 60)
+# Startet den gebauten Player (Builds\Windows64) im Foto-Modus: der Player speichert das
+# Foto selbst (ScreenCapture) und beendet sich dann. Wartet auf die Datei, hoechstens 120 s.
+# Fehlt die Datei nach 120 s, macht die PowerShell ein Fenster-Foto (altes Verhalten) und killt den Player.
+# Aufruf: powershell -ExecutionPolicy Bypass -File Tools\spiel_foto.ps1 -Out Logs\ci\spiel_foto.png [-Seed 4242] [-Pitch 0] [-Warte 25]
+param(
+    [string]$Out = "Logs\ci\spiel_foto.png",
+    [int]$Seed = 4242,
+    [double]$Pitch = 0,
+    [int]$Warte = 25
+)
 Add-Type -AssemblyName System.Drawing
 Add-Type -TypeDefinition @'
 using System; using System.Runtime.InteropServices;
@@ -8,13 +15,40 @@ public class WSF { [DllImport("user32.dll")] public static extern bool GetWindow
  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L,T,R,B; } }
 '@
 $root = Split-Path -Parent $PSScriptRoot
-$p = Start-Process "$root\Builds\Windows64\Spinnenspiel.exe" -ArgumentList '-screen-fullscreen','0','-screen-width','1280','-screen-height','720' -PassThru
-Start-Sleep $Warte
-$p.Refresh(); $h = $p.MainWindowHandle
-$r = New-Object WSF+RECT; [void][WSF]::GetWindowRect($h, [ref]$r)
-$bmp = New-Object System.Drawing.Bitmap ($r.R - $r.L), ($r.B - $r.T)
-$g = [System.Drawing.Graphics]::FromImage($bmp); $dc = $g.GetHdc(); [void][WSF]::PrintWindow($h, $dc, 2); $g.ReleaseHdc($dc)
 $full = if ([System.IO.Path]::IsPathRooted($Out)) { $Out } else { Join-Path $root $Out }
-$bmp.Save($full)
-Stop-Process $p -Force
-Write-Output "Foto: $full"
+New-Item -ItemType Directory -Path (Split-Path -Parent $full) -Force | Out-Null
+Remove-Item $full -ErrorAction SilentlyContinue
+
+$p = Start-Process "$root\Builds\Windows64\Spinnenspiel.exe" -ArgumentList @(
+    '-screen-fullscreen','0','-screen-width','1280','-screen-height','720',
+    '-fotopfad', "`"$full`"", '-fotoseed', "$Seed", '-fotopitch', "$Pitch", '-fotowarte', "$Warte"
+) -PassThru
+
+# Auf die Foto-Datei warten: sie gilt als fertig, wenn sie ueber 100 KB hat und ihre
+# Groesse ueber mehrere Abfragen stabil ist. Hoechstens 120 s.
+$deadline = (Get-Date).AddSeconds(120)
+$lastSize = -1; $stable = 0
+while ((Get-Date) -lt $deadline) {
+    Start-Sleep -Seconds 2
+    if (Test-Path $full) {
+        $size = (Get-Item $full).Length
+        if ($size -gt 100KB -and $size -eq $lastSize) { $stable++ } else { $stable = 0 }
+        if ($stable -ge 2) { break }
+        $lastSize = $size
+    }
+}
+
+if (-not (Test-Path $full)) {
+    # Fallback: altes Fenster-Foto, falls der Player das Foto nicht selbst schreibt.
+    Start-Sleep $Warte
+    $p.Refresh(); $h = $p.MainWindowHandle
+    $r = New-Object WSF+RECT; [void][WSF]::GetWindowRect($h, [ref]$r)
+    $bmp = New-Object System.Drawing.Bitmap ($r.R - $r.L), ($r.B - $r.T)
+    $g = [System.Drawing.Graphics]::FromImage($bmp); $dc = $g.GetHdc(); [void][WSF]::PrintWindow($h, $dc, 2); $g.ReleaseHdc($dc)
+    $bmp.Save($full)
+    Write-Output "Foto (Fallback Fenster): $full"
+} else {
+    Write-Output ("Foto (Player): $full ({0:N0} Bytes)" -f (Get-Item $full).Length)
+}
+
+if (-not $p.HasExited) { Stop-Process $p -Force }
