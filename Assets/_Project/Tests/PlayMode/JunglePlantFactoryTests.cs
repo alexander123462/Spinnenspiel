@@ -115,5 +115,48 @@ namespace Spinnenspiel.Tests
             }
             Assert.That(differing >= 4);
         }
+
+        // KLEE2: Klee-Optik — gewoelbte Teilblaetter statt flacher Platten.
+        [Test]
+        public void Clover_TriCountAndCurvature()
+        {
+            var mesh = Spinnenspiel.CloverFactory.Clover(7);
+            int tris = mesh.triangles.Length / 3;
+            UnityEngine.Debug.Log(string.Format("[KLEE2] Dreiecke je Kleepflanze={0} -> Kriterium >= 20 -> {1}",
+                tris, tris >= 20 ? "OK" : "NOK"));
+            Assert.That(tris, Is.GreaterThanOrEqualTo(20));
+
+            // Voelbung: die Blattverterex liegen NICHT in einer Ebene. Naechste-Nachbarn
+            // (Dreiecke teilen Positionen nicht, da nicht indexiert) ueber Normalen pruefen:
+            // die Spanne der y-Normalen muss deutlich > 0 sein (flache Platte = gleiche Normale).
+            var normals = mesh.normals;
+            float nmin = 1f, nmax = -1f;
+            for (int i = 0; i < normals.Length; i++)
+            {
+                if (normals[i].y < nmin) nmin = normals[i].y;
+                if (normals[i].y > nmax) nmax = normals[i].y;
+            }
+            float span = nmax - nmin;
+            UnityEngine.Debug.Log(string.Format("[KLEE2] Normalen-y-Spanne={0:F3} -> Kriterium >= 0.15 (Voelbung) -> {1}",
+                span, span >= 0.15f ? "OK" : "NOK"));
+            Assert.That(span, Is.GreaterThanOrEqualTo(0.15f));
+
+            // Blattbreite in Mesh-Einheit: L max 0.7 -> Breite <= 2*0.7; mit scale 8..13 cm
+            // ergibt das Blaetter bis ~9 cm (Kriterium im Welt-Test KleeTests).
+            Assert.That(mesh.bounds.size.x, Is.LessThanOrEqualTo(1.5f));
+        }
+
+        [Test]
+        public void Clover_Deterministic()
+        {
+            var a = Spinnenspiel.CloverFactory.Clover(3);
+            var b = Spinnenspiel.CloverFactory.Clover(3);
+            Assert.That(a.vertexCount, Is.EqualTo(b.vertexCount));
+            var va = a.vertices; var vb = b.vertices;
+            for (int i = 0; i < va.Length; i++)
+                Assert.That(Mathf.Approximately(va[i].x, vb[i].x) &&
+                            Mathf.Approximately(va[i].y, vb[i].y) &&
+                            Mathf.Approximately(va[i].z, vb[i].z));
+        }
     }
 }

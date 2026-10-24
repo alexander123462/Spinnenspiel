@@ -1304,7 +1304,8 @@ namespace Spinnenspiel
                     if (World.Height(x, z) < JungleWorld.WaterLevel + 0.1f) continue;
 
                     int hi2 = Mathf.RoundToInt(x * 100f), hj2 = Mathf.RoundToInt(z * 100f);
-                    float scale = 0.05f + World.Hash01(hi2, hj2, 134) * 0.07f; // 5..12 cm
+                    // KLEE2: Pflanzen 8..13 cm hoch, Blaetter 4..9 cm (L=0.5..0.7 Mesh-Einheit * scale).
+                    float scale = 0.08f + World.Hash01(hi2, hj2, 134) * 0.05f; // 8..13 cm
                     var ci = new CombineInstance
                     {
                         mesh = variants[Mathf.FloorToInt(World.Hash01(hi2, hj2, 135) * variants.Length) % variants.Length],

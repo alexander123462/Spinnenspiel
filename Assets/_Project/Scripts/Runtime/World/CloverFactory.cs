@@ -4,11 +4,14 @@ using UnityEngine;
 namespace Spinnenspiel
 {
     /// <summary>
-    /// KLEE1: prozeduraler Klee/Sauerklee (CloverFactory) fuer den Klee-Bodenteppich.
-    /// Mesh-Einheit: Hoexhe 1 (Stiel auf y=0, Blattdach bei y~1), Breite ~1.4.
-    /// Der Generator skaliert auf 5..12 cm (scale = Zielhoehe). Seed-deterministisch.
-    /// Alpha-Cutout-Textur T_Clover_Leaf (ein Kleeblatt zentriert) auf Blatt-Faechern,
-    /// Stiel-UVs liegen mitten in der undurchsichtigen Blattflaeche (wird nie weggeschnitten).
+    /// KLEE1/KLEE2: prozeduraler Klee/Sauerklee (CloverFactory) fuer den Klee-Bodenteppich.
+    /// Mesh-Einheit: Hoehe 1 (Stiel auf y=0, Blattdach bei y~1), Breite ~0.95.
+    /// Der Generator skaliert auf 5..9 cm (scale = Zielhoehe) -> Blaetter 4..9 cm breit.
+    /// KLEE2: jedes der 3 Teilblaetter ist eine gewoelbte Herzflaeche aus zwei Ringen
+    /// (21 Dreiecke je Teilblatt, Mitte gegenueber dem Rand angehoben) statt eines
+    /// flachen Faechers — das nimmt den "flache kantige Platten"-Look vom Player-Foto.
+    /// Alpha-Cutout-Textur T_Clover_Leaf auf Blatt-Faechern; alle Blatt-UVs liegen in der
+    /// undurchsichtigen Mitte (0.28..0.72), werden also nie weggeschnitten.
     /// </summary>
     public static class CloverFactory
     {
@@ -50,37 +53,80 @@ namespace Spinnenspiel
             return mesh;
         }
 
-        /// <summary>Ein Herz-Blaettchen als Faecher: Herzradius R(t)=L*(1-0.38*exp(-(theta/0.34)^2))
-        /// mit Kerze zur Spitze. Blattlokal: +X = aussen, +Y = quer; dann um tilt um die
-        /// Aussenachse heben und um yaw um Welt-Y drehen.</summary>
+        /// <summary>KLEE2: ein Herz-Teilblatt als gewoelbte Flaeche aus zwei Ringen.
+        /// Herzkontur R(t)=L*(1-0.38*exp(-(theta/0.34)^2)) mit Kerze zur Spitze; der innere
+        /// Ring liegt bei 55 % des Konturradius, die Blattmitte ist um 'cup' ueber dem Rand
+        /// angehoben (Schuessel- Woelbung). Blattlokal: +X = aussen, +Y = quer; dann um tilt
+        /// um die Aussenachse heben und um yaw um Welt-Y drehen. 21 Dreiecke je Teilblatt.</summary>
         private static void AddLeaflet(List<Vector3> verts, List<Vector2> uvs, Vector3 root, float yaw, float tilt, float L)
         {
-            const int seg = 9;                 // 9 Segmente, Kerze mittig
-            int baseIdx = verts.Count;
-            verts.Add(root);
-            uvs.Add(new Vector2(0.5f, 0.42f)); // Blattansatz: undurchsichtige Zone
+            const int seg = 9;          // Aeussere Ringe mit 9 Punkten (Kerze mittig)
+            const int inner = 7;        // Innerer Ring mit 7 Punkten
+            const float cup = 0.16f;    // Woelbung: Mitte ueber dem Rand
+            Vector3 up = new Vector3(0f, 1f, 0f);
+
+            // Blattlokal berechnen (u = Konturanteil 0..1, t = Winkelparameter -1..1),
+            // am Ende gemeinsam um tilt (Aussenachse) und yaw (Welt-Y) drehen.
+            var lp = new List<Vector3>();     // blaetterlokale Positionen
+            var lv = new List<Vector2>();     // UVs (alle garantiert in der undurchsichtigen Blattmitte)
+
+            Vector3 center = LocalPoint(L, 0.3f, 0f, cup);
+            lp.Add(center); lv.Add(LeafUv(0.3f, 0f));
+
+            for (int i = 0; i < inner; i++)
+            {
+                float t = -1f + 2f * i / (inner - 1);
+                Vector3 p = LocalPoint(L, 0.55f, t, cup * Dome(0.55f));
+                lp.Add(p); lv.Add(LeafUv(0.55f, t));
+            }
             for (int i = 0; i <= seg; i++)
             {
-                float t = -1f + 2f * i / seg;              // -1..1
-                float theta = t * 1.25f;                   // +-72 Grad
-                float r = L * (1f - 0.38f * Mathf.Exp(-(theta * theta) / (0.34f * 0.34f)));
-                float lx = r * Mathf.Cos(theta);           // aussen
-                float ly = r * Mathf.Sin(theta);           // quer
-                // Heben (tilt um Aussenachse), dann Gieren um Welt-Y.
-                float y = lx * Mathf.Sin(tilt) + 0.04f;
-                float xz = lx * Mathf.Cos(tilt);
-                Vector3 p = root + new Vector3(xz * Mathf.Cos(yaw), y, xz * Mathf.Sin(yaw))
-                    + new Vector3(-ly * Mathf.Sin(yaw), 0f, ly * Mathf.Cos(yaw));
-                verts.Add(p);
-                // UV: Herzblatt mittig in der Blattflaeche der Textur (fest, nie Cutout-Rand).
-                uvs.Add(new Vector2(0.5f + 0.22f * t, 0.5f + 0.2f * Mathf.Abs(t)));
+                float t = -1f + 2f * i / seg;
+                Vector3 p = LocalPoint(L, 1f, t, 0f);
+                lp.Add(p); lv.Add(LeafUv(1f, t));
+            }
+
+            // In Weltlage bringen: tilt hebt die Blattspitze an (Rechts um Aussenachse), dann Gieren um Welt-Y.
+            Vector3 axis = Vector3.Cross(new Vector3(Mathf.Cos(yaw), 0f, Mathf.Sin(yaw)), up);
+            var wp = new List<Vector3>(lp.Count);
+            foreach (Vector3 q in lp)
+                wp.Add(root + Quaternion.AngleAxis(tilt * Mathf.Rad2Deg, axis) * q);
+
+            // Dreiecke: Mitte -> innerer Faecher, innerer Ring -> Randstreifen.
+            void V(int i) { verts.Add(wp[i]); uvs.Add(lv[i]); }
+            for (int i = 0; i < inner; i++)
+            {
+                V(0); V(1 + i); V(1 + (i + 1) % inner);
             }
             for (int i = 0; i < seg; i++)
             {
-                AddTri(verts, uvs,
-                    verts[baseIdx], verts[baseIdx + 1 + i], verts[baseIdx + 2 + i],
-                    uvs[baseIdx], uvs[baseIdx + 1 + i], uvs[baseIdx + 2 + i]);
+                int a = 1 + i % inner, b = 1 + (i + 1) % inner;
+                int oa = 1 + inner + i, ob = 1 + inner + i + 1;
+                V(a); V(b); V(oa);
+                V(b); V(ob); V(oa);
             }
+        }
+
+        /// <summary>Blattlokaler Punkt der Herzkontur: u = Konturanteil (0.55 innen, 1 Rand),
+        /// t = Winkelparameter (-1..1, Kerze bei t=0), lift = Hoehe ueber der Blattebene.</summary>
+        private static Vector3 LocalPoint(float L, float u, float t, float lift)
+        {
+            float theta = t * 1.25f;
+            float rContour = L * (1f - 0.38f * Mathf.Exp(-(theta * theta) / (0.34f * 0.34f)));
+            float r = u * rContour;
+            float lx = r * Mathf.Cos(theta);   // aussen
+            float ly = r * Mathf.Sin(theta);   // quer
+            return new Vector3(lx, lift, ly);
+        }
+
+        /// <summary>Schuesselprofil 1 (Mitte) .. 0 (Rand): quadratischer Abfall.</summary>
+        private static float Dome(float u) { return (1f - u) * (1f - u); }
+
+        /// <summary>UV eines Punkts bei Konturanteil u und Winkel t, in der undurchsichtigen
+        /// Blattmitte der Textur (0.40..0.60, safe gegenueber dem Cutout-Bereich ab 0.28/0.72).</summary>
+        private static Vector2 LeafUv(float u, float t)
+        {
+            return new Vector2(0.5f + 0.18f * u, 0.5f + 0.18f * t);
         }
 
         private static void AddTri(List<Vector3> verts, List<Vector2> uvs,

@@ -230,8 +230,9 @@ namespace Spinnenspiel.EditorTools
             }, true);
         }
 
-        /// <summary>KLEE1: helles Kleeblatt (3 Herz-Lappen) mit Alpha fuer den Cutout-Teppich.
-        /// Die Mitte (0.28..0.72) ist immer undurchsichtig: CloverFactory-UVs liegen dort.</summary>
+        /// <summary>KLEE1/KLEE2: helles Kleeblatt (3 Herz-Lappen) mit Alpha fuer den Cutout-Teppich.
+        /// Die Mitte (0.28..0.72) ist immer undurchsichtig: CloverFactory-UVs liegen dort.
+        /// KLEE2: heller Mittelstreifen mit V-Zeichnung (wie bei echtem Sauerklee), dunklerer Rand.</summary>
         public static Texture2D CloverLeaf()
         {
             return Generate("T_Clover_Leaf", 256, (u, v) =>
@@ -244,11 +245,17 @@ namespace Spinnenspiel.EditorTools
                 if (theta > Mathf.PI) theta = 2f * Mathf.PI - theta;
                 float rLeaf = 0.42f * (1f - 0.38f * Mathf.Exp(-(theta * theta) / (0.34f * 0.34f)));
                 float a = r < rLeaf ? 1f : 0f;
-                // Blattrippen: heller Mittelnerv, leichte Adern.
-                float vein = 1f - 0.25f * Mathf.Exp(-(dx * dx) / 0.0006f) * (dy > 0f ? 1f : 0.3f);
+                // KLEE2: V-Zeichnung (Chevron) als heller Streifen um den Blattmittelpunkt.
+                float vLine = Mathf.Abs(dy + 0.55f * Mathf.Abs(dx) - 0.02f);
+                float chevron = Mathf.Exp(-(vLine * vLine) / 0.0016f) * (dy > -0.30f ? 1f : 0.2f);
+                // Heller Mittelstreifen entlang der Hauptachse.
+                float mid = Mathf.Exp(-(dx * dx) / 0.0018f) * (dy > -0.05f ? 1f : 0.35f);
+                // KLEE2: dunklerer Rand zur Blattkontur hin.
+                float edgeDark = 1f - 0.35f * Mathf.Clamp01((r / rLeaf - 0.6f) / 0.4f);
                 float n = Mathf.PerlinNoise(u * 9f, v * 9f);
-                Color c = Color.Lerp(new Color(0.30f, 0.55f, 0.16f), new Color(0.52f, 0.76f, 0.30f), n * 0.7f + 0.15f);
-                c *= vein;
+                Color c = Color.Lerp(new Color(0.13f, 0.32f, 0.08f), new Color(0.45f, 0.68f, 0.30f), n * 0.7f + 0.15f);
+                c = Color.Lerp(c, new Color(0.62f, 0.80f, 0.48f), Mathf.Clamp01(chevron * 0.8f + mid * 0.5f));
+                c *= edgeDark;
                 c.a = a;
                 return c;
             }, true);
