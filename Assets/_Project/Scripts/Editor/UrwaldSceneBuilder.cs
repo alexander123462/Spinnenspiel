@@ -138,6 +138,10 @@ namespace Spinnenspiel.EditorTools
             dayCycle.daySunColor = WaldLook.SunColor;
             // T7 Morgennebel: the cycle drives the fog volume built by WorldLightingBuilder.
             dayCycle.fogVolumeComponent = WorldLightingBuilder.LastBuiltFog;
+            // FARBE1a: the cycle drives the sky brightness (day factor) and the tests pin the
+            // exposure via the wired Exposure component.
+            dayCycle.skyVolume = WorldLightingBuilder.LastBuiltSky;
+            dayCycle.exposureVolume = WorldLightingBuilder.LastBuiltExposure;
             new GameObject("Sky Ambient").AddComponent<SkyAmbientUpdater>();
             new GameObject("Jungle Ambience").AddComponent<JungleAmbientAudio>();
             new GameObject("Debug Overlay").AddComponent<DebugOverlay>();

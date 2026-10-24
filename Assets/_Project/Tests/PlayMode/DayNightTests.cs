@@ -19,6 +19,21 @@ namespace Spinnenspiel.Tests
         // ~140..190 (window 60..200) and night ~10..20 (window 10..45).
         private const float fixedExposure = 20f;
 
+        /// <summary>FARBE1a: HDRP-Exposure (EV100, hoeher = dunkler) Startwert der Kalibrierung.
+        /// Auto-Exposure (AutomaticHistogram) normalisierte Nacht hoch auf Mittelgrau (Raw
+        /// noon 0.063 / night 0.086 in o-farbe1c). Die Kalibrierschleife verschiebt das EV dann
+        /// auf Ziel-Noon-Raw calibTargetRaw.</summary>
+        private const float fixedHdrvEv = 14f;
+
+        /// <summary>FARBE1a: Ziel-Noon-Raw der Grobkalibrierung (nur gegen Schwarzrahmen
+        /// abgesichert; die Feinkalibrierung erfolgt auf den gemessenen Noon-Mittel).</summary>
+        private const float calibTargetRaw = 0.06f;
+
+        /// <summary>FARBE1a: Ziel-Mittel des Noon-Rahmens nach der Feinkalibrierung.
+        /// Das echte Tag/Nacht-Roh-Verhaeltnis betraegt ~23 (r101-f5: noon Raw 0.364,
+        /// night Raw 0.0155) — bei Noon ~130 landet die Nacht dann bei ~15 (Fenster 10..45).</summary>
+        private const float noonCalibTarget = 130f;
+
         /// <summary>J5: Live flies (day species) via their spawner 'Insekten' (activeAtNight=false),
         /// so the disabled template is not miscounted.</summary>
         private static int DayInsectCount()
@@ -99,6 +114,11 @@ namespace Spinnenspiel.Tests
         /// <summary>J5: Raw (pre-exposure) luma mean of the last SaveFrameFixed call.</summary>
         private static float lastRawLumaMean;
 
+        /// <summary>FARBE1a: KLEE1b-Lehre — der erste Offscreen-Capture nach dem Editor-Start kann
+        /// einen einfarbigen Rahmen liefern (HDRP-Shader kompilieren asynchron; Raw luma dann 0).
+        /// Die Kalibrierschleife im J5-Test faengt das mit Stabilisierungs-Proben ab
+        /// (zwei Aufnahmen in Folge innerhalb Faktor 2).</summary>
+
         private static Vector3 SaveFrameFixed(Camera cam, int w, int h, string file, float exposure)
         {
             var rt = new RenderTexture(w, h, 0, RenderTextureFormat.ARGBHalf);
@@ -152,6 +172,65 @@ namespace Spinnenspiel.Tests
         {
             x = Mathf.Max(x - 0.003f, 0f);
             return (x * (2.51f * x + 0.03f)) / ((x * (2.43f * x + 0.59f) + 0.14f));
+        }
+
+        /// <summary>FARBE1a: DayFactorAt is the shared curve of Update and SetDayProgress.
+        /// EditMode-pinned: deep night 0, noon 1, monotonic ramp between (no abrupt jumps),
+        /// symmetric around midnight.</summary>
+        [Test]
+        public void J5_DayFactorAt_Kurve()
+        {
+            // Test cycle like J5: 0.2 min day, 0.04 min ramps, 6 min night (clamped to day).
+            float dayFactorNight = DayNightCycle.DayFactorAt(0f, 0.2f, 0.04f, 6f);
+            Assert.AreEqual(0f, dayFactorNight, 1e-4f, "Midnight must be dark (0).");
+
+            float dayFactorNoon = DayNightCycle.DayFactorAt(0.5f, 0.2f, 0.04f, 6f);
+            Assert.AreEqual(1f, dayFactorNoon, 1e-4f, "Noon must be full day (1).");
+
+            // Monotonic rising noon -> midnight core (with tolerance for the piecewise ramp).
+            float prev = dayFactorNoon;
+            for (float t = 0.5f; t <= 1f; t += 0.01f)
+            {
+                float cur = DayNightCycle.DayFactorAt(t, 0.2f, 0.04f, 6f);
+                Assert.LessOrEqual(cur, prev + 1e-4f, "dayFactor not monotonic toward night at " + t.ToString("F2"));
+                prev = cur;
+            }
+
+            // Symmetric around midnight: 0.1 and 0.9 give the same factor.
+            Assert.AreEqual(DayNightCycle.DayFactorAt(0.1f, 0.2f, 0.04f, 6f),
+                DayNightCycle.DayFactorAt(0.9f, 0.2f, 0.04f, 6f), 1e-4f,
+                "dayFactor must be symmetric around midnight.");
+        }
+
+        /// <summary>FARBE1a: SetDayProgress applies the light state IMMEDIATELY (same frame),
+        /// so a capture right after the jump already shows night/day — the root cause of the
+        /// night frame mirroring the day frame.</summary>
+        [Test]
+        public void J5_SetDayProgress_SetztLichtSofort()
+        {
+            GameObject go = new GameObject("SkySnapTest");
+            Light testSun = go.AddComponent<Light>();
+            testSun.type = LightType.Directional;
+            DayNightCycle cycle = go.AddComponent<DayNightCycle>();
+            cycle.sun = testSun;
+            cycle.dayLengthMinutes = 0.2f;
+            cycle.transitionMinutes = 0.04f;
+            cycle.dayLux = 100000f;
+            cycle.moonLux = 16000f;
+
+            cycle.SetDayProgress(0.0f); // midnight
+            Assert.AreEqual(0f, cycle.CurrentDayFactor, 1e-3f, "SetDayProgress(0) must set dayFactor 0 in the SAME call.");
+            Assert.AreEqual(16000f, testSun.intensity, 1f, "SetDayProgress(0) must set moonLux in the SAME call.");
+
+            cycle.SetDayProgress(0.5f); // noon
+            Assert.AreEqual(1f, cycle.CurrentDayFactor, 1e-3f, "SetDayProgress(0.5) must set dayFactor 1 in the SAME call.");
+            Assert.AreEqual(100000f, testSun.intensity, 1f, "SetDayProgress(0.5) must set dayLux in the SAME call.");
+
+            // No sky volume wired in this bare setup -> sentinel -1 (no crash).
+            Assert.AreEqual(-1f, cycle.CurrentSkyMultiplier(), "Unwired sky must report -1.");
+
+            cycle.sun = null;
+            GameObject.DestroyImmediate(go);
         }
 
         /// <summary>
@@ -233,7 +312,13 @@ namespace Spinnenspiel.Tests
                 yield return null;
             }
             Assert.IsNotNull(worldGen, "Urwald world (Seed 4242) never ready.");
-
+            // FARBE1: volumetrischer Nebel (WALD8c) macht die Offscreen-Rahmen weiss (KLEE1b-Lehre).
+            cycle.SetVolumetricFogForTests(false);
+            // FARBE1a: Auto-Exposure (AutomaticHistogram) normalisiert Tag UND Nacht auf Mittelgrau —
+            // der Nacht-Rahmen wurde hochgeregelt (nacht Raw > noon Raw). Fuer die Messung auf
+            // Fixed-Exposure (EV) umschalten, dann ist der Rahmen reproduzierbar.
+            Assert.IsTrue(cycle.SetFixedExposureForTests(fixedHdrvEv),
+                "Exposure volume not wired to the DayNightCycle.");
             Camera cam = Object.FindFirstObjectByType<Camera>();
             Assert.IsNotNull(cam, "No Camera in Urwald.");
 
@@ -250,6 +335,49 @@ namespace Spinnenspiel.Tests
             // disabled templates as well). activeAtNight=false -> day species (flies).
             int fliesAtNoon = DayInsectCount();
             int mothsAtNoon = NightInsectCount();
+            // FARBE1a: WarmUp + Kalibrierung in EINER Schleife aus Vollgroessen-Aufnahmen:
+            // die 64x48-Proben bleiben teils komplett schwarz (spaet kompilierende Shader,
+            // r101-f4) und taugen nicht zur Helligkeitskalibrierung.
+            // Schritt 1: helles Start-EV (8) — echte Noon-Szene liegt dort bei Raw ~0.3,
+            // Schwarzrahmen bei ~0..3E-4. Stabil = Raw > 1E-3 (kein Schwarzrahmen) und zwei
+            // Aufnahmen in Folge innerhalb Faktor 2.
+            const float calibStartEv = 8f;
+            cycle.SetFixedExposureForTests(calibStartEv);
+            float calRaw = 0f;
+            float prevCalRaw = -1f;
+            for (int cal = 0; cal < 20; cal++)
+            {
+                SaveFrameFixed(cam, 480, 270, "Logs/ci/j5-noon-calib.png", 1f);
+                calRaw = lastRawLumaMean;
+                if (calRaw > 1e-3f && prevCalRaw > 0f && calRaw < prevCalRaw * 2f && calRaw * 2f > prevCalRaw)
+                {
+                    break;
+                }
+                prevCalRaw = calRaw;
+                yield return new UnityEngine.WaitForSecondsRealtime(1f);
+            }
+            // Schritt 2: EV-Roheinstellung aus dem Raw (Raw skaliert linear mit 2^-EV), dann
+            // zwei Fein-Kalibrierungen auf den ENGUELTIG gemessenen Noon-Mittel (ACES ist
+            // nichtlinear, deshalb nicht auf den Raw kalibrieren).
+            float ev = calibStartEv + Mathf.Clamp(Mathf.Log(Mathf.Clamp(calRaw, 1e-4f, 3f) / calibTargetRaw) * 1.4427f, -10f, 10f);
+            float noonCalMean = 0f;
+            for (int pass = 0; pass < 2; pass++)
+            {
+                cycle.SetFixedExposureForTests(ev);
+                for (int settle = 0; settle < 3; settle++) yield return null;
+                noonCalMean = SaveFrameFixed(cam, 480, 270, "Logs/ci/j5-noon-calib.png", fixedExposure).x;
+                if (noonCalMean > 1f)
+                {
+                    ev += Mathf.Log(noonCalMean / noonCalibTarget) * 1.4427f; // log2; EV hoch = dunkler
+                }
+                Debug.Log("[J5-noon-cal] pass " + pass + " EV " + ev.ToString("F2") + " Mittel " + noonCalMean.ToString("F1"));
+            }
+            cycle.SetFixedExposureForTests(ev);
+            for (int settle = 0; settle < 3; settle++) yield return null;
+            Debug.Log("[J5-noon-setup] dayFactor " + cycle.CurrentDayFactor.ToString("F3")
+                + " sunLux " + (cycle.sun != null ? cycle.sun.intensity.ToString("F0") : "n/a")
+                + " skyMultiplier " + cycle.CurrentSkyMultiplier().ToString("E2")
+                + " EV " + ev.ToString("F2") + " (Calib-Raw " + calRaw.ToString("E2") + ")");
             Vector3 noonStats = SaveFrameFixed(cam, 480, 270, "Logs/ci/j5-noon.png", fixedExposure);
             Debug.Log("[J5-noon] Mittel " + noonStats.x.ToString("F1") + " Max " + noonStats.y.ToString("F0") + " Magenta " + noonStats.z.ToString("F0") + " Raw " + lastRawLumaMean.ToString("E2"));
 
@@ -264,6 +392,15 @@ namespace Spinnenspiel.Tests
 
             int fliesAtNight = DayInsectCount();
             int mothsAtNight = NightInsectCount();
+            // FARBE1a: 2-3 Frames warten, damit Volume/Exposure/Himmel (DynamicGI) im neuen
+            // Nacht-Zustand ankommen, BEVOR gemessen wird. Die Kontrast-WarmUp-Probe faellt
+            // nachts weg: ein korrekter Nachtrahmen ist dunkel und wuerde sie bis zum Timeout
+            // laufen lassen.
+            for (int settle = 0; settle < 3; settle++) yield return null;
+            Debug.Log("[J5-night-setup] dayFactor " + cycle.CurrentDayFactor.ToString("F3")
+                + " sunLux " + (cycle.sun != null ? cycle.sun.intensity.ToString("F0") : "n/a")
+                + " skyMultiplier " + cycle.CurrentSkyMultiplier().ToString("E2")
+                + " ambientMode " + UnityEngine.RenderSettings.ambientMode);
             Vector3 nightStats = SaveFrameFixed(cam, 480, 270, "Logs/ci/j5-night.png", fixedExposure);
             Debug.Log("[J5-night] Mittel " + nightStats.x.ToString("F1") + " Max " + nightStats.y.ToString("F0") + " Magenta " + nightStats.z.ToString("F0") + " Raw " + lastRawLumaMean.ToString("E2"));
 

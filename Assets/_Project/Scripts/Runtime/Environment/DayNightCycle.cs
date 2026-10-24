@@ -26,7 +26,7 @@ namespace Spinnenspiel
 
         /// <summary>Brightness during night/moonlight (Lux).</summary>
         [Tooltip("Moon-like brightness at night in Lux")]
-        public float moonLux = 16000f;
+        public float moonLux = 50000f;
 
         /// <summary>Interval for updating the dynamic ambient light in seconds.</summary>
         [Tooltip("Interval for DynamicGI.UpdateEnvironment in seconds")]
@@ -105,6 +105,47 @@ namespace Spinnenspiel
         private float fogBaseDensity = -1f; // baseline RenderSettings.fogDensity (visible when volumetric off)
         private bool fogMissingWarned;
 
+        /// <summary>FARBE1a: The HDRP PhysicallyBasedSky built by the Builder. The sky renders a
+        /// full-bright DAY sky whenever the main light sits above the horizon — and the cycle
+        /// parks the "moon" above the horizon at night (J5). Without this link the night frame
+        /// shows a bright day sky (J5 night was even brighter than noon). The cycle drives the
+        /// sky's multiplier with the day factor, so the sky goes dark with the night.</summary>
+        [Tooltip("HDRP PhysicallyBasedSky whose brightness follows the day factor (set by the Builder)")]
+        public PhysicallyBasedSky skyVolume;
+
+        /// <summary>FARBE1a: The HDRP Exposure component of the scene volume. Auto-exposure
+        /// (AutomaticHistogram) normalises day AND night to mid-grey, which washes out the
+        /// day/night difference in fixed-exposure captures. Tests switch it to Fixed via
+        /// SetFixedExposureForTests.</summary>
+        [Tooltip("HDRP Exposure component (tests switch it to fixed for reproducible captures)")]
+        public Exposure exposureVolume;
+
+        /// <summary>FARBE1a: Sky multiplier at deep night. 0.02 keeps the sky a dim twilight
+        /// glow (moon-lit scene reads dark but not pitch black): measured day/night raw ratio
+        /// at 0.003 was ~64 (night Mittel 2.2 — below the 10..45 window); the sky (via dynamic
+        /// ambient) dominates the frame, so 0.02 lands night at ~20-25 (ratio ~6, matches the
+        /// 16000 lx moonlight design where night is ~5-10x darker than day).</summary>
+        [Tooltip("Sky brightness multiplier at deep night (0 = pitch black)")]
+        public float skyNightMultiplier = 0.01f;
+
+        /// <summary>J5: dayFactor (0 = deep night, 1 = full day) for a day fraction with explicit
+        /// dawn/dusk ramps. Pure function so EditMode tests can pin the ramp shape (and the
+        /// SetDayProgress shortcut uses the SAME curve as Update). nightMinutes is passed in
+        /// because the field is private.</summary>
+        public static float DayFactorAt(float dayFraction, float lengthMinutes, float transitionMinutes, float nightMinutes)
+        {
+            float rampFrac = Mathf.Max(transitionMinutes, 0.01f) / lengthMinutes;
+            float coreMinutes = Mathf.Min(nightMinutes, Mathf.Max(lengthMinutes - 2f * transitionMinutes, 0f));
+            float coreFrac = coreMinutes / lengthMinutes;
+            float distFromMidnight = Mathf.Min(dayFraction, 1f - dayFraction);
+            float dayFactor = distFromMidnight <= coreFrac * 0.5f ? 0f : 1f;
+            if (distFromMidnight > coreFrac * 0.5f && rampFrac > 0f)
+            {
+                dayFactor = Mathf.Min(1f, (distFromMidnight - coreFrac * 0.5f) / rampFrac);
+            }
+            return dayFactor;
+        }
+
         /// <summary>T7: The current scaled meanFreePath of the wired fog volume, or -1 when
         /// no fog volume is wired. Exposed as a plain float so Tests (no HDRP dependency)
         /// can assert the curve really drives the scene's fog.</summary>
@@ -157,6 +198,37 @@ namespace Spinnenspiel
             return true;
         }
 
+        /// <summary>FARBE1a: Tests-only switch of the wired HDRP Exposure to Fixed with the given
+        /// EV. Auto-exposure normalises night up to day brightness (and adapts over frames),
+        /// which destroys the fixed-exposure day/night measurement. False when no volume is wired.</summary>
+        public bool SetFixedExposureForTests(float ev)
+        {
+            if (exposureVolume == null) return false;
+            exposureVolume.mode.Override(ExposureMode.Fixed);
+            exposureVolume.fixedExposure.Override(ev);
+            return true;
+        }
+
+        /// <summary>FARBE1a: The current sky multiplier (1 = full day sky), or -1 when no sky
+        /// volume is wired. Plain float so Tests (no HDRP reference) can log the sky source.</summary>
+        public float CurrentSkyMultiplier()
+        {
+            return skyVolume == null ? -1f : skyVolume.multiplier.value;
+        }
+
+        /// <summary>FARBE1a: Drives the PhysicallyBasedSky brightness with the day factor.
+        /// The HDRP sky follows the MAIN LIGHT elevation; the cycle parks the moon ABOVE the
+        /// horizon at night (J5, otherwise the scene would be pitch black), so without this link
+        /// the sky keeps rendering a full-bright day sky at night. Multiplier 1 at noon matches
+        /// the previous EV-0 baseline; deep night goes to skyNightMultiplier (near black), which
+        /// also darkens the dynamic ambient (SkyAmbientMode.Dynamic derives from the sky).</summary>
+        private void ApplySky()
+        {
+            if (skyVolume == null) return;
+            float m = Mathf.Lerp(skyNightMultiplier, 1f, CurrentDayFactor);
+            skyVolume.multiplier.Override(m);
+        }
+
         /// <summary>Tests/Screenshot: Jump to a day progress (0 = midnight, 0.5 = noon).</summary>
         public void SetDayProgress(float progress)
         {
@@ -165,6 +237,23 @@ namespace Spinnenspiel
             // S5: a Test-Jump is not a natural sunrise — no event, only the baseline moves.
             lastDayFraction = dayFraction;
             ApplyFog();
+            // FARBE1a: recompute the light/sky state for the jumped fraction immediately,
+            // so a capture right after the jump already shows the new time of day.
+            float lengthMinutes = dayLengthMinutes > 0.01f ? dayLengthMinutes : 0.01f;
+            CurrentDayFactor = DayFactorAt(dayFraction, lengthMinutes, Mathf.Max(transitionMinutes, 0.01f), nightMinutes);
+            CurrentNightFactor = 1f - CurrentDayFactor;
+            if (sun != null)
+            {
+                float phase = (dayFraction - 0.25f) * Mathf.PI * 2f;
+                float elevDeg = Mathf.Asin(Mathf.Sin(phase)) * Mathf.Rad2Deg;
+                float azDeg = phase * Mathf.Rad2Deg + 90f;
+                float elevLight = elevDeg >= 0f ? elevDeg : -elevDeg;
+                float azLight = elevDeg >= 0f ? azDeg : azDeg + 180f;
+                sun.transform.rotation = Quaternion.Euler(elevLight, azLight, 0f);
+                sun.intensity = Mathf.Lerp(moonLux, dayLux, CurrentDayFactor);
+                sun.color = Color.Lerp(daySunColor, moonTint, 1f - CurrentDayFactor);
+            }
+            ApplySky();
         }
 
         private void Update()
@@ -202,20 +291,15 @@ namespace Spinnenspiel
 
             // J5: dayFactor from the cycle fraction with explicit dawn/dusk ramps (not abrupt):
             // night core = nightMinutes centred at midnight, ramps of transitionMinutes on both sides.
-            float rampFrac = Mathf.Max(transitionMinutes, 0.01f) / lengthMinutes;
-            float coreMinutes = Mathf.Min(nightMinutes, Mathf.Max(lengthMinutes - 2f * transitionMinutes, 0f));
-            float coreFrac = coreMinutes / lengthMinutes;
-            float distFromMidnight = Mathf.Min(dayFraction, 1f - dayFraction);
-            float dayFactor = distFromMidnight <= coreFrac * 0.5f ? 0f : 1f;
-            if (distFromMidnight > coreFrac * 0.5f && rampFrac > 0f)
-            {
-                dayFactor = Mathf.Min(1f, (distFromMidnight - coreFrac * 0.5f) / rampFrac);
-            }
+            float dayFactor = DayFactorAt(dayFraction, lengthMinutes, Mathf.Max(transitionMinutes, 0.01f), nightMinutes);
             CurrentDayFactor = dayFactor;
             CurrentNightFactor = 1f - dayFactor;
             sun.intensity = Mathf.Lerp(moonLux, dayLux, dayFactor);
             sun.color = Color.Lerp(
                 daySunColor, moonTint, 1f - dayFactor);
+
+            // FARBE1a: the sky brightness must follow the day factor (see ApplySky).
+            ApplySky();
 
             ambientTimer += Time.deltaTime;
             if (ambientTimer >= ambientUpdateSeconds)

@@ -17,6 +17,12 @@ namespace Spinnenspiel.EditorTools
         /// the DayNightCycle can scale its meanFreePath (Volume-Override, no new scene).</summary>
         public static Fog LastBuiltFog;
 
+        /// <summary>FARBE1a: The PhysicallyBasedSky and Exposure components of the last-built
+        /// profile, so the DayNightCycle can drive sky brightness (day factor) and the tests
+        /// can pin a fixed exposure.</summary>
+        public static PhysicallyBasedSky LastBuiltSky;
+        public static Exposure LastBuiltExposure;
+
         private static float G6_FIXED_EV = 6f; // Fixed-Exposure EV (HDRP: hoeher = dunkler; r117 EV=-1 -> Mittel 255 blendout)
 
         public static Light Build()
@@ -85,13 +91,13 @@ namespace Spinnenspiel.EditorTools
             AssetUtil.ReplaceAsset(profile, Folder + "/Testwelt_VolumeProfile.asset");
 
             var env = profile.Add<VisualEnvironment>(true); env.skyType.Override((int)SkyType.PhysicallyBased); env.skyAmbientMode.Override(SkyAmbientMode.Dynamic);
-            profile.Add<PhysicallyBasedSky>(true);
+            LastBuiltSky = profile.Add<PhysicallyBasedSky>(true); // FARBE1a: DayNightCycle faehrt die Himmelshelligkeit mit dem Tag-Faktor.
             // U1: VolumetricFog AUS - der Nebel dies Dunnelesier vor allem Nahaufnahmen (Nahkampfschaerfe)
             // und macht die Kontrast (luma-StDev) in den Abnahaengemeter laeuermisstaen fall.
             // WALD2a2: only fog.albedo via WaldLook.FogAlbedo (meanFreePath/Density stay at baseline).
             var fog = profile.Add<Fog>(true); fog.enabled.Override(true); fog.meanFreePath.Override(WaldLook.FogMeanFreePath); fog.maximumHeight.Override(25f); fog.enableVolumetricFog.Override(WaldLook.VolumetricFogOn); fog.albedo.Override(WaldLook.FogAlbedo); fog.anisotropy.Override(WaldLook.FogAnisotropy); // WALD8c: Volumetric-Fog ON + Streuung toward the sun -> Lichtbahnen (was off per U1)
             LastBuiltFog = fog; // T7: expose the Fog volume so the DayNightCycle can drive it.
-            var exp = profile.Add<Exposure>(true); exp.mode.Override(ExposureMode.AutomaticHistogram); exp.limitMin.Override(0f); exp.limitMax.Override(15f);
+            var exp = profile.Add<Exposure>(true); LastBuiltExposure = exp; exp.mode.Override(ExposureMode.AutomaticHistogram); exp.limitMin.Override(0f); exp.limitMax.Override(15f); // FARBE1a: verdrahtet, damit Tests sie auf Fixed stellen koennen (Look bleibt Auto).
             var tm = profile.Add<Tonemapping>(true); tm.mode.Override(TonemappingMode.ACES);
             var bloom = profile.Add<Bloom>(true); bloom.intensity.Override(0.15f);
             // WALD2a1: only saturation via WaldLook (Nebel, Sonne, Exposure stay at baseline).
