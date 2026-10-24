@@ -27,3 +27,5 @@ Ursache: kein Spielcode-Fehler; Beweisbild grau wegen Aufnahme-Pipeline (auch Wa
 
 2026-10-24 FARBE1 (Overseer): Ursache J5 = Capture-Setup (Nebel + Nacht-Rahmen nicht dunkel), Mond-Anhebung war falsch. 3 gezielte DayNight-Laeufe (o-farbe1, 1b, 1c), kein Commit. Look/Test-Aenderungen in Stash 'Hermes FARBE1'; Punkt in FARBE1a/FARBE1b zerlegt.
 2026-10-24 FARBE1a (Overseer): Hermes-Aenderungen korrekt, Rest = Nacht zu dunkel. moonLux 16000->50000, gezielt+voll gruen, Commit d33a34d.
+
+- 2026-10-25 FOTO1 blockiert (Zeitbudget, Fix ungebaut). Overseer: Player gebaut, Foto-Check 0.05 bei gleicher Pose (1/3 Ausreisser durch Spinnenpose), Pose-Log ergaenzt, volle CI gruen, Commit 92079ea.
