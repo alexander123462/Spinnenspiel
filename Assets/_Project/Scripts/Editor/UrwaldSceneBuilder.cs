@@ -136,6 +136,8 @@ namespace Spinnenspiel.EditorTools
             dayCycle.sun = Object.FindFirstObjectByType<Light>();
             // WALD2a3: daytime sun color from WaldLook (runtime cycle drives the sun each frame).
             dayCycle.daySunColor = WaldLook.SunColor;
+            // FARBE1: night brightness from WaldLook (J5 night Mittel was 5 < 10).
+            dayCycle.moonLux = WaldLook.MoonIntensityLux;
             // T7 Morgennebel: the cycle drives the fog volume built by WorldLightingBuilder.
             dayCycle.fogVolumeComponent = WorldLightingBuilder.LastBuiltFog;
             // FARBE1a: the cycle drives the sky brightness (day factor) and the tests pin the

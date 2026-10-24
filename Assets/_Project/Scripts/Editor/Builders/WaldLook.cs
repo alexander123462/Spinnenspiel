@@ -11,20 +11,21 @@ namespace Spinnenspiel.EditorTools
     public static class WaldLook
     {
         // --- Nebel (T7-Morgennebel bleibt: meanFreePath-Basewert, DayNightCycle scales it). ---
-        public static Color FogAlbedo = new Color(0.42f, 0.52f, 0.42f); // WALD9: bright fog painted 50 % of frame white; darker green haze (T7 keeps look)
+        public static Color FogAlbedo = new Color(0.38f, 0.55f, 0.38f); // FARBE1: greener haze (player photo farbe_1: green-dominant only 16 %, RGB 60/58/45 brownish)
         public static float FogMeanFreePath = 95f; // WALD9: 60 -> 95, Nebel thins so the forest reads (messung r114: sat 0.1, green 0 %)
         public static float FogDensity = 0.004f; // WALD9: 0.012 -> 0.004, frame was blown-out flat (luma 162, bright 87 %)
 
         // --- Sonne: weich, gefiltert, warm-neutral; Schatten nicht ganz schwarz. ---
-        public static Color SunColor = new Color(1f, 0.95f, 0.86f);
+        public static Color SunColor = new Color(1f, 0.96f, 0.90f); // FARBE1: less warm (farbe_1 looked brown/olive; warmer light amplified brown)
         public static float SunIntensityLux = 42000f; // WALD9: 75000 -> 42000, luma mean 149 far above 45..75 target
+        public static float MoonIntensityLux = 16000f; // FARBE1: 48000 machte J5-Nacht weiss (Mittel 229); Originalwert, Messung mit Nebel aus entscheidet
         public static float SunShadowStrength = 0.85f; // WALD9: back to 0.85, dark share target 25..45 % needs real shadows
         public static int SunColorTemperatureK = 5400;
 
         // --- Umgebungslicht (Trilight-Fallback; gruenlich-kuehl, NEAR Baseline so the Bildtests keep contrast). ---
-        public static Color AmbientSky = new Color(0.34f, 0.44f, 0.50f);    // WALD9: darker sky so luma mean falls toward 45..75
-        public static Color AmbientEquator = new Color(0.34f, 0.46f, 0.36f); // WALD9: greener + darker horizon
-        public static Color AmbientGround = new Color(0.12f, 0.16f, 0.10f);  // WALD9: darker greener ground bounce
+        public static Color AmbientSky = new Color(0.30f, 0.46f, 0.40f);    // FARBE1 d3: green over blue (d2 frame went blue-grey: B 61 > G 60)
+        public static Color AmbientEquator = new Color(0.30f, 0.50f, 0.32f); // FARBE1: green horizon bounce
+        public static Color AmbientGround = new Color(0.12f, 0.22f, 0.10f);  // FARBE1: greener ground bounce (ground strip G only 46 vs R 42)
 
         // --- Belichtung fest (Auto-Histogram blew out die Scene) und Sattierung senken. ---
         public static float FixedExposureEV = 13.8f; // HDRP Fixed = EV100 (kein Multiplikator!): 1 = voellig ueberbelichtet (flache 164er Bilder, r120). Sonne 75000 lx -> ca. EV 13. Iterate per messung.txt.

@@ -114,10 +114,25 @@ namespace Spinnenspiel.Tests
         /// <summary>J5: Raw (pre-exposure) luma mean of the last SaveFrameFixed call.</summary>
         private static float lastRawLumaMean;
 
-        /// <summary>FARBE1a: KLEE1b-Lehre — der erste Offscreen-Capture nach dem Editor-Start kann
-        /// einen einfarbigen Rahmen liefern (HDRP-Shader kompilieren asynchron; Raw luma dann 0).
-        /// Die Kalibrierschleife im J5-Test faengt das mit Stabilisierungs-Proben ab
-        /// (zwei Aufnahmen in Folge innerhalb Faktor 2).</summary>
+        /// <summary>FARBE1: KLEE1b-Lehre — der erste Offscreen-Capture nach dem Editor-Start kann
+        /// einen einfarbigen Rahmen liefern (HDRP-Shader kompilieren asynchron; Raw luma dann 0 oder ~1).
+        /// T7 loest das mit Warmup-Frames; J5 faengt hier mit Kleinst-Proben dasselbe ab, BEVOR
+        /// gemessen wird. Abbruch, sobald eine Probe Kontrast zeigt (Max - Mittel > 8) und kein
+        /// Weiss-/Schwarzframe ist (Raw zwischen 1E-4 und 0.3; echter Wald-Noon-Roh liegt ~0.05).</summary>
+        private static IEnumerator WarmUpFixed(Camera cam)
+        {
+            for (int probe = 0; probe < 25; probe++)
+            {
+                Vector3 p = SaveFrameFixed(cam, 64, 48, "Logs/ci/j5_warmup_probe.png", 1f);
+                if (p.y - p.x > 8f && lastRawLumaMean > 1e-4f && lastRawLumaMean < 0.3f)
+                {
+                    Debug.Log("[J5] WarmUp nach " + probe + " Proben (Raw " + lastRawLumaMean.ToString("E2") + ")");
+                    yield break;
+                }
+                yield return new UnityEngine.WaitForSecondsRealtime(1.5f);
+            }
+            Debug.Log("[J5] WarmUp ohne Erfolg (Raw " + lastRawLumaMean.ToString("E2") + ")");
+        }
 
         private static Vector3 SaveFrameFixed(Camera cam, int w, int h, string file, float exposure)
         {
@@ -378,6 +393,8 @@ namespace Spinnenspiel.Tests
                 + " sunLux " + (cycle.sun != null ? cycle.sun.intensity.ToString("F0") : "n/a")
                 + " skyMultiplier " + cycle.CurrentSkyMultiplier().ToString("E2")
                 + " EV " + ev.ToString("F2") + " (Calib-Raw " + calRaw.ToString("E2") + ")");
+            // FARBE1: WarmUp gegen Blank-Rahmen (KLEE1b-Lehre), bevor gemessen wird.
+            yield return WarmUpFixed(cam);
             Vector3 noonStats = SaveFrameFixed(cam, 480, 270, "Logs/ci/j5-noon.png", fixedExposure);
             Debug.Log("[J5-noon] Mittel " + noonStats.x.ToString("F1") + " Max " + noonStats.y.ToString("F0") + " Magenta " + noonStats.z.ToString("F0") + " Raw " + lastRawLumaMean.ToString("E2"));
 
@@ -401,6 +418,8 @@ namespace Spinnenspiel.Tests
                 + " sunLux " + (cycle.sun != null ? cycle.sun.intensity.ToString("F0") : "n/a")
                 + " skyMultiplier " + cycle.CurrentSkyMultiplier().ToString("E2")
                 + " ambientMode " + UnityEngine.RenderSettings.ambientMode);
+            // FARBE1: WarmUp gegen Blank-Rahmen (KLEE1b-Lehre), bevor gemessen wird.
+            yield return WarmUpFixed(cam);
             Vector3 nightStats = SaveFrameFixed(cam, 480, 270, "Logs/ci/j5-night.png", fixedExposure);
             Debug.Log("[J5-night] Mittel " + nightStats.x.ToString("F1") + " Max " + nightStats.y.ToString("F0") + " Magenta " + nightStats.z.ToString("F0") + " Raw " + lastRawLumaMean.ToString("E2"));
 
