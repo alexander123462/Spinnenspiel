@@ -129,8 +129,11 @@ namespace Spinnenspiel
                     }
 
                     Vector3 desired = leg.RestTarget.position + lead;
-                    // Welle von hinten nach vorne: hinteres Paar (3) ohne, vorderes (0) mit maximaler Verzögerung.
-                    float delay = (3 - leg.PairIndex) * profile.waveDelay * stepDuration;
+                    // Welle von vorne nach hinten (wie bei echten Spinnen): vorderes Paar (0)
+                    // zuerst, hinteres Paar (3) mit maximaler Verzögerung. Würde das vordere
+                    // Paar zuletzt schwingen, bleibt sein Fuss beim Sprint zu lange stehen,
+                    // der Körper ueberholt ihn und das Messfenster (vorneZmin) wird gerissen.
+                    float delay = leg.PairIndex * profile.waveDelay * stepDuration;
                     leg.BeginStep(desired, stepDuration - delay, profile.stepHeight, delay);
                     startedInGroup++;
                 }
@@ -194,8 +197,9 @@ namespace Spinnenspiel
                 Vector3 desired = leg.RestTarget.position + lead;
                 if (leg.NeedsStep(desired, threshold))
                 {
-                    // Welle von hinten nach vorne: hinteres Paar (3) ohne, vorderes (0) mit maximaler Verzögerung.
-                    float delay = (3 - leg.PairIndex) * profile.waveDelay * stepDuration;
+                    // Welle von vorne nach hinten: vorderes Paar (0) zuerst, damit der
+                    // Fuss vor dem ueberholenden Koerper neu aufgesetzt wird.
+                    float delay = leg.PairIndex * profile.waveDelay * stepDuration;
                     leg.BeginStep(desired, stepDuration - delay, profile.stepHeight, delay);
                     started++;
                 }
