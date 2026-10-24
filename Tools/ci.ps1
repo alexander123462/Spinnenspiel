@@ -23,6 +23,7 @@ function Invoke-Unity([string[]]$UnityArgs, [string]$Log) {
     $all = @('-batchmode', '-projectPath', "`"$project`"", '-logFile', "`"$Log`"") + $UnityArgs
     # Nur auf Unity selbst warten (Start-Process -Wait wartet auch auf Hintergrund-Kindprozesse wie den Lizenz-Client).
     $p = Start-Process -FilePath $UnityExe -ArgumentList $all -PassThru -WindowStyle Hidden
+    try { $p.PriorityClass = 'BelowNormal' } catch {}  # die lokale KI (Strata) hat Vorrang vor Builds und Tests
     $p.WaitForExit()
     return $p.ExitCode
 }
