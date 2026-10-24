@@ -9,3 +9,4 @@
 - Spinnenspiel.Tests.UrwaldTests.Urwald_Nahkampfscharf — SharpFrac wackelt je Lauf (3,7 %..8,9 % voll, gruen isoliert), rot seit r116 auf HEAD (Nebel).
 - Spinnenspiel.Tests.DayNightTests.J5_TagAndNacht_LightAndInsectsFollowCycle — flackert zwischen 'Day Mittel 260 > 200 (Blendout)' und 'Night Mittel 5 < 10'; ohne Klee-Aenderungen identisch rot (Overseer-Check 2026-10-23, Auto-Exposure/Look); gleiche Wurzel wie die einfarbig grauen Offscreen-Beweisbilder (Mittel=164).
 - Spinnenspiel.Tests.DayNightTests.J5_TagAndNacht_LightAndInsectsFollowCycle — flackert zwischen 'Day Mittel 260 > 200' und 'Night Mittel 5 < 10'; ohne Klee-Aenderungen identisch rot (Overseer 2026-10-23, Auto-Exposure/Look). Aus ROT_NEU.md uebernommen (KLEE1b).
+- Spinnenspiel.Tests.DayNightTests.J5_TagAndNacht_LightAndInsectsFollowCycle — Vorab-Rot (HEAD): Offscreen-Rahmen weiss/Nacht nicht dunkel; wird in FARBE1a repariert (Overseer 2026-10-24).
