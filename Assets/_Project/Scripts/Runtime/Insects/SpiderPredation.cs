@@ -25,12 +25,23 @@ namespace Spinnenspiel
         private SpiderWebBuilder _builder;
         private SpiderSilk _silk;
         private SpiderHunger _hunger;
+        private SpiderEnergy _energy;
+
+        // J3b: Directzugriff. Benamed Constants: Range, Chance, Abklingzeit.
+        private static readonly float directGrabRange = 0.4f;     // m
+        private static readonly float directGrabChance = 0.35f;   // Wahrscheinlichkeit 0..1
+        private static readonly float directGrabCooldown = 3f;    // s
+        private float _directGrabCooldownUntil;
+
+        /// <summary>J3b-Testhook: fixed roll (0..1) used once instead of Zufall (negative = Zufall).</summary>
+        public float grabRollOverride = -1f;
 
         private void Awake()
         {
             _builder = GetComponent<SpiderWebBuilder>();
             _silk = GetComponent<SpiderSilk>();
             _hunger = GetComponent<SpiderHunger>();
+            _energy = GetComponent<SpiderEnergy>();
         }
 
         private void OnEnable()
@@ -66,6 +77,21 @@ namespace Spinnenspiel
                 Target = null;
             }
 
+            // E (Tastatur) oder X (Gamepad): Jagd starten.
+            bool pressed = (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
+                || (Gamepad.current != null && Gamepad.current.buttonWest.wasPressedThisFrame);
+            if (pressed)
+            {
+                // J3b: Directzugriff – packen nur aus unter directGrabRange m (35 %),
+                // danach directGrabCooldown s Abklingzeit. Vorrang über Web-Jagd.
+                FlyingInsect near = FindDirectGrabTarget();
+                if (near != null)
+                {
+                    TryDirectGrab(near);
+                    return;
+                }
+            }
+
             if (Target == null || IsHunting || _builder == null || !_builder.IsSittingInWeb)
             {
                 return;
@@ -74,14 +100,6 @@ namespace Spinnenspiel
             // In der Nabe sitzt: Spinne dreht sich zur Beute.
             Quaternion facing = _builder.FacingRotation(Target.transform.position - transform.position);
             transform.rotation = Quaternion.Slerp(transform.rotation, facing, 6f * Time.deltaTime);
-
-            // E (Tastatur) oder X (Gamepad): Jagd starten.
-            bool pressed = (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
-                || (Gamepad.current != null && Gamepad.current.buttonWest.wasPressedThisFrame);
-            if (pressed)
-            {
-                StartHunt(Target);
-            }
         }
 
         private void OnGUI()
@@ -92,6 +110,81 @@ namespace Spinnenspiel
             }
             GUI.Label(new Rect(Screen.width / 2f - 80f, Screen.height - 36f, 160f, 24f),
                 "E / X: Beute holen");
+        }
+
+        /// <summary>J3b: Nächste fliegende (nicht gefangen/entwickelt) Insekt within directGrabRange m (null: none).</summary>
+        private FlyingInsect FindDirectGrabTarget()
+        {
+            FlyingInsect best = null;
+            float bestDist = directGrabRange;
+            foreach (FlyingInsect insect in Object.FindObjectsByType<FlyingInsect>(FindObjectsSortMode.None))
+            {
+                if (insect.State != FlyingInsect.InsectState.Flying)
+                {
+                    continue;
+                }
+
+                float d = Vector3.Distance(insect.transform.position, transform.position);
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    best = insect;
+                }
+            }
+
+            return best;
+        }
+
+        /// <summary>J3b: Directzugriff-Versuch (auch Testhook). In cooldown: abgelehnt. Else 35 % Roll; on success the insect gets eaten via the existing Fress-Pfad.</summary>
+        public bool TryDirectGrab(FlyingInsect prey)
+        {
+            if (prey == null || prey.State != FlyingInsect.InsectState.Flying)
+            {
+                return false;
+            }
+
+            // J3b: Range-Gate – outside directGrabRange never attempted.
+            if (Vector3.Distance(prey.transform.position, transform.position) > directGrabRange)
+            {
+                Debug.Log("[J3b] direct grab out of range");
+                return false;
+            }
+
+            if (Time.time < _directGrabCooldownUntil)
+            {
+                Debug.Log("[J3b] direct grab rejected: still in cooldown");
+                return false;
+            }
+
+            _directGrabCooldownUntil = Time.time + directGrabCooldown;
+            float roll = grabRollOverride >= 0f ? grabRollOverride : Random.value;
+            grabRollOverride = -1f; // consume override once
+            bool success = roll < directGrabChance;
+            if (!success)
+            {
+                Debug.Log("[J3b] direct grab roll " + roll.ToString("F3") + " -> miss");
+                return false;
+            }
+
+            Debug.Log("[J3b] direct grab roll " + roll.ToString("F3") + " -> hit, insect eaten");
+            if (_hunger != null)
+            {
+                _hunger.Eat(0.35f);
+            }
+
+            if (_energy != null && prey.energyValue > 0f)
+            {
+                _energy.FeedEnergy(prey.energyValue);
+            }
+
+            System.Action<FlyingInsect> handler = PreyEaten;
+            prey.Remove();
+            if (handler != null)
+            {
+                handler(prey);
+            }
+
+            return true;
         }
 
         /// <summary>Jagd starten (auch aufrufbar aus Tests). Läuft nur einmal gleichzeitig.</summary>
@@ -195,6 +288,10 @@ namespace Spinnenspiel
                 if (_hunger != null)
                 {
                     _hunger.Eat(0.35f);
+                }
+                if (_energy != null && prey.energyValue > 0f)
+                {
+                    _energy.FeedEnergy(prey.energyValue);
                 }
                 System.Action<FlyingInsect> handler = PreyEaten;
                 prey.Remove();

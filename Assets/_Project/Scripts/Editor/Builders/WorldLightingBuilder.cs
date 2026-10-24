@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.Rendering.Universal;
+using UnityEngine.Rendering.HighDefinition;
 
 namespace Spinnenspiel.EditorTools
 {
@@ -13,17 +13,32 @@ namespace Spinnenspiel.EditorTools
     {
         private const string Folder = AssetUtil.GeneratedRoot + "/Lighting";
 
+        /// <summary>T7: The Fog volume component of the last-built Volume profile, so
+        /// the DayNightCycle can scale its meanFreePath (Volume-Override, no new scene).</summary>
+        public static Fog LastBuiltFog;
+
+        /// <summary>FARBE1a: The PhysicallyBasedSky and Exposure components of the last-built
+        /// profile, so the DayNightCycle can drive sky brightness (day factor) and the tests
+        /// can pin a fixed exposure.</summary>
+        public static PhysicallyBasedSky LastBuiltSky;
+        public static Exposure LastBuiltExposure;
+
+        private static float G6_FIXED_EV = 6f; // Fixed-Exposure EV (HDRP: hoeher = dunkler; r117 EV=-1 -> Mittel 255 blendout)
+
         public static Light Build()
         {
             GameObject sunObject = new GameObject("Sun");
             Light sun = sunObject.AddComponent<Light>();
             sun.type = LightType.Directional;
             sun.shadows = LightShadows.Soft;
-            sun.shadowStrength = 0.85f;
+            sun.shadowStrength = WaldLook.SunShadowStrength; // WALD2a3: shadow strength from one place (0.78, not black)
             sun.shadowNormalBias = 0.3f;
             sun.shadowBias = 0.02f;
             sun.intensity = 1.35f;
-            sun.color = new Color(1f, 0.93f, 0.82f);
+            // HDRP: physikalische Lichtstaerken (Lux) + Volumetrische Dimmung fuer Lichtstrahlen.
+            var hd = sun.GetComponent<HDAdditionalLightData>(); if (hd == null) hd = sun.gameObject.AddComponent<HDAdditionalLightData>();
+            sun.lightUnit = LightUnit.Lux; sun.intensity = 100000f; sun.useColorTemperature = true; sun.colorTemperature = 5600f; sun.shadows = LightShadows.Soft; hd.volumetricDimmer = 1f; // WALD2a3: Lux stays at 100000 (Lux-dimming without fixed exposure is ineffective / belongs to WALD2b)
+            sun.color = WaldLook.SunColor; // WALD2a3: only the sun color moves, from WaldLook (not baseline 1/0.93/0.82)
             RenderSettings.sun = sun;
 
             if (ScanSky.IsAvailable())
@@ -33,23 +48,9 @@ namespace Spinnenspiel.EditorTools
                 // siehe ScanSky.SunRotation.
                 sunObject.transform.rotation = ScanSky.SunRotation;
 
-                Shader panoramic = Shader.Find("Skybox/Panoramic");
-                if (panoramic != null)
-                {
-                    Material sky = new Material(panoramic);
-                    sky.SetTexture("_MainTex", hdri);
-                    sky.SetFloat("_Mapping", 1f); // Latitude-Longitude (Equirect)
-                    sky.SetFloat("_ImageType", 0f);
-                    sky.SetFloat("_Exposure", 1f);
-                    RenderSettings.skybox = AssetUtil.ReplaceAsset(sky, Folder + "/MAT_Sky.mat");
-                }
-                else
-                {
-                    Debug.LogWarning("[Spinnenspiel] Shader Skybox/Panoramic nicht gefunden – Skybox bleibt leer.");
-                }
-
-                RenderSettings.ambientMode = AmbientMode.Skybox;
-                RenderSettings.defaultReflectionMode = DefaultReflectionMode.Skybox;
+                // G6/G1: kein Legacy-Skybox mehr (Built-In-Shaders magenta in HDRP).
+                // HDRP rendert den PhysicallyBased-Sky per Volume (CreateVolume), skybox leer.
+                RenderSettings.skybox = null;
             }
             else
             {
@@ -67,16 +68,17 @@ namespace Spinnenspiel.EditorTools
                     RenderSettings.skybox = AssetUtil.ReplaceAsset(sky, Folder + "/MAT_Sky.mat");
                 }
 
+                // WALD2a1: Umgebungslicht (Trilight-Fallback) gruenlich-kuehl ueber WaldLook.
                 RenderSettings.ambientMode = AmbientMode.Trilight;
-                RenderSettings.ambientSkyColor = new Color(0.50f, 0.58f, 0.70f);
-                RenderSettings.ambientEquatorColor = new Color(0.52f, 0.54f, 0.50f);
-                RenderSettings.ambientGroundColor = new Color(0.22f, 0.20f, 0.16f);
+                RenderSettings.ambientSkyColor = WaldLook.AmbientSky;
+                RenderSettings.ambientEquatorColor = WaldLook.AmbientEquator;
+                RenderSettings.ambientGroundColor = WaldLook.AmbientGround;
             }
 
             RenderSettings.fog = true;
             RenderSettings.fogMode = FogMode.ExponentialSquared;
-            RenderSettings.fogDensity = 0.022f;
-            RenderSettings.fogColor = new Color(0.68f, 0.74f, 0.78f);
+            RenderSettings.fogDensity = 0.012f; // A2: dezent Nebel, nicht flaechendeckend
+            RenderSettings.fogColor = WaldLook.FogAlbedo; // WALD2a2: RenderSettings.fogColor follows the same WaldLook value
 
             CreateVolume();
             ConfigurePipeline();
@@ -88,22 +90,24 @@ namespace Spinnenspiel.EditorTools
             VolumeProfile profile = ScriptableObject.CreateInstance<VolumeProfile>();
             AssetUtil.ReplaceAsset(profile, Folder + "/Testwelt_VolumeProfile.asset");
 
-            Tonemapping tonemapping = profile.Add<Tonemapping>(true);
-            tonemapping.mode.Override(TonemappingMode.ACES);
-
-            Bloom bloom = profile.Add<Bloom>(true);
-            bloom.intensity.Override(0.35f);
-            bloom.threshold.Override(1.05f);
-            bloom.scatter.Override(0.6f);
-
-            ColorAdjustments color = profile.Add<ColorAdjustments>(true);
-            color.postExposure.Override(0.15f);
-            color.contrast.Override(8f);
-            color.saturation.Override(6f);
-
-            Vignette vignette = profile.Add<Vignette>(true);
-            vignette.intensity.Override(0.18f);
-            vignette.smoothness.Override(0.5f);
+            var env = profile.Add<VisualEnvironment>(true); env.skyType.Override((int)SkyType.PhysicallyBased); env.skyAmbientMode.Override(SkyAmbientMode.Dynamic);
+            LastBuiltSky = profile.Add<PhysicallyBasedSky>(true); // FARBE1a: DayNightCycle faehrt die Himmelshelligkeit mit dem Tag-Faktor.
+            // U1: VolumetricFog AUS - der Nebel dies Dunnelesier vor allem Nahaufnahmen (Nahkampfschaerfe)
+            // und macht die Kontrast (luma-StDev) in den Abnahaengemeter laeuermisstaen fall.
+            // WALD2a2: only fog.albedo via WaldLook.FogAlbedo (meanFreePath/Density stay at baseline).
+            var fog = profile.Add<Fog>(true); fog.enabled.Override(true); fog.meanFreePath.Override(WaldLook.FogMeanFreePath); fog.maximumHeight.Override(25f); fog.enableVolumetricFog.Override(WaldLook.VolumetricFogOn); fog.albedo.Override(WaldLook.FogAlbedo); fog.anisotropy.Override(WaldLook.FogAnisotropy); // WALD8c: Volumetric-Fog ON + Streuung toward the sun -> Lichtbahnen (was off per U1)
+            LastBuiltFog = fog; // T7: expose the Fog volume so the DayNightCycle can drive it.
+            var exp = profile.Add<Exposure>(true); LastBuiltExposure = exp; exp.mode.Override(ExposureMode.AutomaticHistogram); exp.limitMin.Override(0f); exp.limitMax.Override(15f); // FARBE1a: verdrahtet, damit Tests sie auf Fixed stellen koennen (Look bleibt Auto).
+            var tm = profile.Add<Tonemapping>(true); tm.mode.Override(TonemappingMode.ACES);
+            var bloom = profile.Add<Bloom>(true); bloom.intensity.Override(0.15f);
+            // WALD2a1: only saturation via WaldLook (Nebel, Sonne, Exposure stay at baseline).
+            var ca = profile.Add<ColorAdjustments>(true); ca.saturation.Override(WaldLook.SaturationPercent);
+            var vig = profile.Add<Vignette>(true); vig.intensity.Override(0.2f);
+            var sh = profile.Add<HDShadowSettings>(true); sh.maxShadowDistance.Override(80f);
+            var cs = profile.Add<ContactShadows>(true); cs.enable.Override(true);
+            var ao = profile.Add<ScreenSpaceAmbientOcclusion>(true); ao.intensity.Override(1f);
+            // G4: leichte Makro-Tiefenunschärfe (manueller Fokus, nicht Physikalische-Kamera-Modus).
+            var dof = profile.Add<DepthOfField>(true); dof.focusMode.Override(DepthOfFieldMode.Manual); dof.nearFocusStart.Override(0f); dof.nearFocusEnd.Override(0.15f); dof.farFocusStart.Override(6f); dof.farFocusEnd.Override(20f); // A2: dezent DoF, nicht flaechendeckend
 
             foreach (VolumeComponent component in profile.components)
             {
@@ -121,17 +125,8 @@ namespace Spinnenspiel.EditorTools
 
         private static void ConfigurePipeline()
         {
-            UniversalRenderPipelineAsset pipeline = GraphicsSettings.defaultRenderPipeline as UniversalRenderPipelineAsset;
-            if (pipeline == null)
-            {
-                Debug.LogWarning("[Spinnenspiel] Keine URP-Pipeline aktiv – Schatten/MSAA nicht angepasst.");
-                return;
-            }
-
-            pipeline.shadowDistance = 45f;
-            pipeline.shadowCascadeCount = 3;
-            pipeline.msaaSampleCount = 4;
-            UnityEditor.EditorUtility.SetDirty(pipeline);
+            // URP-Konfig unter HDRP hinfällig – Schattendistanz/MSAA stehen im HDRP-Asset bzw. im Volume (HDShadowSettings).
+            return;
         }
     }
 }

@@ -38,10 +38,18 @@ namespace Spinnenspiel
         /// Darf das Netz Insekten fangen? Fangspirale muss weit genug gewachsen sein
         /// (t &gt;= 0.3 in ihrer Phase) oder das Netz ist fertig.
         /// </summary>
-        public bool CanCatch => (_stage == WebStage.CaptureSpiral && _t >= 0.3f) || _stage == WebStage.Done;
+        public bool CanCatch
+            => ((_stage == WebStage.CaptureSpiral && _t >= 0.3f) || _stage == WebStage.Done)
+               && (Durability == null || !Durability.Torn);
 
         /// <summary>Radius der Fangspirale um die Nabe (für Tests).</summary>
         public float CaptureRadius => _captureRadius;
+
+        /// <summary>
+        /// S6: Haltbarkeits-Modell des Netzes (null → unendlich, netze ohne Alteration).
+        /// Under 0 the net is torn and catches nothing anymore.
+        /// </summary>
+        public NetDurabilityModel Durability;
 
         private WebStage _stage;
         private float _t;
@@ -49,6 +57,9 @@ namespace Spinnenspiel
         private float _captureRadius;
         private bool _localSpace;
         private Vector3 _basePos;
+        private Material _threadMat;
+        private Material _capMat;
+        private bool _tornApplied;
 
         private void OnEnable() => All.Add(this);
         private void OnDisable() => All.Remove(this);
@@ -89,7 +100,16 @@ namespace Spinnenspiel
             fullCapture = layout.CaptureSpiral;
             fullAux = layout.AuxSpiral;
 
-            Material mat = SilkThread.SharedMaterial;
+            // S6: Per-Netz-Material-Kopie, so the durability tint does not affect other nets.
+            _threadMat = new Material(SilkThread.SharedMaterial);
+            Material mat = _threadMat;
+
+            // S6: Fresh durability model when none was assigned from outside (tests).
+            if (Durability == null)
+            {
+                Durability = new NetDurabilityModel();
+            }
+            Durability.Reset();
 
             // Rahmen: geschlossene Linie.
             frameLine = AddLine("Frame", layout.Frame, true, mat);
@@ -116,8 +136,9 @@ namespace Spinnenspiel
             hubRingLine = AddLine("HubRing", layout.HubRing, true, mat);
 
             // Fangspirale: eine Linie, leicht glänzend-weiß, Alpha 0.9.
-            var capMat = new Material(mat);
+            var capMat = new Material(_threadMat);
             capMat.color = new Color(1f, 1f, 1f, 0.9f);
+            _capMat = capMat;
             captureLine = AddLine("CaptureSpiral", layout.CaptureSpiral, false, capMat);
 
             // Hilfsspirale: ausgeblendet, außer showAux.
@@ -276,12 +297,103 @@ namespace Spinnenspiel
             EnsureLocalSpace();
         }
 
+        /// <summary>S6: A caught insect wears the net down (cost from the model).</summary>
+        public void ApplyCatch()
+        {
+            if (Durability != null)
+            {
+                Durability.AddCatch();
+            }
+        }
+
+        /// <summary>S6: Rain wears the net down (1 % per 10 s at full intensity).</summary>
+        public void TickRain(float dt, float intensity)
+        {
+            if (Durability != null)
+            {
+                Durability.TickRain(dt, intensity);
+            }
+        }
+
+        /// <summary>S6: Repair at the web — durability back to 100 (energy cost spent by caller).</summary>
+        public void Repair()
+        {
+            if (Durability != null)
+            {
+                Durability.Repair();
+            }
+        }
+
+        /// <summary>
+        /// S6: Haltbarkeits as thread color: 100 % white → mid yellowish → torn gray.
+        /// A torn net hides all its threads (faeden verschwinden).
+        /// </summary>
+        private void ApplyDurabilityTint()
+        {
+            if (Durability == null)
+            {
+                return;
+            }
+
+            float f = Mathf.Clamp01(Durability.Durability / NetDurabilityModel.maxDurability);
+            Color tint;
+            if (f > 0.5f)
+            {
+                // White at 100 %, yellowish at 50 %.
+                float k = (f - 0.5f) * 2f;
+                tint = new Color(1f, Mathf.Lerp(0.85f, 1f, k), Mathf.Lerp(0.45f, 1f, k), 1f);
+            }
+            else
+            {
+                // Yellowish at 50 %, gray at 0 %.
+                float k = f * 2f;
+                tint = new Color(Mathf.Lerp(0.45f, 0.85f, k), Mathf.Lerp(0.45f, 0.85f, k), Mathf.Lerp(0.45f, 0.45f, k), 1f);
+            }
+
+            if (_threadMat != null)
+            {
+                _threadMat.color = tint;
+            }
+            if (_capMat != null)
+            {
+                _capMat.color = new Color(tint.r, tint.g, tint.b, 0.9f);
+            }
+
+            if (Durability.Torn)
+            {
+                if (!_tornApplied)
+                {
+                    _tornApplied = true;
+                    foreach (LineRenderer line in AllLines())
+                    {
+                        line.enabled = false;
+                    }
+                }
+            }
+            else if (_tornApplied)
+            {
+                // Repair: Fäden come back, except the auxiliary spiral (its own rule).
+                _tornApplied = false;
+                foreach (LineRenderer line in AllLines())
+                {
+                    line.enabled = line == auxLine ? showAux : true;
+                }
+            }
+        }
+
         /// <summary>
         /// Dämpft die Vibration (Exp, ~4/s) und schwingt das Netz um seine Basisposition
         /// entlang der Netzebene (Sinus 55 rad/s, Amplitude 0.004 · _vib).
         /// </summary>
         private void LateUpdate()
         {
+            // S6: Rain wears the net down (1 % per 10 s at full intensity).
+            WeatherController rain = WeatherController.Instance;
+            if (rain != null)
+            {
+                TickRain(Time.deltaTime, rain.Rain01);
+            }
+            ApplyDurabilityTint();
             if (!_localSpace)
                 return;
 

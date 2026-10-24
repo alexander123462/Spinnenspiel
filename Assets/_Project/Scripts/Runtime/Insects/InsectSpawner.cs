@@ -24,6 +24,64 @@ namespace Spinnenspiel
         [Tooltip("Optional: dann ist home für alle Insekten homeOverride.position.")]
         public Transform homeOverride;
 
+        [Tooltip("S2: Optional Muecke-Vorlage (deaktivierte). Ist es set, the spawner mixes flies and mosquitoes.")]
+        public GameObject mosquitoTemplate;
+
+        [Tooltip("J5: Tag/Nacht-Cycle. Without it the spawner is always active (day/night ignored).")]
+        public DayNightCycle cycle;
+
+        [Tooltip("J5: true = this species flies only at night, false = only during the day.")]
+        public bool activeAtNight;
+
+        [Tooltip("T1: Optional Kaefer-Vorlage (deaktivierte). Ist es set, the spawner mixes rare armored beetles in.")]
+        public GameObject beetleTemplate;
+
+        [Tooltip("T2: Optional Libelle-Vorlage (deaktivierte). Ist es set, the spawner mixes very rare libelles in (3 %).")]
+        public GameObject libelleTemplate;
+
+        // K4a: Regen-Zustand des WeatherController (Instance singleton).
+        private const float RainShareOfCount = 0.3f;   // Zielzahl waahtrend Regen (30 Prozent)
+        private const float RainThreshold = 0.5f;      // Rain01 ueber this = "es regnt"
+        private const float RainFadeSeconds = 20f;     // Vorhandene Insekten ueber this many s auslaufen
+        private const float RainLeadSeconds = 0.5f;    // Kurze Fuerspan: eeste Remove nur nach dem Interval
+
+        // S2: Anteil Muecken among the spawns (of the day species) as a named constant.
+        private const float MosquitoShare = 0.4f;      // ~40 % of day-insects are mosquitoes
+
+        // T1: Anteil Kaefer among the day-spawns (rare armored prey) as a named constant.
+        private static float BeetleShare => PreyMixModel.beetleShare; // 10 %, from the pure model
+
+        // T2: Anteil Libelle among the day-spawns (very rare risky prey) as a named constant.
+        private static float LibelleShare => LibelleModel.libelleShare; // 3 %, from the pure model
+
+        private float rainRemovalTimer;   // K4a: Countdown bis naechsten staggered Remove.
+        private float rainRemovalInterval; // K4a: Constant interval while raining (fade stays smooth).
+
+        /// <summary>K4a: true while the WeatherController reports rain (no controller = never rains).</summary>
+        public bool Raining
+        {
+            get
+            {
+                return WeatherController.Instance != null &&
+                       WeatherController.Instance.Rain01 >= RainThreshold;
+            }
+        }
+
+        /// <summary>J5: Share 0..1 of <see cref="count"/> that is out now (day/night ramp).</summary>
+        private float ActiveShare
+        {
+            get
+            {
+                if (cycle == null)
+                {
+                    return 1f;
+                }
+
+                float dayFactor = Mathf.Clamp01(cycle.CurrentDayFactor);
+                return activeAtNight ? 1f - dayFactor : dayFactor;
+            }
+        }
+
         private readonly List<FlyingInsect> insects = new List<FlyingInsect>();
         private readonly System.Random rng = new System.Random();
 
@@ -80,12 +138,80 @@ namespace Spinnenspiel
             insects.Remove(insect);
         }
 
-        /// <summary>Entfernte Insekten ersetzen und auf <see cref="count"/> aufstocken.</summary>
+        /// <summary>Entfernte Insekten ersetzen und auf count aufstocken. J5: only the day/night share is kept. K4a: rain lowers the target and staggers removals.</summary>
         private void Reconcile()
         {
             if (template == null)
             {
                 return;
+            }
+
+            // J5: Target = share of count for this species at the current time (ramp, not abrupt).
+            int target = Mathf.RoundToInt(count * ActiveShare);
+
+            // K4a: While it rains the target drops to RainShareOfCount (30 Prozent).
+            bool raining = Raining;
+            if (raining)
+            {
+                target = Mathf.RoundToInt(target * RainShareOfCount);
+            }
+
+            if (raining)
+            {
+                // K4a: Existing insects do not vanish abruptly but run out over RainFadeSeconds.
+                int excess = AliveCount - target;
+                if (excess > 0)
+                {
+                    if (rainRemovalInterval <= 0f)
+                    {
+                        rainRemovalInterval = RainFadeSeconds / excess;
+                        rainRemovalTimer = rainRemovalInterval + RainLeadSeconds;
+                    }
+                    else
+                    {
+                        rainRemovalTimer -= Time.deltaTime;
+                        if (rainRemovalTimer <= 0f)
+                        {
+                            FlyingInsect victim = FirstFlyingVictim();
+                            if (victim != null)
+                            {
+                                victim.Remove();
+                                insects.Remove(victim);
+                            }
+
+                            rainRemovalTimer += rainRemovalInterval;
+                        }
+                    }
+                }
+                else
+                {
+                    rainRemovalInterval = 0f;
+                    rainRemovalTimer = 0f;
+                }
+            }
+            else if (AliveCount > target)
+            {
+                // Insekten beyond the current target get removed (they retreat at dawn/dusk).
+                while (AliveCount > target)
+            {
+                FlyingInsect victim = null;
+                foreach (FlyingInsect candidate in insects)
+                {
+                    if (candidate != null && candidate.State == FlyingInsect.InsectState.Flying)
+                    {
+                        victim = candidate;
+                        break;
+                    }
+                }
+
+                if (victim == null)
+                {
+                    break; // Caught ones stay.
+                }
+
+                victim.Remove();
+                insects.Remove(victim);
+            }
             }
 
             // Entfernte Insekten aufräumen und zu weit entfernte ersetzen.
@@ -125,10 +251,24 @@ namespace Spinnenspiel
                 }
             }
 
-            for (int i = alive; i < count; i++)
+            for (int i = alive; i < target; i++)
             {
                 Spawn();
             }
+        }
+
+        /// <summary>K4a: First still-flying insect that may retreat (Caught ones stay).</summary>
+        private FlyingInsect FirstFlyingVictim()
+        {
+            foreach (FlyingInsect candidate in insects)
+            {
+                if (candidate != null && candidate.State == FlyingInsect.InsectState.Flying)
+                {
+                    return candidate;
+                }
+            }
+
+            return null;
         }
 
         private Vector3 centerPosition()
@@ -158,13 +298,39 @@ namespace Spinnenspiel
             // Höhe 0.4–1.4 m über dem Boden (Raycast nach unten).
             pos.y = GroundHeight(pos) + Mathf.Lerp(0.4f, 1.4f, (float)rng.NextDouble());
 
-            FlyingInsect templateInsect = template.GetComponent<FlyingInsect>();
+            // S2: Ist ein Muecke-Vorlage set? Dann ~MosquitoShare der Spawns are mosquitoes.
+            // T1: Ist ein Kaefer-Vorlage set? Dann ~BeetleShare (10 %) der day-spawns are beetles (drawn first).
+            // T2: Ist ein Libelle-Vorlage set? Dann ~LibelleShare (3 %) der day-spawns are libelles (drawn first).
+            // T12: die Haeufigkeit-Multiplikator der S1-Difficulty scales the very-rare libelle share;
+            //      the beetle/mosquito bands start above the scaled libelle band so they stay disjoint.
+            float libelleBand = LibelleModel.libelleShare * GameDifficulty.HazardFrequencyMultiplier();
+            if (libelleBand > 1f)
+            {
+                libelleBand = 1f;
+            }
+
+            GameObject chosenTemplate = template;
+            double speciesRoll = rng.NextDouble();
+            if (libelleTemplate != null && speciesRoll < libelleBand)
+            {
+                chosenTemplate = libelleTemplate;
+            }
+            else if (beetleTemplate != null && speciesRoll < libelleBand + BeetleShare)
+            {
+                chosenTemplate = beetleTemplate;
+            }
+            else if (mosquitoTemplate != null && speciesRoll < libelleBand + BeetleShare + MosquitoShare)
+            {
+                chosenTemplate = mosquitoTemplate;
+            }
+
+            FlyingInsect templateInsect = chosenTemplate.GetComponent<FlyingInsect>();
             if (templateInsect == null)
             {
                 return;
             }
 
-            GameObject spawned = Instantiate(template, pos, Quaternion.identity, transform);
+            GameObject spawned = Instantiate(chosenTemplate, pos, Quaternion.identity, transform);
             spawned.SetActive(true);
             FlyingInsect insect = spawned.GetComponent<FlyingInsect>();
             if (insect != null)

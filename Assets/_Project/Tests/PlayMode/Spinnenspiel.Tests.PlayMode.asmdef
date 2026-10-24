@@ -1,7 +1,7 @@
 {
   "name": "Spinnenspiel.Tests.PlayMode",
   "rootNamespace": "Spinnenspiel.Tests",
-  "references": ["Spinnenspiel.Runtime", "UnityEngine.TestRunner", "UnityEditor.TestRunner"],
+  "references": ["Spinnenspiel.Runtime", "UnityEngine.TestRunner", "UnityEditor.TestRunner", "Unity.RenderPipelines.Core.Runtime", "Unity.InputSystem", "Unity.InputSystem.TestFramework"],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,

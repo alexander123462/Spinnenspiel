@@ -15,6 +15,8 @@ namespace Spinnenspiel
         private static AudioClip _wind;
         private static AudioClip _stream;
         private static AudioClip[] _birds;
+        private static AudioClip _rainforest;
+        private static AudioClip _rain;
 
         /// <summary>Kurze Tritt-Geräusche (mehrere Varianten) für eine Oberfläche.</summary>
         public static AudioClip[] Footsteps(SurfaceType surface)
@@ -105,6 +107,51 @@ namespace Spinnenspiel
             return _wind;
         }
 
+        /// <summary>Sommer-Downpour: gefilterte Rauschen-Brause plus kurze Tropfen-Hitsch;
+        /// seamless loop, volume driven by WeatherController.Rain01.</summary>
+        public static AudioClip RainfallLoop()
+        {
+            if (_rain != null)
+            {
+                return _rain;
+            }
+
+            const float seconds = 8f;
+            int length = Mathf.CeilToInt(seconds * SampleRate);
+            float[] data = new float[length];
+            System.Random random = new System.Random(3111);
+
+            // Brause: two filtered noise layers (wide + narrow band) -> steady rain body.
+            float wide = 0f, narrow = 0f;
+            for (int i = 0; i < length; i++)
+            {
+                float t = i / (float)length;
+                float noise = (float)random.NextDouble() * 2f - 1f;
+                wide += (noise - wide) * 0.03f;
+                narrow += (noise - narrow) * 0.18f;
+                float swell = 0.75f + 0.25f * Mathf.Sin(t * Mathf.PI * 2f * 1.5f);
+                data[i] = (wide * 2.2f + (narrow - wide) * 0.5f) * swell * 0.42f;
+            }
+
+            // Tropfen-Hitsch: short bright chirps on top of the brause.
+            for (int d = 0; d < 60; d++)
+            {
+                int start = random.Next(0, length - Mathf.CeilToInt(0.04f * SampleRate));
+                float baseFrequency = 2200f + (float)random.NextDouble() * 3200f;
+                float amp = 0.02f + (float)random.NextDouble() * 0.03f;
+                int count = Mathf.FloorToInt(0.03f * SampleRate);
+                for (int i = 0; i < count && start + i < length; i++)
+                {
+                    float t = i / (float)SampleRate;
+                    data[start + i] += Mathf.Sin(2f * Mathf.PI * baseFrequency * t) * amp * (1f - t / 0.03f);
+                }
+            }
+
+            data = Crossfade(data, SampleRate / 2);
+            _rain = Create("Ambience_Rainfall", data);
+            return _rain;
+        }
+
         /// <summary>Plätschern: viele kurze, zufällige Tropfen-Chirps über gefiltertem Rauschen.</summary>
         public static AudioClip StreamLoop()
         {
@@ -183,6 +230,222 @@ namespace Spinnenspiel
 
             return _birds;
         }
+
+        /// <summary>M7-10.6 Rainforest-Ambience: Zikaden-Drone (high stridulation trills)
+        /// plus Frosch-Pulse underneath; seamless loop for the Urwald.</summary>
+        public static AudioClip RainforestLoop()
+        {
+            if (_rainforest != null)
+            {
+                return _rainforest;
+            }
+
+            const float seconds = 10f;
+            int length = Mathf.CeilToInt(seconds * SampleRate);
+            float[] data = new float[length];
+            System.Random random = new System.Random(577);
+
+            // Zikaden: trill = ~4.2 kHz with a fast buzz (modulated) over 0.3 s, repeated.
+            for (int c = 0; c < 14; c++)
+            {
+                int start = random.Next(0, length - Mathf.CeilToInt(0.45f * SampleRate));
+                float baseFrequency = 3900f + (float)random.NextDouble() * 700f;
+                float amp = 0.03f + (float)random.NextDouble() * 0.03f;
+                int count = Mathf.FloorToInt(0.35f * SampleRate);
+                for (int i = 0; i < count && start + i < length; i++)
+                {
+                    float t = i / (float)SampleRate;
+                    float buzz = 1f + 0.25f * Mathf.Sin(t * 2f * Mathf.PI * 90f);
+                    data[start + i] += Mathf.Sin(2f * Mathf.PI * baseFrequency * buzz * t) * amp * Mathf.Sin(Mathf.Min(1f, t / 0.05f));
+                }
+            }
+
+            // Froesch: tiefe, kurze "urb"-Pulses mit nachher rising formant.
+            for (int f = 0; f < 9; f++)
+            {
+                int start = random.Next(0, length - Mathf.CeilToInt(0.3f * SampleRate));
+                float baseFrequency = 180f + (float)random.NextDouble() * 140f;
+                int count = Mathf.FloorToInt(0.22f * SampleRate);
+                for (int i = 0; i < count && start + i < length; i++)
+                {
+                    float t = i / (float)SampleRate;
+                    float f2 = baseFrequency * (1f + 0.6f * t / 0.22f);
+                    data[start + i] += (Mathf.Sin(2f * Mathf.PI * baseFrequency * t) + 0.5f * Mathf.Sin(2f * Mathf.PI * f2 * t)) * 0.06f * Mathf.Sin(t / 0.22f * Mathf.PI);
+                }
+            }
+
+            data = Crossfade(data, SampleRate / 2);
+            _rainforest = Create("Ambience_Rainforest", data);
+            return _rainforest;
+        }
+
+        /// <summary>S3: kurze Zupfton (Pluck) — kurza twang: bright snap plus quick descending glissando.</summary>
+        public static AudioClip Pluck()
+        {
+            if (_pluck != null)
+            {
+                return _pluck;
+            }
+
+            float duration = 0.16f;
+            int length = Mathf.CeilToInt(duration * SampleRate);
+            float[] data = new float[length];
+            System.Random random = new System.Random(4242);
+            float baseFrequency = 1450f + (float)random.NextDouble() * 250f;
+
+            // Snap: filtered noise hit at t=0 (the string being plucked).
+            float filtered = 0f;
+            for (int i = 0; i < length; i++)
+            {
+                float t = i / (float)SampleRate;
+                float noise = (float)random.NextDouble() * 2f - 1f;
+                filtered += (noise - filtered) * 0.4f;
+                data[i] = filtered * 0.35f * Mathf.Exp(-t / 0.004f);
+            }
+
+            // Tone: glissando down with a fast decay and a slight vibrato.
+            for (int i = 0; i < length; i++)
+            {
+                float t = i / (float)SampleRate;
+                float frequency = baseFrequency * (1f - 0.35f * Mathf.Clamp01(t / duration));
+                float phase = 2f * Mathf.PI * frequency * t * (1f + 0.02f * Mathf.Sin(t * 70f));
+                float envelope = Mathf.Exp(-t / 0.05f);
+                data[i] += Mathf.Sin(phase) * envelope * 0.5f;
+            }
+
+            _pluck = Create("Fang_Pluck", data);
+            return _pluck;
+        }
+
+        /// <summary>T5: Frequenz der Vogel-Alarm-Ruf an normalized time t01 (0..1).
+        /// Two descending glissandi: tone 1 high, tone 2 lower -> strictly decreasing over the call.</summary>
+        public static float AlarmFrequencyAt(float t01)
+        {
+            const float fTop = 900f, fMid = 620f, fBottom = 430f;
+            if (t01 < 0.5f)
+            {
+                return Mathf.Lerp(fTop, fMid, t01 * 2f);
+            }
+            return Mathf.Lerp(fMid, fBottom, (t01 - 0.5f) * 2f);
+        }
+
+        /// <summary>T5: Vogel-Alarm-Ruf: two descending tones from AlarmFrequencyAt (Vorwarnung cry).</summary>
+        public static AudioClip BirdAlarmCall()
+        {
+            if (_alarm != null)
+            {
+                return _alarm;
+            }
+
+            const float duration = 0.5f;
+            int length = Mathf.CeilToInt(duration * SampleRate);
+            float[] data = new float[length];
+            for (int i = 0; i < length; i++)
+            {
+                float t01 = i / (float)length;
+                float t = i / (float)SampleRate;
+                float frequency = AlarmFrequencyAt(t01);
+                // Two distinct tones: a short dip in the middle marks the tone boundary.
+                float toneSplit = 1f - 0.35f * Mathf.Sin(Mathf.PI * Mathf.Clamp01((t01 - 0.5f) * 2f + 0.5f));
+                float phase = 2f * Mathf.PI * frequency * t * (1f + 0.015f * Mathf.Sin(t * 40f));
+                float envelope = Mathf.Sin(Mathf.Min(t01, 0.999f) * Mathf.PI);
+                data[i] = Mathf.Sin(phase) * envelope * toneSplit * 0.5f;
+            }
+
+            _alarm = Create("Bird_AlarmCall", data);
+            return _alarm;
+        }
+
+        private static AudioClip _musicBed;
+
+        /// <summary>T6: calm background music bed for the dynamic-danger track.
+        /// A slow, low drone (root-like fifth) with a gentle swell every 4 s; deterministic
+        /// seamless loop. The DangerMusic component drives its volume by intensity.</summary>
+        public static AudioClip DangerMusicBed()
+        {
+            if (_musicBed != null)
+            {
+                return _musicBed;
+            }
+
+            const float seconds = 12f;
+            int length = Mathf.CeilToInt(seconds * SampleRate);
+            float[] data = new float[length];
+
+            // Low sustained fifth (root + third): two soft sine layers with slow formant drift.
+            const float rootA = 96f, rootB = 144f;
+            for (int i = 0; i < length; i++)
+            {
+                float t = i / (float)SampleRate;
+                float swell = 0.7f + 0.3f * Mathf.Sin(t * Mathf.PI * 2f * 0.25f);
+                float a = Mathf.Sin(2f * Mathf.PI * rootA * t) * 0.16f;
+                float b = Mathf.Sin(2f * Mathf.PI * rootB * t * (1f + 0.004f * Mathf.Sin(t * 9f))) * 0.1f;
+                data[i] = (a + b) * swell * 0.6f;
+            }
+
+            // Sparse high chime (a distant bell-tone) for colour, low amplitude.
+            System.Random random = new System.Random(616);
+            int chimes = 5;
+            for (int c = 0; c < chimes; c++)
+            {
+                int start = random.Next(0, length - Mathf.CeilToInt(1.4f * SampleRate));
+                float frequency = 520f + (float)random.NextDouble() * 260f;
+                for (int i = 0; i < Mathf.FloorToInt(1.3f * SampleRate) && start + i < length; i++)
+                {
+                    float t = i / (float)SampleRate;
+                    data[start + i] += Mathf.Sin(2f * Mathf.PI * frequency * t) * 0.05f * Mathf.Exp(-t / 0.4f);
+                }
+            }
+
+            data = Crossfade(data, SampleRate / 2);
+            _musicBed = Create("Music_DangerBed", data);
+            return _musicBed;
+        }
+
+        /// <summary>S4: kurzes Knacken/Schmatz (Crunch) — two bite-hits: bright snap plus muffled chew.</summary>
+        public static AudioClip Crunch()
+        {
+            if (_crunch != null)
+            {
+                return _crunch;
+            }
+
+            float duration = 0.22f;
+            int length = Mathf.CeilToInt(duration * SampleRate);
+            float[] data = new float[length];
+            System.Random random = new System.Random(909);
+
+            // Hit 1: sharp crack (filtered noise snap), Hit 2: softer schmatz a bit later.
+            for (int hit = 0; hit < 2; hit++)
+            {
+                float t0 = hit * 0.09f;
+                float lowpass = hit == 0 ? 0.5f : 0.2f;
+                float decay = hit == 0 ? 0.004f : 0.03f;
+                float amp = hit == 0 ? 0.5f : 0.3f;
+                float filtered = 0f;
+                for (int i = Mathf.RoundToInt(t0 * SampleRate); i < length; i++)
+                {
+                    float t = (i - t0 * SampleRate) / (float)SampleRate;
+                    float noise = (float)random.NextDouble() * 2f - 1f;
+                    filtered += (noise - filtered) * lowpass;
+                    data[i] += filtered * amp * Mathf.Exp(-t / decay);
+                }
+            }
+
+            // Chewing body: low pulse under the second hit.
+            for (int i = Mathf.RoundToInt(0.09f * SampleRate); i < length; i++)
+            {
+                float t = (i - 0.09f * SampleRate) / (float)SampleRate;
+                data[i] += Mathf.Sin(2f * Mathf.PI * 160f * t) * 0.12f * Mathf.Exp(-t / 0.05f);
+            }
+
+            _crunch = Create("Feed_Crunch", data);
+            return _crunch;
+        }
+
+        private static AudioClip _pluck;
+        private static AudioClip _crunch;
+        private static AudioClip _alarm;
 
         private static float[] Crossfade(float[] data, int samples)
         {

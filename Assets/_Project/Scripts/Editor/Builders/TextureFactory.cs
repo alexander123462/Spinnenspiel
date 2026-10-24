@@ -156,6 +156,104 @@ namespace Spinnenspiel.EditorTools
                 Mathf.Abs(Mathf.Sin((u * 18f + TileNoise(u, v, 3f, 2, 1f) * 4f) * Mathf.PI)) * 0.6f + TileNoise(u, v, 24f, 3, 6.1f) * 0.4f, 5f);
         }
 
+        /// <summary>WALD7: Moos-Atlas — speckled moss greens (hue ~80..110 deg) with an ALPHA gradient
+        /// over v (v=0 solid at the Stamm-Fuss, fading to transparent toward v=1). The cutout shape
+        /// comes from the texture (noise speckles + fade), so Alpha-Cutout is the right trick here.</summary>
+        public static Texture2D Moos()
+        {
+            return Generate("T_Moos", 512, (u, v) =>
+            {
+                float blotch = TileNoise(u, v, 6f, 4, 77f);          // moos clumps
+                float fine = TileNoise(u, v, 20f, 3, 91f);           // fine structure
+                Color deep = new Color(0.16f, 0.38f, 0.13f);         // hue ~125 desat -> moos dark
+                Color bright = new Color(0.42f, 0.66f, 0.24f);       // hellgruen, hue ~97 deg
+                Color c = Color.Lerp(deep, bright, blotch * 0.7f + fine * 0.3f);
+                float fade = Mathf.Clamp01((1f - v) * 1.5f);         // v=0 solid -> v~0.7 gone (out upward)
+                float speck = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.32f, 0.62f, blotch * 0.6f + fine * 0.4f));
+                return new Color(c.r, c.g, c.b, fade * speck);
+            }, true);
+        }
+
+        private static float RedwoodHeight(float u, float v)
+        {
+            // lange senkrechte Fasern (u hoch, v niedrig) + tiefe Furchen
+            float fibre = TileNoise(u, v, 2f, 2, 3.3f) * 0.3f + Mathf.PerlinNoise(u * 64f, v * 3f) * 0.7f;
+            float ridge = Mathf.Abs(Mathf.Sin((u * 14f + TileNoise(u, v, 2f, 2, 8f) * 2.5f) * Mathf.PI));
+            return Mathf.Clamp01(fibre * 0.55f + ridge * 0.45f);
+        }
+
+        /// <summary>WALD4: Mammutbaum-Rinde, rotbraun (Farbton ca. 12..25 Grad), senkrechte Fasern, dunkle Furchen.</summary>
+        public static Texture2D RedwoodBark()
+        {
+            return Generate("T_RedwoodBark", 512, (u, v) =>
+            {
+                float h = RedwoodHeight(u, v);
+                float patch = TileNoise(u, v, 3f, 3, 21f);
+                Color dark = new Color(0.10f, 0.06f, 0.045f);
+                Color mid = new Color(0.26f, 0.15f, 0.10f);
+                Color light = new Color(0.40f, 0.26f, 0.19f);
+                Color c = h < 0.5f ? Color.Lerp(dark, mid, h * 2f) : Color.Lerp(mid, light, (h - 0.5f) * 2f);
+                c = Color.Lerp(c, new Color(0.28f, 0.25f, 0.20f), Mathf.Clamp01((patch - 0.5f) * 3f) * 0.6f); // graue Flecken
+                return Color.Lerp(c, new Color(0.22f, 0.34f, 0.12f), Mathf.Clamp01((TileNoise(u, v, 5f, 3, 50f) - 0.64f) * 4f) * 0.35f); // Moosahnung
+            }, false);
+        }
+
+        public static Texture2D RedwoodBarkNormal()
+        {
+            return GenerateNormal("T_RedwoodBark_N", 512, RedwoodHeight, 7f);
+        }
+
+        /// <summary>WALD5: Dach-Karte, dichte dunkelgruene Nadel-/Blattbueschel mit Alpha.</summary>
+        public static Texture2D CanopyLeaves()
+        {
+            return Generate("T_CanopyLeaves", 512, (u, v) =>
+            {
+                float alpha = 0f, shade = 0f;
+                for (int i = 0; i < 46; i++)
+                {
+                    float cx = 0.08f + 0.84f * WorldLayout.Hash01(i, 3, 41);
+                    float cy = 0.08f + 0.84f * WorldLayout.Hash01(i, 7, 43);
+                    float angle = WorldLayout.Hash01(i, 5, 47) * Mathf.PI * 2f;
+                    float dx = u - cx, dy = v - cy;
+                    float lx = dx * Mathf.Cos(angle) + dy * Mathf.Sin(angle);
+                    float ly = -dx * Mathf.Sin(angle) + dy * Mathf.Cos(angle);
+                    float leaf = (lx * lx) / (0.11f * 0.11f) + (ly * ly) / (0.03f * 0.03f);
+                    if (leaf < 1f)
+                    {
+                        alpha = 1f;
+                        shade = Mathf.Max(shade, 1f - leaf * 0.4f - Mathf.Abs(ly) * 4f);
+                    }
+                }
+                Color c = Color.Lerp(new Color(0.07f, 0.20f, 0.06f), new Color(0.22f, 0.45f, 0.14f), Mathf.Clamp01(shade));
+                c.a = alpha;
+                return c;
+            }, true);
+        }
+
+        /// <summary>KLEE1: helles Kleeblatt (3 Herz-Lappen) mit Alpha fuer den Cutout-Teppich.
+        /// Die Mitte (0.28..0.72) ist immer undurchsichtig: CloverFactory-UVs liegen dort.</summary>
+        public static Texture2D CloverLeaf()
+        {
+            return Generate("T_Clover_Leaf", 256, (u, v) =>
+            {
+                float dx = u - 0.5f, dy = v - 0.42f;
+                // Herz-Kontur in Polarkoordinaten (Kerze nach oben).
+                float ang = Mathf.Atan2(dy, dx);
+                float r = Mathf.Sqrt(dx * dx + dy * dy);
+                float theta = Mathf.Abs(ang - Mathf.PI * 0.5f);
+                if (theta > Mathf.PI) theta = 2f * Mathf.PI - theta;
+                float rLeaf = 0.42f * (1f - 0.38f * Mathf.Exp(-(theta * theta) / (0.34f * 0.34f)));
+                float a = r < rLeaf ? 1f : 0f;
+                // Blattrippen: heller Mittelnerv, leichte Adern.
+                float vein = 1f - 0.25f * Mathf.Exp(-(dx * dx) / 0.0006f) * (dy > 0f ? 1f : 0.3f);
+                float n = Mathf.PerlinNoise(u * 9f, v * 9f);
+                Color c = Color.Lerp(new Color(0.30f, 0.55f, 0.16f), new Color(0.52f, 0.76f, 0.30f), n * 0.7f + 0.15f);
+                c *= vein;
+                c.a = a;
+                return c;
+            }, true);
+        }
+
         /// <summary>Blatt-Atlas: mehrere Blätter mit Alpha auf einer Karte (für Busch- und Baumkarten).</summary>
         public static Texture2D LeafCluster()
         {

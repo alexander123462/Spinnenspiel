@@ -202,5 +202,250 @@ namespace Spinnenspiel
             m.RecalculateBounds();
             return m;
         }
+
+        /// <summary>M7-10.5: Spinngscale Laubblatt lieing on the ground (cm-sized).</summary>
+        public static Mesh FallenLeaf(int seed)
+        {
+            var rng = new System.Random(seed);
+            float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+
+            float len = R(0.03f, 0.06f);
+            float wid = len * R(0.5f, 0.8f);
+            float curl = R(0f, 0.25f);
+            int ribs = rng.Next(3, 6);
+
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            var uvs = new List<Vector2>();
+
+            // Central spine along X, width in Z; slight upward curl at the tip.
+            for (int i = 0; i <= ribs; i++)
+            {
+                float t = (float)i / ribs;
+                float x = (t - 0.5f) * len;
+                float w = wid * 0.5f * Mathf.Sin(t * Mathf.PI) + 0.002f;
+                float y = curl * len * t * t;
+                verts.Add(new Vector3(x, y, -w));
+                verts.Add(new Vector3(x, y, w));
+                uvs.Add(new Vector2(t, 0f));
+                uvs.Add(new Vector2(t, 1f));
+            }
+            for (int i = 0; i < ribs; i++)
+            {
+                int a = i * 2, b = a + 1, c = a + 2, d = a + 3;
+                tris.Add(a); tris.Add(c); tris.Add(b);
+                tris.Add(b); tris.Add(c); tris.Add(d);
+            }
+
+            var m = new Mesh { name = "FallenLeaf_" + seed };
+            m.SetVertices(verts);
+            m.SetTriangles(tris, 0);
+            m.SetUVs(0, uvs);
+            m.RecalculateNormals();
+            m.RecalculateBounds();
+            return m;
+        }
+
+        /// <summary>M7-10.5: Small twig (1–4 cm) lying on the ground.</summary>
+        public static Mesh GroundTwig(int seed)
+        {
+            var rng = new System.Random(seed);
+            float len = 0.01f + (float)rng.NextDouble() * 0.03f;
+            float r = 0.0015f + (float)rng.NextDouble() * 0.0015f;
+            int sides = 5;
+
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            var uvs = new List<Vector2>();
+
+            // Cylinder along X (lying flat), no caps (too small to see).
+            for (int s = 0; s <= sides; s++)
+            {
+                float a = s % sides * (Mathf.PI * 2f / sides);
+                float y = Mathf.Cos(a) * r + r; // lie on ground: bottom at y=0
+                float z = Mathf.Sin(a) * r;
+                verts.Add(new Vector3(-len * 0.5f, y, z));
+                verts.Add(new Vector3(len * 0.5f, y, z));
+                uvs.Add(new Vector2(0f, (float)s / sides));
+                uvs.Add(new Vector2(1f, (float)s / sides));
+            }
+            for (int s = 0; s < sides; s++)
+            {
+                int a0 = s * 2, b0 = a0 + 1, c0 = a0 + 2, d0 = a0 + 3;
+                tris.Add(a0); tris.Add(c0); tris.Add(b0);
+                tris.Add(b0); tris.Add(c0); tris.Add(d0);
+            }
+
+            var m = new Mesh { name = "GroundTwig_" + seed };
+            m.SetVertices(verts);
+            m.SetTriangles(tris, 0);
+            m.SetUVs(0, uvs);
+            m.RecalculateNormals();
+            m.RecalculateBounds();
+            return m;
+        }
+
+        /// <summary>
+        /// WALD7: Moos-Shell um dem Stamm-Fuss — UNIT-Mesh (Radius 1, Hoehe 1, Y-Axis), per Tree
+        /// scaled to the Trunk-Radius. V-Coordinate = Hoehe (0 = Fuss, 1 = Oberedge), so die
+        /// alpha-Gradient der Moos-Textur fades the shell out upward. One shared mesh+material:
+        /// Unity auto-batches, no new material per object.
+        /// </summary>
+        public static Mesh MoosBaseShell(int seed)
+        {
+            var rng = new System.Random(seed);
+            float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+
+            int sides = 14;
+            List<Vector3> verts = new List<Vector3>();
+            List<Vector3> normals = new List<Vector3>();
+            List<Vector2> uvs = new List<Vector2>();
+            List<int> tris = new List<int>();
+
+            for (int s = 0; s < sides; s++)
+            {
+                float a0 = s / (float)sides * Mathf.PI * 2f;
+                float a1 = (s + 1) / (float)sides * Mathf.PI * 2f;
+                // slight radius wobble per side -> organic moos edge
+                float r0 = 1f + R(-0.06f, 0.06f);
+                float r1 = 1f + R(-0.06f, 0.06f);
+                Vector3 p0b = new Vector3(Mathf.Cos(a0) * r0, 0f, Mathf.Sin(a0) * r0);
+                Vector3 p1b = new Vector3(Mathf.Cos(a1) * r1, 0f, Mathf.Sin(a1) * r1);
+                Vector3 n0 = new Vector3(Mathf.Cos(a0), 0f, Mathf.Sin(a0));
+                Vector3 n1 = new Vector3(Mathf.Cos(a1), 0f, Mathf.Sin(a1));
+                int i0 = verts.Count;
+                verts.Add(p0b); normals.Add(n0); uvs.Add(new Vector2(s / (float)sides, 0f));
+                verts.Add(new Vector3(p0b.x, 1f, p0b.z)); normals.Add(n0); uvs.Add(new Vector2(s / (float)sides, 1f));
+                verts.Add(p1b); normals.Add(n1); uvs.Add(new Vector2((s + 1) / (float)sides, 0f));
+                verts.Add(new Vector3(p1b.x, 1f, p1b.z)); normals.Add(n1); uvs.Add(new Vector2((s + 1) / (float)sides, 1f));
+                tris.Add(i0); tris.Add(i0 + 2); tris.Add(i0 + 1);
+                tris.Add(i0 + 1); tris.Add(i0 + 2); tris.Add(i0 + 3);
+            }
+
+            Mesh m = new Mesh();
+            m.SetVertices(verts);
+            m.SetNormals(normals);
+            m.SetUVs(0, uvs);
+            m.SetTriangles(tris, 0);
+            m.RecalculateBounds();
+            return m;
+        }
+
+        /// <summary>
+        /// WALD7: Moos-Karten-Patch for the UPPER side of Totholz — UNIT-Mesh (X/Z in -1..1,
+        /// Y 0..0.25), per Log scaled to the top-face extent. Cards are up-facing quads with
+        /// slight tilt; UV v stays below the gradient fade -> fully green. Deterministic from seed.
+        /// </summary>
+        public static Mesh MoosCapCards(int seed)
+        {
+            var rng = new System.Random(seed);
+            float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+
+            var verts = new List<Vector3>();
+            var norms = new List<Vector3>();
+            var uvs = new List<Vector2>();
+            var tris = new List<int>();
+
+            int cards = rng.Next(5, 8);
+            for (int c = 0; c < cards; c++)
+            {
+                float cx = R(-0.6f, 0.6f), cz = R(-0.6f, 0.6f);
+                float half = R(0.22f, 0.42f);
+                float ang = R(0f, Mathf.PI * 2f);
+                float tilt = R(0.05f, 0.18f); // slight up-tilt at the far edge -> volume hint
+                Vector3 ax = new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang));
+                Vector3 side = new Vector3(-ax.z, 0f, ax.x);
+                Vector3 p0 = new Vector3(cx, R(0.02f, 0.06f), cz);
+                Vector3 p1 = p0 + ax * half;
+                Vector3 q0 = p0 + side * half * 0.7f;
+                Vector3 q1 = p1 + side * half * 0.7f + Vector3.up * tilt;
+                int b = verts.Count;
+                float u0 = R(0.15f, 0.6f), v0 = R(0.05f, 0.25f); // below the fade -> solid green
+                verts.Add(p0); verts.Add(q0); verts.Add(q1); verts.Add(p1 + Vector3.up * tilt);
+                uvs.Add(new Vector2(u0, v0)); uvs.Add(new Vector2(u0 + 0.3f, v0));
+                uvs.Add(new Vector2(u0 + 0.3f, v0 + 0.2f)); uvs.Add(new Vector2(u0, v0 + 0.2f));
+                for (int k = 0; k < 4; k++) norms.Add(Vector3.up);
+                tris.Add(b); tris.Add(b + 1); tris.Add(b + 2);
+                tris.Add(b); tris.Add(b + 2); tris.Add(b + 3);
+            }
+
+            var m = new Mesh { name = "MoosCapCards_" + seed };
+            m.SetVertices(verts);
+            m.SetNormals(norms);
+            m.SetUVs(0, uvs);
+            m.SetTriangles(tris, 0);
+            m.RecalculateBounds();
+            return m;
+        }
+
+        /// <summary>
+        /// WALD6: Jungbaeumchen/Nadelwedel (Coniferen-Saling) as Gebuesch, deterministic from seed.
+        /// Central stem + 3-5 whorls of needle twigs (thin cones), total height normalised to ~1 m
+        /// so the generator can scale it to 0.5..2 m. Real geometry -> opaque material (no cutout).
+        /// </summary>
+        public static Mesh YoungConifer(int seed)
+        {
+            var rng = new System.Random(seed);
+            float R(float a, float b) => a + (float)rng.NextDouble() * (b - a);
+
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            var norms = new List<Vector3>();
+
+            // Central stem: 6-sided cone from y=0 to y=1, thin at top.
+            const int sides = 6;
+            for (int s = 0; s < sides; s++)
+            {
+                float a0 = s * (Mathf.PI * 2f / sides);
+                float a1 = (s + 1) * (Mathf.PI * 2f / sides);
+                float rB = 0.02f, rT = 0.006f;
+                int b = verts.Count;
+                verts.Add(new Vector3(Mathf.Cos(a0) * rB, 0f, Mathf.Sin(a0) * rB));
+                verts.Add(new Vector3(Mathf.Cos(a1) * rB, 0f, Mathf.Sin(a1) * rB));
+                verts.Add(new Vector3(Mathf.Cos(a1) * rT, 1f, Mathf.Sin(a1) * rT));
+                verts.Add(new Vector3(Mathf.Cos(a0) * rT, 1f, Mathf.Sin(a0) * rT));
+                Vector3 n = new Vector3(Mathf.Cos((a0 + a1) * 0.5f), 0.2f, Mathf.Sin((a0 + a1) * 0.5f)).normalized;
+                for (int k = 0; k < 4; k++) norms.Add(n);
+                tris.Add(b); tris.Add(b + 1); tris.Add(b + 2);
+                tris.Add(b); tris.Add(b + 2); tris.Add(b + 3);
+            }
+
+            // Needle twigs: whorls at 4 heights, each twig a thin tapered quad-strip pair (billon).
+            int whorls = rng.Next(3, 6);
+            for (int w = 0; w < whorls; w++)
+            {
+                float y = 0.25f + w * (0.7f / Mathf.Max(1, whorls - 1)) * 0.95f;
+                float len = R(0.18f, 0.34f) * (1.15f - y * 0.6f);
+                int twigs = rng.Next(5, 8);
+                float baseAng = rng.Next(0, 360) * Mathf.Deg2Rad;
+                for (int t = 0; t < twigs; t++)
+                {
+                    float ang = baseAng + t * (Mathf.PI * 2f / twigs) + R(-0.15f, 0.15f);
+                    float dx = Mathf.Cos(ang), dz = Mathf.Sin(ang);
+                    float rise = R(0.12f, 0.3f) * len;
+                    float wHalf = R(0.012f, 0.024f);
+                    int b = verts.Count;
+                    Vector3 p0 = new Vector3(dx * 0.02f, y, dz * 0.02f);
+                    Vector3 p1 = new Vector3(dx * len, y + rise, dz * len);
+                    Vector3 sideV = new Vector3(-dz, 0f, dx) * wHalf;
+                    verts.Add(p0 - sideV); verts.Add(p0 + sideV);
+                    verts.Add(p1 + sideV + Vector3.up * 0.004f); verts.Add(p1 - sideV + Vector3.up * 0.004f);
+                    for (int k = 0; k < 4; k++) norms.Add(Vector3.up);
+                    tris.Add(b); tris.Add(b + 1); tris.Add(b + 2);
+                    tris.Add(b); tris.Add(b + 2); tris.Add(b + 3);
+                }
+            }
+
+            var m = new Mesh { name = "YoungConifer_" + seed };
+            m.SetVertices(verts);
+            m.SetTriangles(tris, 0);
+            m.SetNormals(norms);
+            // Flat UV (texture centre): no per-vertex mapping needed, tint comes from MPB _BaseColor.
+            var uvs = new Vector2[verts.Count];
+            for (int u = 0; u < uvs.Length; u++) uvs[u] = new Vector2(0.5f, 0.5f);
+            m.SetUVs(0, uvs);
+            m.RecalculateBounds();
+            return m;
+        }
     }
 }

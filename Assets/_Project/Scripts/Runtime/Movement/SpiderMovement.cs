@@ -31,12 +31,27 @@ namespace Spinnenspiel
         [Header("Schwerkraft")]
         [SerializeField] private float gravityScale = 1f;
 
+        [Header("Sprung")]
+        [SerializeField, Tooltip("Hubhöhe der Sprung (m)")] private float jumpHeight = 0.5f;
+        [SerializeField, Tooltip("Weitsch des Sprung (m)")] private float jumpDistance = 1.2f;
+        [SerializeField, Tooltip("Abklingzeit vor dem naechste Sprung (s)")] private float jumpCooldown = 0.6f;
+
         [Header("Oberflächen-Haftung")]
         [SerializeField] private SpiderSurfaceSensor sensor = new SpiderSurfaceSensor();
         [SerializeField] private float adhesionRate = 20f; // wie schnell (1/s) die Spinne zur Fläche gezogen wird
         [SerializeField] private float alignRate = 6f; // up-Achse zur Normale ausrichten (rad/s)
         [SerializeField] private float detachDelay = 0.2f; // Toleranz nach Letztem Oberflächen-Treffer (s)
         [SerializeField] private float bodyRadius = 0.05f; // Körperkugel für Kollisionsschutz (m)
+
+        [Header("Energie-Folgen (J2c)")]
+        [SerializeField, Tooltip("Energie-component of the spider (tempo factor reads it).")] private SpiderEnergy energy;
+        [SerializeField, Tooltip("Under this energy the spider moves at the reduced tempo.")] private float lowEnergyThreshold = 25f;
+        [SerializeField, Tooltip("Tempo factor under the low-energy threshold.")] private float lowEnergyTempoFactor = 0.6f;
+
+        [Header("Radnetz")]
+        [SerializeField] private float webSpeedFactor = 0.6f; // Tempo-Faktor im Netz (Relativ zu Lauf-/Sprinttempo)
+        [SerializeField] private float webGrip = 0.12f; // max. Abstand (m) zu einem Faden, damit die Spinne sich weiterbewegt
+        [SerializeField] private float webBodyOffset = 0.03f; // Abstand des Körpers zur Netzebene (m)
 
         [Header("Weltgrenzen")]
         [SerializeField] private bool useWorldBounds; // XZ-Abgrenzung nur, wenn an
@@ -56,6 +71,9 @@ namespace Spinnenspiel
         private Vector3 _surfaceNormal = Vector3.up;
         private bool _attached = true;
         private float _lastSurfaceTime = float.NegativeInfinity;
+        private float _wallClimbTime = float.NegativeInfinity;
+        private Vector3 _lastWallPoint = Vector3.zero;
+        private Vector3 _lastWallNormal = Vector3.zero;
         private Vector2? _externalMoveInput;
         private float _ropeLength;
         private Vector3 _ropeVel;
@@ -66,6 +84,11 @@ namespace Spinnenspiel
         private float _boardCooldownUntil;
         private bool _warnedNoCamera;
         private SpiderSurfaceDetector _surface;
+        private Collider _bodyCollider;
+        private float _jumpCooldownUntil = float.NegativeInfinity;
+        private Vector3 _jumpVel;
+        private bool _inJump;
+        private bool _jumpRequest;
 
         /// <summary>Letzte Gesamtbewegungsgeschwindigkeit in m/s (Positionsdifferenz pro Sekunde).</summary>
         public Vector3 Velocity => _lastVelocity;
@@ -79,14 +102,23 @@ namespace Spinnenspiel
         /// <summary>Normale der zuletzt erkannten Oberfläche (Weltkoordinaten).</summary>
         public Vector3 SurfaceNormal => _surfaceNormal;
 
-        /// <summary>True, wenn die Spinne an einer Unterlage haftet (Boden, Wand, ...).</summary>
-        public bool IsGrounded => IsAttached || CurrentThread != null;
+        /// <summary>L2: Sprung anfordern (z. B. aus Tests); bei true der naechste Frame ein Absprung versuche.</summary>
+        public void RequestJump()
+        {
+            _jumpRequest = true;
+        }
+
+        /// <summary>True, wenn die Spinne an einer Unterlage haftet (Boden, Wand, ...), am Faden hängt oder im Netz läuft.</summary>
+        public bool IsGrounded => IsAttached || CurrentThread != null || CurrentWeb != null;
 
         /// <summary>True, solange die Spinne am Seil (Dragline) hängt.</summary>
         public bool IsOnRope { get; private set; }
 
         /// <summary>An welchen Seidenfaden die Spinne aktuell hängt/klettert (null = kein Faden).</summary>
         public SilkThread CurrentThread { get; private set; }
+
+        /// <summary>In welchem Radnetz die Spinne aktuell läuft (null = kein Netz).</summary>
+        public OrbWeb CurrentWeb { get; private set; }
 
         public float WalkSpeed => walkSpeed;
 
@@ -105,6 +137,36 @@ namespace Spinnenspiel
 
             return input != null && input.SprintHeld;
         }
+
+        /// <summary>J2c: Tempo-Faktor aus der Energie — under the threshold moves at the reduced tempo.
+        /// 1 when energy is unknown (no component) so movement never breaks.</summary>
+        public float EnergyTempoFactor()
+        {
+            if (energy == null)
+            {
+                energy = GetComponent<SpiderEnergy>();
+            }
+            if (energy == null)
+            {
+                return 1f;
+            }
+            return energy.Energy < lowEnergyThreshold ? lowEnergyTempoFactor : 1f;
+        }
+
+        /// <summary>S7: Bis zu diesem Moment betauebt (Wespe-Sting): movement input ignored.</summary>
+        private float _stunUntil;
+
+        /// <summary>S7: Betaeubing: the spider cannot move for the given seconds.</summary>
+        public void SetStun(float seconds)
+        {
+            if (seconds > 0f)
+            {
+                _stunUntil = Time.time + seconds;
+            }
+        }
+
+        /// <summary>S7: True while a stun runs (for tests and HUD).</summary>
+        public bool IsStunned { get; private set; }
 
         /// <summary>
         /// Setzt eine externe, kamerarelative Bewegungsrichtung (z. B. für automatisierte Tests).
@@ -172,6 +234,38 @@ namespace Spinnenspiel
         }
 
         /// <summary>
+        /// Shared: Set a landing position so that the body collider bottom rests ON the terrain
+        /// surface instead of inside it. A SphereCast-landing hands back the contact point, which
+        /// sits at the surface, but the collider bottom (center - halfExtent) would then be BELOW
+        /// the terrain -> the spider sinks in (S2). Raises the center so the bottom equals terrain
+        /// height plus a small clearance. Root cause shared with S1 spawn grounding.
+        /// </summary>
+        private Vector3 SettleOnTerrain(Vector3 landing)
+        {
+            if (_bodyCollider == null)
+            {
+                return landing;
+            }
+
+            Terrain terr = Terrain.activeTerrain;
+            if (terr == null)
+            {
+                return landing;
+            }
+
+            float terrainY = terr.SampleHeight(landing) + terr.transform.position.y;
+            // Half extent from body center to collider bottom (current collider, pre-move).
+            float halfToBottom = transform.position.y - _bodyCollider.bounds.min.y;
+            float targetCenterY = terrainY + halfToBottom + 0.03f;
+            if (landing.y < targetCenterY)
+            {
+                landing.y = targetCenterY;
+            }
+
+            return landing;
+        }
+
+        /// <summary>
         /// Hängt die Spinne an einen Seidenfaden (t = Position 0..1, 0 = anchorA).
         /// Davor laufende Bewegung wird verworfen; das Bein-System greift dann auf den Faden.
         /// </summary>
@@ -191,12 +285,50 @@ namespace Spinnenspiel
         }
 
         /// <summary>
+        /// Hängt die Spinne in ein Radnetz ein: läuft auf den Fäden, Beine greifen selbst
+        /// über OrbWeb.TryClosestPoint. Davor laufende Bewegung wird verworfen.
+        /// </summary>
+        public void AttachToWeb(OrbWeb web)
+        {
+            CurrentWeb = web;
+            CurrentThread = null;
+            IsOnRope = false;
+            _attached = false;
+            _vel = Vector3.zero;
+            _lastVelocity = Vector3.zero;
+        }
+
+        /// <summary>Entfernt den Netzbezug (z. B. am Netzrand).</summary>
+        public void DetachFromWeb()
+        {
+            CurrentWeb = null;
+        }
+
+        /// <summary>B4c: Am Seil (Dragline) Leertaste = fallen lassen: abspring from the rope,
+        /// free fall until a surface is hit. Without this the rope state was a dead state where
+        /// space did neither jump nor let go (Alex: "Leertaste drucken, nothing happens").</summary>
+        public void DropFromRope()
+        {
+            if (!IsOnRope)
+            {
+                return;
+            }
+
+            IsOnRope = false;
+            _attached = false;
+            _vel = Vector3.zero;
+            _ropeVel = Vector3.zero;
+            _boardCooldownUntil = Time.time + 1f;
+        }
+
+        /// <summary>
         /// Faden aktiv loslassen: Fadenbezug entfernen und Haftung aufheben, damit die Spinne fällt,
         /// bis sie wieder auf einer Oberfläche landet.
         /// </summary>
         public void LetGo()
         {
             DetachFromThread();
+            CurrentWeb = null;
             _boardCooldownUntil = Time.time + 1f;
             _attached = false;
             CatchOnDragline();
@@ -303,7 +435,7 @@ namespace Spinnenspiel
             {
                 IsOnRope = false;
                 _attached = true;
-                transform.position = hit.point;
+                transform.position = SettleOnTerrain(hit.point);
                 transform.rotation = Quaternion.FromToRotation(transform.up, hit.normal) * transform.rotation;
                 _lastSurfaceTime = Time.time;
                 _vel = Vector3.zero;
@@ -338,6 +470,11 @@ namespace Spinnenspiel
         private void Awake()
         {
             _surface = GetComponent<SpiderSurfaceDetector>();
+            _bodyCollider = GetComponent<Collider>();
+            if (energy == null)
+            {
+                energy = GetComponent<SpiderEnergy>();
+            }
 
             if (input == null)
             {
@@ -368,6 +505,15 @@ namespace Spinnenspiel
 
             Vector3 up = transform.up;
 
+            // S7: Betaeubing (Wespe-Sting): input ignored, no movement while stunned.
+            IsStunned = Time.time < _stunUntil;
+            if (IsStunned)
+            {
+                _externalMoveInput = null;
+                _externalMoveLocal = null;
+                _externalSprint = null;
+            }
+
             // a) Eingabe -> Richtung in der Ebene senkrecht zu up.
             bool local = _externalMoveLocal.HasValue;
             Vector2 moveInput;
@@ -382,6 +528,11 @@ namespace Spinnenspiel
             else
             {
                 moveInput = input != null ? input.Move : Vector2.zero;
+            }
+
+            if (IsStunned)
+            {
+                moveInput = Vector2.zero;
             }
 
             Vector3 dir = local
@@ -401,6 +552,14 @@ namespace Spinnenspiel
                 return;
             }
 
+            // Netz-Modus: im Radnetz laufen, Beine greifen die Fäden selbst.
+            if (CurrentWeb != null)
+            {
+                UpdateWeb(dt, dir);
+                _lastVelocity = (transform.position - oldPos) / dt;
+                return;
+            }
+
             // Seil-Modus (Dragline) hat Vorrang vor freiem Fallen.
             if (IsOnRope)
             {
@@ -409,7 +568,15 @@ namespace Spinnenspiel
                 return;
             }
 
-            if (_attached)
+            // L2: Sprung (Leertaste am Boden/Ast/Stamm; im Netz/Faden bleibt Leertaste "fallen lassen").
+            TryTriggerJump(dir);
+
+            if (_inJump)
+            {
+                UpdateJump(dt);
+                _lastVelocity = (transform.position - oldPos) / dt;
+            }
+            else if (_attached)
             {
                 UpdateAttached(dt, dir, up);
             }
@@ -427,7 +594,145 @@ namespace Spinnenspiel
                 transform.position = p;
             }
 
+            // B3: Sicherheitsnetz gegen die Terrain-Unterseite. Ist die Koerpermittelpunkt
+            // mehr als TERRAIN_FLOOR_TOLERANZ UNTER der Terrainhoehe, wird die Spinne sofort
+            // auf die Terrainoberflaeche gesetzt und up wieder zu Welt-up abgleichen. Unter dem
+            // Terrain der Terrain-Raycast (GroundBelow/Sense) trifft nichts, so die Sperren aus
+            // B2 wirken nicht mehr und die Spinne laeuft kopfueber an der Unterseite (Alex:
+            // Baumstemk im Boden steckt -> Kugelwurf kein Blocker -> Spinne unter Terrain).
+            EnforceTerrainFloor();
+
             _lastVelocity = (transform.position - oldPos) / dt;
+        }
+
+        /// <summary>B2: Liegt innerhalb 1 m unter der Spinne Boden? (Decken-Klettern nur hoch ueber dem Boden.)</summary>
+        private bool GroundBelow()
+        {
+            return Physics.Raycast(transform.position, Vector3.down, out RaycastHit gh, 1.0f, sensor.mask, QueryTriggerInteraction.Ignore)
+                && gh.collider is TerrainCollider;
+        }
+
+        /// <summary>
+        /// B3: Sicherheitsnetz. SampleHeight gibt die Terrainhoehe INSENSATE, so es wirkt auch
+        /// UNTER dem Terrain (wo der Terrain-Raycast GroundBelow/Sense trifft nichts). Liegt der
+        /// Koerpermittelpunkt mehr als TERRAIN_FLOOR_TOLERANZ (0.05 m) UNTER der Terrainoberflaeche,
+        /// wird die Spinne per SettleOnTerrain sofort auf die Terrainoberflaeche gesetzt, up wieder
+        /// zu Welt-up abgleichen und die Unterseite NEVER als haftable surface: _surfaceNormal=up,
+        /// _attached=true so der naechste Frame ein normale Erdoberflaenhaftung neust. Ein Baumstemk
+        /// im Boden steckt oder ein Luecke im TrunkCapsule kann nicht mehr schneiden den Spinne
+        /// unter Terrain; entlanglaufen (SphereCast-Blocker) bleibt der primary path.
+        /// </summary>
+        private void EnforceTerrainFloor()
+        {
+            Terrain terr = Terrain.activeTerrain;
+            if (terr == null)
+            {
+                return;
+            }
+
+            Vector3 p = transform.position;
+            float terrainY = terr.SampleHeight(p) + terr.transform.position.y;
+            const float tolerance = 0.05f;
+            if (p.y >= terrainY - tolerance)
+            {
+                return;
+            }
+
+            // Unter der Terrain: auf die Oberflaeche setzen (SettleOnTerrain rases the center so
+            // the collider bottom rests on the surface + clearance), up back to world-up.
+            Vector3 settled = SettleOnTerrain(new Vector3(p.x, terrainY, p.z));
+            transform.position = settled;
+            // up back to world-up: project forward onto the horizontal plane; if that degenerates
+            // (forward ~ vertical while climbing), fall back to the current right axis.
+            Vector3 fwd = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
+            if (fwd.sqrMagnitude < 1e-6f)
+            {
+                fwd = Vector3.ProjectOnPlane(transform.right, Vector3.up);
+                fwd = fwd.sqrMagnitude < 1e-6f ? Vector3.forward : fwd;
+            }
+            transform.rotation = Quaternion.LookRotation(fwd.normalized, Vector3.up);
+            _surfaceNormal = Vector3.up;
+            _attached = true;
+            _lastSurfaceTime = Time.time;
+            _vel = Vector3.zero;
+        }
+
+        /// <summary>B2: Nahe am Boden ist eine nach unten zeigende Hindernisflaeche (Unterseite von
+        /// Stamm/Wurzel ueber dem Weg) KEINE Kletterflaeche – sonst dreht sich die Spinne kopfueber darunter.</summary>
+        private bool IsOverheadHitOnGround(Vector3 hitNormal, Vector3 groundNormal)
+        {
+            return hitNormal.y < -0.1f && GroundBelow();
+        }
+
+        /// <summary>L2: Am Boden/Ast/Stamm (hafter, nie am Faden/Netz/Seil) die Leertaste-Absprung versuche.</summary>
+        private void TryTriggerJump(Vector3 dir)
+        {
+            if (input != null && input.JumpPressed)
+            {
+                _jumpRequest = true;
+            }
+
+            if (!_jumpRequest)
+            {
+                return;
+            }
+
+            _jumpRequest = false;
+            // Im Netz oder am Faden/Seil bleibt Leertaste "fallen lassen" (SpiderSilk/SpiderWebBuilder).
+            if (!_attached || CurrentThread != null || CurrentWeb != null || IsOnRope)
+            {
+                return;
+            }
+
+            if (Time.time < _jumpCooldownUntil)
+            {
+                return;
+            }
+
+            // Absprung: entlang der Flaechennormale plus Blick-/Laufrichtung.
+            Vector3 n = SafeNormalize(_surfaceNormal, transform.up);
+            Vector3 fwd = dir.sqrMagnitude > 0.01f ? SafeNormalize(dir, transform.forward) : transform.forward;
+
+            // Flight-Parameter: y-Scheitel der Parabola = jumpHeight (m), Horizontaler = jumpDistance (m).
+            float g = Physics.gravity.magnitude * gravityScale;
+            float vNormal = Mathf.Sqrt(2f * g * jumpHeight);          // Abstoss entlang der Flaechennormale
+            float airTime = 2f * vNormal / g;                          // Rueck an Hoehe-Difference 0
+            Vector3 horiz = SafeNormalize(Vector3.ProjectOnPlane(fwd, n), Vector3.ProjectOnPlane(fwd, transform.up));
+            _jumpVel = horiz * (jumpDistance / airTime) + n * vNormal;
+            _inJump = true;
+            _jumpCooldownUntil = Time.time + jumpCooldown;
+        }
+
+        /// <summary>L2: Sprung-Parabola; Landeg per Sphärenwurf wieder an der Fläche haftet (UpdateFalling-Logik).</summary>
+        private void UpdateJump(float dt)
+        {
+            Vector3 up = transform.up;
+
+            // In der Air soft richts the spider back to world-up.
+            Vector3 newUp = Vector3.RotateTowards(up, Vector3.up, 3f * dt, 0f).normalized;
+            transform.rotation = Quaternion.FromToRotation(up, newUp) * transform.rotation;
+
+            _jumpVel += Physics.gravity * gravityScale * dt;
+
+            Vector3 step = _jumpVel * dt;
+            if (step.sqrMagnitude > 1e-8f &&
+                Physics.SphereCast(transform.position + newUp * bodyRadius, bodyRadius, step.normalized,
+                    out RaycastHit hit, step.magnitude + 0.01f, sensor.mask, QueryTriggerInteraction.Ignore))
+            {
+                // Surface hit during flight: land and re-adhere.
+                Vector3 n = hit.normal;
+                transform.rotation = Quaternion.FromToRotation(transform.up, n) * transform.rotation;
+                _vel = Vector3.ProjectOnPlane(_jumpVel, n) * 0.3f;
+                _surfaceNormal = n;
+                _attached = true;
+                _lastSurfaceTime = Time.time;
+                transform.position = SettleOnTerrain(hit.point);
+                _inJump = false;
+            }
+            else
+            {
+                transform.position += step;
+            }
         }
 
         /// <summary>b) Haftend: tangent laufen, up-Achse ausrichten, Kollision begrenzen, an die Fläche haften.</summary>
@@ -437,7 +742,7 @@ namespace Spinnenspiel
 
             bool sprinting = IsSprintHeld() && dir.sqrMagnitude > 0.0001f;
             float surfaceFactor = _surface != null ? _surface.SpeedMultiplier : 1f;
-            float targetSpeed = (sprinting ? sprintSpeed : walkSpeed) * surfaceFactor * Mathf.Clamp01(dir.magnitude);
+            float targetSpeed = (sprinting ? sprintSpeed : walkSpeed) * surfaceFactor * EnergyTempoFactor() * Mathf.Clamp01(dir.magnitude);
             Vector3 targetVelocity = dir * targetSpeed;
 
             // Beschleunigen/Abbremsen mit getrennten Werten.
@@ -454,7 +759,7 @@ namespace Spinnenspiel
             if (!hit)
             {
                 // Kein Treffer: nach Toleranzzeit loslassen.
-                if (Time.time - _lastSurfaceTime > detachDelay)
+                if (Time.time - _lastSurfaceTime > detachDelay && Time.time - _wallClimbTime > 0.4f)
                 {
                     _attached = false;
                     CatchOnDragline();
@@ -463,44 +768,55 @@ namespace Spinnenspiel
                 return;
             }
 
+            // B2: Aufrecht (< 60 Grad geneigt) darf die Spinne nie auf eine nach unten zeigende Flaeche
+            // (Unterseite von Stamm/Wurzel) umspringen: stehen bleiben statt kopfueber zu drehen.
+            if (normal.y < -0.1f && GroundBelow())
+            {
+                _vel = Vector3.zero;
+                _lastSurfaceTime = Time.time;
+                return;
+            }
+
             _lastSurfaceTime = Time.time;
             _surfaceNormal = normal;
 
-            // up-Achse weich zur Oberflächen-Normale ausrichten.
-            Vector3 newUp = Vector3.RotateTowards(up, normal, alignRate * dt, 0f).normalized;
+            // Kletterlatch: after a steep Cast-hit the Sensor-Ground-normal must not fight the climb.
+            bool wallLatched = Time.time - _wallClimbTime < 0.4f;
+            bool groundFightsClimb = wallLatched && Vector3.Angle(normal, Vector3.up) < 45f;
+
+            // up-Achse weich zur Oberflächen-Normale ausrichten (during latch: to the wall normal).
+            Vector3 alignNormal = groundFightsClimb ? _lastWallNormal : normal;
+            if (alignNormal.y < -0.2f && GroundBelow())
+            {
+                _vel = Vector3.zero;
+                _wallClimbTime = float.NegativeInfinity;
+                return;
+            }
+            Vector3 newUp = Vector3.RotateTowards(up, alignNormal, alignRate * dt, 0f).normalized;
             transform.rotation = Quaternion.FromToRotation(up, newUp) * transform.rotation;
 
             // Haftung startet am Sensortreffer, bei Steilflächen am Hindernistreffer.
-            Vector3 adhesionPoint = point;
-            Vector3 adhesionNormal = normal;
+            Vector3 adhesionPoint = groundFightsClimb ? _lastWallPoint : point;
+            Vector3 adhesionNormal = groundFightsClimb ? _lastWallNormal : normal;
 
             // Schritt in Laufrichtung; Sphärenwurf begrenzt bei Hindernis.
             Vector3 oldUp = newUp;
             float step = _vel.magnitude * dt;
             if (step > 0.0001f)
             {
+                bool castHitSteep = false;
+                Vector3 steepNormal = Vector3.zero;
+                Vector3 steepPoint = Vector3.zero;
                 if (Physics.SphereCast(transform.position + newUp * bodyRadius, bodyRadius * 0.9f, _vel.normalized,
                         out RaycastHit castHit, step + 0.01f, sensor.mask, QueryTriggerInteraction.Ignore))
                 {
-                    if (castHit.distance > 0.0001f && Vector3.Angle(castHit.normal, newUp) > 35f)
+                    if (castHit.distance > 0.0001f && Vector3.Angle(castHit.normal, Vector3.up) > 55f && !IsOverheadHitOnGround(castHit.normal, normal))
                     {
-                        // Steiles Hindernis = neue Kletterfläche: umdrehen und entlanglaufen.
-                        Vector3 wallUp = Vector3.RotateTowards(oldUp, castHit.normal, alignRate * 3f * dt, 0f).normalized;
-                        transform.rotation = Quaternion.FromToRotation(newUp, wallUp) * transform.rotation;
-                        newUp = wallUp;
-
-                        // Geschwindigkeit entlang der Hindernisfläche umlenken, Betrag behalten.
-                        Vector3 along = Vector3.ProjectOnPlane(_vel, castHit.normal);
-                        Vector3 climbDir = along.magnitude < 0.3f * _vel.magnitude
-                            ? Vector3.ProjectOnPlane(oldUp, castHit.normal).normalized
-                            : along.normalized;
-                        _vel = climbDir * _vel.magnitude;
-                        // step bleibt normal: entlang der neuen Richtung weiterlaufen.
-
-                        adhesionPoint = castHit.point;
-                        adhesionNormal = castHit.normal;
+                        castHitSteep = true;
+                        steepNormal = castHit.normal;
+                        steepPoint = castHit.point;
                     }
-                    else if (castHit.distance > 0.0001f)
+                    else if (castHit.distance > 0.0001f && !IsOverheadHitOnGround(castHit.normal, normal))
                     {
                         // Flaches Hindernis (z. B. Oberseite eines kleinen Steins):
                         // nicht kappen, sondern entlang der getroffenen Fläche weiterlaufen.
@@ -511,7 +827,37 @@ namespace Spinnenspiel
                         adhesionNormal = castHit.normal;
                         // step bleibt die volle Schrittweite; Ausrichtung übernimmt der Sensor im nächsten Frame.
                     }
-                    // distance <= 0.0001f: Kugel startet überlappend, Schritt normal ausführen.
+                }
+                else if (Physics.SphereCast(transform.position - _vel.normalized * 0.25f + newUp * (bodyRadius + 0.3f), bodyRadius * 1.4f, _vel.normalized,
+                        out RaycastHit castHit2, step + 0.6f, sensor.mask, QueryTriggerInteraction.Ignore))
+                {
+                    if (castHit2.distance > 0.0001f && Vector3.Angle(castHit2.normal, Vector3.up) > 55f && !IsOverheadHitOnGround(castHit2.normal, normal))
+                {
+                    // Leibhoch-Wurf: Steep Stoeckleib ueber dem Fusspfad (Planting-Absatz).
+                    castHitSteep = true;
+                    steepNormal = castHit2.normal;
+                    steepPoint = castHit2.point;
+                }
+                }
+                if (castHitSteep)
+                {
+                    // Steiles Hindernis = neue Kletterfläche: umdrehen und entlanglaufen.
+                    _wallClimbTime = Time.time;
+                    _lastWallPoint = steepPoint;
+                    _lastWallNormal = steepNormal;
+                    Vector3 wallUp = Vector3.RotateTowards(oldUp, steepNormal, alignRate * 3f * dt, 0f).normalized;
+                    transform.rotation = Quaternion.FromToRotation(newUp, wallUp) * transform.rotation;
+                    newUp = wallUp;
+
+                    // Geschwindigkeit entlang der Hindernisfläche umlenken, Betrag behalten.
+                    Vector3 along = Vector3.ProjectOnPlane(_vel, steepNormal);
+                    Vector3 climbDir = along.magnitude < 0.3f * _vel.magnitude
+                        ? Vector3.ProjectOnPlane(oldUp, steepNormal).normalized
+                        : along.normalized;
+                    _vel = climbDir * _vel.magnitude;
+
+                    adhesionPoint = steepPoint;
+                    adhesionNormal = steepNormal;
                 }
             }
 
@@ -606,7 +952,7 @@ namespace Spinnenspiel
             {
                 Vector3 curUp = transform.up;
                 DetachFromThread();
-                transform.position = thread.anchorB;
+                transform.position = SettleOnTerrain(thread.anchorB);
                 transform.rotation = Quaternion.FromToRotation(curUp, -tan.normalized) * transform.rotation;
                 _vel = Vector3.zero;
                 _attached = true;
@@ -619,12 +965,58 @@ namespace Spinnenspiel
             {
                 Vector3 curUp = transform.up;
                 DetachFromThread();
-                transform.position = thread.anchorA;
+                transform.position = SettleOnTerrain(thread.anchorA);
                 transform.rotation = Quaternion.FromToRotation(curUp, tan.normalized) * transform.rotation;
                 _vel = Vector3.zero;
                 _attached = true;
                 _lastSurfaceTime = Time.time;
             }
+        }
+
+        /// <summary>
+        /// Netz-Modus: Die Spinne läuft in der Netzebene auf den Fäden; die Beine
+        /// greifen die Fäden selbst (OrbWeb.TryClosestPoint in SpiderLeg). Am Netzrand
+        /// (kein Faden mehr in Reichweite) bleibt sie stehen. Weltgrenzen gelten hier
+        /// bewusst nicht (das Netz darf über/unter der XZ-Grenze hängen).
+        /// </summary>
+        private void UpdateWeb(float dt, Vector3 dir)
+        {
+            OrbWeb web = CurrentWeb;
+            if (web == null || web.Layout == null)
+            {
+                // Netz verschwunden (z. B. zerstört): loslassen und fallen.
+                LetGo();
+                return;
+            }
+
+            // Netzebene von der Seite der Spinne aus orientieren.
+            Vector3 n = web.PlaneNormal;
+            if (Vector3.Dot(n, transform.up) < 0f)
+            {
+                n = -n;
+            }
+
+            dir = Vector3.ProjectOnPlane(dir, n);
+            float tempo = (IsSprintHeld() ? sprintSpeed : walkSpeed) * webSpeedFactor;
+
+            Vector3 hub = web.Layout.Hub;
+            Vector3 candidate = transform.position + dir * tempo * dt;
+            // Auf die Netzebene projizieren und den Körperabstand (webBodyOffset) setzen.
+            candidate = candidate - n * Vector3.Dot(candidate - hub, n) + n * webBodyOffset;
+
+            // Nur weiterbewegen, wenn in der Ebene noch ein Faden in Reichweite ist
+            // (sonst Netzrand: stehen bleiben).
+            if (web.TryClosestPoint(candidate - n * webBodyOffset, webGrip, out _))
+            {
+                transform.position = candidate;
+            }
+
+            // Drehung: Blick in Laufrichtung in der Netzebene; ohne Eingabe nur
+            // die up-Achse an die Netzebene ausrichten.
+            Quaternion target = dir.sqrMagnitude > 1e-4f
+                ? Quaternion.LookRotation(dir.normalized, n)
+                : Quaternion.FromToRotation(transform.up, n) * transform.rotation;
+            transform.rotation = Quaternion.RotateTowards(transform.rotation, target, turnSpeed * dt);
         }
 
         /// <summary>
