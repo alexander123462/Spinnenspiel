@@ -26,3 +26,4 @@ Ursache: kein Spielcode-Fehler; Beweisbild grau wegen Aufnahme-Pipeline (auch Wa
 2026-10-24 KLEE1b (Overseer): Ursache asynchrone HDRP-Shader-Kompilierung im ersten Test + volumetrischer Nebel -> einfarbiges Beweisbild. Getan: Nebel-Aus + WarmUp-Schleife in KleeTests/Wald7MoosTests, voll getestet, J5 und Legs_Gait in ROT.md, Punkt [x].
 
 2026-10-24 FARBE1 (Overseer): Ursache J5 = Capture-Setup (Nebel + Nacht-Rahmen nicht dunkel), Mond-Anhebung war falsch. 3 gezielte DayNight-Laeufe (o-farbe1, 1b, 1c), kein Commit. Look/Test-Aenderungen in Stash 'Hermes FARBE1'; Punkt in FARBE1a/FARBE1b zerlegt.
+2026-10-24 FARBE1a (Overseer): Hermes-Aenderungen korrekt, Rest = Nacht zu dunkel. moonLux 16000->50000, gezielt+voll gruen, Commit d33a34d.
