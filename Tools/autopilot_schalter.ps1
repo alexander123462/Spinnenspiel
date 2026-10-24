@@ -22,16 +22,12 @@ if (Test-Path $pause) {
     Write-Host 'Nichts gestartet.'
     return
   }
-  if (-not (Lauscht 8080)) {
+  if (-not (Lauscht 8084)) {
     Write-Host 'Starte Coder-KI (Strata, 5080) ...'
-    Start-Process -FilePath 'C:\AI\Strata\.venv\Scripts\python.exe' -ArgumentList '"C:\AI\Strata\serve\server.py"', '--engine', 'strata', '--config', '"C:\AI\Strata\strata-coder-iq1_m.json"', '--port', '8080' -WorkingDirectory 'C:\AI\Strata' -WindowStyle Hidden
-    if (Warte 8080 300) { Write-Host '  Coder-KI bereit.' -ForegroundColor Green } else { Write-Host '  Coder-KI antwortet nicht (nach 5 Minuten).' -ForegroundColor Red; return }
+    Start-Process -FilePath 'C:\AI\Strata\.venv\Scripts\python.exe' -ArgumentList '"C:\AI\Strata\serve\server.py"', '--engine', 'strata', '--config', '"C:\AI\Strata\strata-qwen-iq3_s-long.json"', '--port', '8084' -WorkingDirectory 'C:\AI\Strata' -WindowStyle Hidden
+    if (Warte 8084 300) { Write-Host '  Coder-KI bereit.' -ForegroundColor Green } else { Write-Host '  Coder-KI antwortet nicht (nach 5 Minuten).' -ForegroundColor Red; return }
   } else { Write-Host 'Coder-KI laeuft schon.' }
-  if (-not (Lauscht 8082)) {
-    Write-Host 'Starte Vision-KI (2070) ...'
-    Start-Process -FilePath 'C:\AI\HermesVision\Start-HermesVision.bat' -WindowStyle Hidden
-    if (Warte 8082 180) { Write-Host '  Vision-KI bereit.' -ForegroundColor Green } else { Write-Host '  Vision-KI antwortet nicht (laeuft der Autopilot trotzdem, nur ohne Bilder).' -ForegroundColor Yellow }
-  } else { Write-Host 'Vision-KI laeuft schon.' }
+  # Bilder liest die Coder-KI selbst (Vision-Encoder auf der CPU, Port 8084); die separate Vision-KI auf der 2070 entfaellt.
   Remove-Item -Force $pause -ErrorAction SilentlyContinue
   Add-Content $log ('== Gestartet per Schalter ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
   & powershell -NoProfile -ExecutionPolicy Bypass -File "$root\Tools\autopilot_watchdog.ps1"
@@ -64,7 +60,7 @@ if (Test-Path $pause) {
   Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'hermes.exe chat' -or $_.CommandLine -match 'autopilot_loop2' -or $_.Name -eq 'tee.exe' -or ($_.Name -eq 'Unity.exe' -and $_.CommandLine -match 'batchmode') } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
   Write-Host 'Schleife, Hermes und Unity-Testlaeufe beendet.'
   Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'Strata\\serve\\server.py' -or $_.Name -match '^strata' -or $_.Name -eq 'llama-server.exe' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
-  Write-Host 'Coder-KI und Vision-KI beendet (Grafikkarten frei).'
+  Write-Host 'Coder-KI beendet (Grafikkarte frei).'
   Add-Content $log ('== Pausiert per Schalter ' + (Get-Date -Format 'yyyy-MM-dd HH:mm:ss'))
   Write-Host ''
   Write-Host 'AUTOPILOT PAUSIERT. Viel Spass am PC!' -ForegroundColor Green

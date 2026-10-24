@@ -21,3 +21,7 @@ Alle Aenderungen sind direkt in den Originalen gemacht (keine Kopien). Rueckgaen
 ## C:\AI\Strata\strata-coder-iq1_m.json (Coder-KI)
 - alt: `--max-context` 131072 -> neu: 90000 (Hermes nutzt 80000; spart VRAM/KV)
 - Das IQ2_XS-Modell (strata-qwen-iq2_xs.json) wurde NICHT angefasst.
+
+## Tools/autopilot_schalter.ps1 (Desktop-Schalter 0 AUTOPILOT AN-AUS) - 2026-10-24 Overseer
+- alt: startet Strata IQ2_XS (strata-qwen-iq2_xs.json) auf Port 8080 -> neu: strata-qwen-iq3_s-long.json (IQ3_S, 262k Kontext, KV im RAM, Vision) auf Port 8084, passend zu Hermes-Provider strata_iq3 (Tools/autopilot_loop2.sh)
+- Die Desktop-Datei selbst blieb unveraendert.
