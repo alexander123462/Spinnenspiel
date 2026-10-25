@@ -1,15 +1,15 @@
 # -*- coding: utf-8 -*-
-"""Fragt das lokale Vision-Modell (Gemma 4 E4B, RTX 2070, Port 8082) zu einem Bild.
+"""Fragt die lokale KI (Strata IQ3_S, Port 8084, Vision-Encoder auf der CPU) zu einem Bild.
 
 Aufruf:  python Tools/bild_fragen.py <bild.png> "<frage>"
-Startet den Vision-Server selbst, wenn er nicht laeuft (Desktop\\Vision-2070.bat).
+Startet KEINEN Server mehr (Overseer 2026-10-25: ein zweiter Strata-Start belegte weitere 46 GiB RAM und liess den PC haengen).
 Gibt nur die Antwort des Modells auf stdout aus. Rueckgabe 0 = ok.
 """
 import base64, json, os, subprocess, sys, time, urllib.error, urllib.request
 
-PORT = 8082
+PORT = 8084
 BASE = "http://127.0.0.1:%d/v1" % PORT
-BAT = r"C:\AI\HermesVision\Start-HermesVision.bat"
+MODELL = "qwen3.8-flash-next-iq3_s"
 STANDARDFRAGE = "Beschreibe sachlich, was auf dem Bild zu sehen ist. Nenne Auffaelligkeiten wie fehlende Teile, Luecken, schwarze Flaechen oder Fehler."
 
 
@@ -22,17 +22,9 @@ def laeuft():
 
 
 def starten():
-    sys.stderr.write("[bild_fragen] Vision-Server laeuft nicht, starte %s ...\n" % BAT)
-    if not os.path.exists(BAT):
-        sys.stderr.write("[bild_fragen] FEHLER: %s fehlt.\n" % BAT)
-        return False
-    subprocess.Popen(["cmd", "/c", "start", "", "/min", BAT],
-                     shell=False, close_fds=True)
-    for _ in range(72):          # bis zu 6 Minuten (Modell laden)
-        time.sleep(5)
-        if laeuft():
-            sys.stderr.write("[bild_fragen] Vision-Server bereit.\n")
-            return True
+    # Kein eigener Serverstart: Schleife/Schalter verwalten Strata (Port 8084). Ein zweiter Server braucht erneut ~46 GiB RAM.
+    sys.stderr.write("[bild_fragen] Strata (Port %d) antwortet nicht; es wird KEIN zweiter Server gestartet. Spaeter erneut versuchen.
+" % PORT)
     return False
 
 
@@ -41,7 +33,7 @@ def fragen(bild, frage):
     with open(bild, "rb") as f:
         b64 = base64.b64encode(f.read()).decode("ascii")
     payload = {
-        "model": "vision",
+        "model": MODELL,
         "temperature": 0.2,
         "max_tokens": 400,
         "messages": [{"role": "user", "content": [
