@@ -29,3 +29,5 @@ Ursache: kein Spielcode-Fehler; Beweisbild grau wegen Aufnahme-Pipeline (auch Wa
 2026-10-24 FARBE1a (Overseer): Hermes-Aenderungen korrekt, Rest = Nacht zu dunkel. moonLux 16000->50000, gezielt+voll gruen, Commit d33a34d.
 
 - 2026-10-25 FOTO1 blockiert (Zeitbudget, Fix ungebaut). Overseer: Player gebaut, Foto-Check 0.05 bei gleicher Pose (1/3 Ausreisser durch Spinnenpose), Pose-Log ergaenzt, volle CI gruen, Commit 92079ea.
+
+- 2026-10-25 02:45 LICHT1 (Overseer): blockiert wegen Messaufbau (Foto zeigt Spinne statt Boden). Player gebaut, Foto nachher gemessen (Std-Faktor 0,9). Zerlegt in LICHT1a/LICHT1b, Code-Aenderung gestasht. Nichts Gameplay-seitig committet.
