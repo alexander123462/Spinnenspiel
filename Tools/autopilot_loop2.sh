@@ -100,6 +100,8 @@ while :; do
   [ -n "$ENDE" ] && [ "$(date +%H%M)" -ge "$ENDE" ] && { echo "== Endzeit erreicht $(date '+%T')" >> $LOG; break; }
   # grep -c liefert bei null Treffern Exit 1; das alte "|| echo 0" hat daraus "0\n0" gemacht,
   # der Zahlenvergleich lief auf einen Fehler und die Schleife drehte leer weiter statt zu enden.
+  # Strata-Gesundheit: ohne Server (abgestuerzt/pausiert) keine Runde starten, sonst drehen die Runden leer und starten Blender/Unity umsonst (Overseer 2026-10-25).
+  if ! curl -s -m 5 http://127.0.0.1:8084/v1/models 2>/dev/null | grep -q '"id"'; then echo "-- Strata (Port 8084) antwortet nicht, warte 120 s $(date '+%T')" >> $LOG; sleep 120; continue; fi
   OFFEN=$(grep -c "^- \[ \]" Docs/BACKLOG.md 2>/dev/null | head -1)
   case "$OFFEN" in ''|*[!0-9]*) OFFEN=0;; esac
   [ "$OFFEN" -eq 0 ] && { echo "== Keine offenen Punkte mehr $(date '+%T')" >> $LOG; melde "Spinnenspiel: Autopilot hat NICHTS MEHR ZU TUN - alle Backlog-Punkte sind erledigt oder blockiert. $(date '+%F %T')"; break; }
