@@ -6,7 +6,7 @@ set -u
 cd "$(dirname "$0")/.."
 ROOT=$(pwd -W 2>/dev/null || pwd)
 HERMES="$HOME/AppData/Local/hermes/installs/c03e36b7d5e1df4a/environments/29c75efe5ca34d23b94b2772fbe90024/venv/Scripts/hermes.exe"
-PROVIDER="custom:strata"; MODELL="qwen3.8-flash-next-coder-iq1_m"
+PROVIDER="custom:strata_iq3"; MODELL="qwen3.8-flash-next-iq3_s"
 ENDE="${1:-}"
 LOG=Logs/autopilot_loop.log
 # Discord-Meldung, wenn die Schleife nicht weiterarbeiten kann.
@@ -78,6 +78,11 @@ Blockierter Punkt: $id" \
 
 # Hermes (Python) soll Ausgabe sofort ins Fenster schreiben (sonst gepuffert, Fenster wirkt tot).
 export PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8
+# Rot-Gate: Namen bekannter roter Tests aus Docs/ROT.md (Basislinie) und Docs/ROT_NEU.md (von Hermes gemeldet, unbestaetigt).
+rot_namen() {
+  grep -h '^- Spinnenspiel\.Tests\.' "$@" 2>/dev/null | sed -E 's/^- (Spinnenspiel\.Tests\.[A-Za-z0-9_.]+).*/\1/' | sort -u
+}
+
 mkdir -p Logs
 echo "== Start $(date '+%F %T') Endzeit=${ENDE:-keine}" >> $LOG
 
@@ -102,6 +107,18 @@ while :; do
   PUNKT=$(grep -m1 "^- \[ \]" Docs/BACKLOG.md | cut -c1-60)
   PUNKTVOLL=$(grep -m1 "^- \[ \]" Docs/BACKLOG.md)
   KUERZEL=$(printf '%s' "$PUNKTVOLL" | sed -E 's/^- \[ \] ([A-Za-z0-9.]+).*/\1/')
+  # Rot zuerst: ist ein Test als rot bekannt, wird er vor dem naechsten Backlog-Punkt repariert (hoechstens 2 Versuche je Test).
+  ROT_VOR=$(rot_namen Docs/ROT.md)
+  ROTTEST=""
+  for t in $( [ -z "$RESUME_ID" ] && rot_namen Docs/ROT.md Docs/ROT_NEU.md ); do
+    n=$(cat "Logs/rot_versuche_$t.count" 2>/dev/null || echo 0)
+    if [ "$n" -lt 2 ]; then ROTTEST="$t"; echo $((n+1)) > "Logs/rot_versuche_$t.count"; break; fi
+  done
+  if [ -n "$ROTTEST" ]; then
+    PUNKT="ROT $ROTTEST"; KUERZEL="ROT"
+    PUNKTVOLL="- [ ] ROT Behebe den roten Test $ROTTEST. Er steht in Docs/ROT.md oder Docs/ROT_NEU.md. Dies ist KEIN Backlog-Punkt: haenge nichts im Backlog ab. Finde die Ursache (Testcode, Logs/ci/*-tests.log, frueherer Commit per git log -S oder git log -5 --stat), behebe sie im SPIELCODE. Den Test nur aendern, wenn seine Annahme nachweislich falsch ist, und das in Docs/BERICHT.md begruenden. Kriterium: der Test ist gruen, der volle CI-Lauf hat keinen NEUEN roten Test, und sein Eintrag ist aus Docs/ROT.md bzw. Docs/ROT_NEU.md entfernt (im selben Commit). Danach aufhoeren."
+    echo "-- ROT-Reparatur: $ROTTEST" >> $LOG
+  fi
   echo "-- Runde $RUNDE $(date '+%T') offen=$OFFEN -> $PUNKT" >> $LOG
 
   cat > Logs/autopilot_auftrag.txt <<AUF
@@ -121,13 +138,13 @@ Such dir KEINEN anderen Punkt aus. Eingerueckte Unterpunkte ("  - [ ]") gehoeren
 
 Vorgehen: in Schritte zerlegen; Code nur in Stuecken (max. ca. 60 Zeilen pro Schreibvorgang); bestehende Dateien nur per Patch aendern und vorher lesen; zu neuer Logik gehoert ein Test. WAEHREND der Entwicklung nur die betroffenen Tests laufen lassen (schneller): powershell -ExecutionPolicy Bypass -File $ROOT/Tools/ci.ps1 -Name r$RUNDE-f1 -Method Spinnenspiel.EditorTools.UrwaldSceneBuilder.Build -Tests -Filter "Spinnenspiel.Tests.<Klasse>.<Testname>*" (Namen -f2, -f3 fuer weitere Versuche). Erst wenn die gezielten Tests gruen sind, EINMAL der volle CI-Lauf vor dem Commit (ohne -Filter), nie mehr als zweimal voll pro Punkt:
 powershell -ExecutionPolicy Bypass -File $ROOT/Tools/ci.ps1 -Name r$RUNDE -Method Spinnenspiel.EditorTools.UrwaldSceneBuilder.Build -Tests
-Ergebnis aus Logs/ci/r$RUNDE-summary.txt lesen. Commit-Gate: Lies Docs/ROT.md. Committen, wenn der Test deines Punktes gruen ist und JEDER fehlgeschlagene Test in Docs/ROT.md steht (diese Fehlschlaege zaehlen NICHT als Fehlversuch und sind KEIN Grund, eigene Aenderungen zurueckzunehmen). Steht ein Fehlschlag NICHT in Docs/ROT.md, ist er deine Regression - dann nicht committen. Nur die eigenen Dateien committen (nie git add -A). NEU: nach einem erfolgreichen Commit zusaetzlich "git push origin hdrp" ausfuehren, damit Alex den Fortschritt am Server sieht. Nie nach main pushen. Schlaegt der Push fehl, den Punkt trotzdem als [x] stehen lassen, den Fehler in einer Zeile melden und NICHT wiederholen. Danach Punkt in Docs/BACKLOG.md auf [x] setzen (mit Commit-Hash), eine Zeile in Docs/BERICHT.md anhaengen.
+Ergebnis aus Logs/ci/r$RUNDE-summary.txt lesen. Commit-Gate: Lies Docs/ROT.md. Committen, wenn der Test deines Punktes gruen ist und JEDER fehlgeschlagene Test in Docs/ROT.md steht (diese Fehlschlaege zaehlen NICHT als Fehlversuch und sind KEIN Grund, eigene Aenderungen zurueckzunehmen). Steht ein Fehlschlag NICHT in Docs/ROT.md, ist er deine Regression - dann nicht committen. Du darfst Docs/ROT.md NIE erweitern und Docs/ROT_NEU.md zaehlt nicht als Entschuldigung: ein neuer roter Test ist deine Regression, behebe ihn. Gelingt das in 3 Versuchen nicht, markiere den Punkt als [!] mit den gemessenen Werten (Claude greift dann ein). Nur die eigenen Dateien committen (nie git add -A). NEU: nach einem erfolgreichen Commit zusaetzlich "git push origin hdrp" ausfuehren, damit Alex den Fortschritt am Server sieht. Nie nach main pushen. Schlaegt der Push fehl, den Punkt trotzdem als [x] stehen lassen, den Fehler in einer Zeile melden und NICHT wiederholen. Danach Punkt in Docs/BACKLOG.md auf [x] setzen (mit Commit-Hash), eine Zeile in Docs/BERICHT.md anhaengen.
 
 Roter Test deines Punktes: Pruefe ZUERST, ob die Annahme des Tests stimmt (Testaufbau, Vorbedingungen, Zaehler, Zeitfenster; vergleiche mit einem aehnlichen gruenen Test in derselben Datei), bevor du den Spielcode umbaust. Meist liegt der Fehler im Testaufbau. Lies bei jedem Fehlschlag die konkrete Meldung in Logs/ci/r$RUNDE-tests.log.
 
 Beweisbild: Aendert dein Punkt etwas Sichtbares, erzeuge ein Bild (Screenshot-Test legt PNG unter Logs/ci ab), lass es mit python Tools/bild_fragen.py <png> beschreiben, trage die Beschreibung in Docs/BERICHT.md ein und nenne in der Discord-Nachricht den Bildpfad. Ohne Bildkontrolle nicht "fertig" melden bei sichtbaren Aenderungen.
 
-Regeln: Unity muss geschlossen sein (tasklist | grep -i Unity.exe) - laeuft Unity, Punkt als "[!] Unity offen" markieren und aufhoeren. Maximal 3 Versuche; danach Punkt als "[!]" mit Grund markieren und aufhoeren. Eigene Aenderungen dabei NICHT zuruecknehmen, sondern im Arbeitsbaum lassen und im Backlog-Eintrag die geaenderten Dateien namentlich auflisten. Keine Hintergrundprozesse starten, auf deren Ende du wartest. Geaenderte .mat/.asset-Dateien im Arbeitsbaum sind Unity-Rauschen und bleiben unangetastet. Nie mit einer Frage aufhoeren.
+Regeln: Unity muss geschlossen sein (tasklist | grep -i Unity.exe) - laeuft Unity, Punkt als "[!] Unity offen" markieren und aufhoeren. Maximal 3 Versuche; danach Punkt als "[!]" mit Grund markieren und aufhoeren. Eigene Aenderungen dabei NICHT zuruecknehmen, sondern im Arbeitsbaum lassen und im Backlog-Eintrag die geaenderten Dateien namentlich auflisten. Der volle CI-Lauf dauert laenger als 10 Minuten (Vordergrund-Grenze 600 s): starte ihn mit terminal(background=true, notify_on_complete=true) und warte darauf mit process wait (timeout bis 1500) - das ist AUSDRUECKLICH erlaubt und der vorgesehene Weg. Starte ihn nicht zweimal. Sonst keine Hintergrundprozesse, auf deren Ende du wartest. Geaenderte .mat/.asset-Dateien im Arbeitsbaum sind Unity-Rauschen und bleiben unangetastet. Nie mit einer Frage aufhoeren.
 
 Wenn du einen Punkt als [!] markierst, also nicht weiterkommst: schreibe ZUSAETZLICH eine kurze Nachricht auf Discord, auf Deutsch, hoechstens 3 Zeilen - welcher Punkt, woran es scheitert, was du schon versucht hast. Du bist mit Discord verbunden und weisst, wie das geht. Auch bei JEDEM erfolgreich abgeschlossenen Punkt (Commit) schreibst du auf Discord, auf Deutsch, in 2 bis 4 kurzen Saetzen und so, dass ein Laie es versteht: was jetzt im Spiel anders ist (z. B. 'Die Spinne hat jetzt eine Energieanzeige'), ob die Tests gruen sind (nur 'alle Tests bestanden' oder 'X Tests rot'), und welcher Punkt als naechstes kommt. Keine Dateinamen, keine Commit-Hashes, kein Fachjargon.
 
@@ -150,6 +167,27 @@ AUF
   if grep -q "^- \[!\] $KUERZEL " Docs/BACKLOG.md 2>/dev/null; then
     melde "Spinnenspiel: Hermes kommt bei Punkt $KUERZEL nicht weiter und hat ihn als blockiert markiert ($(date '+%F %T')). Grund steht in Docs/BACKLOG.md. Die Schleife macht mit dem naechsten Punkt weiter."
   fi
+  # Rot-Gate nach der Runde: neue Eintraege in Docs/ROT.md gehoeren Claude, nicht Hermes -> nach Docs/ROT_NEU.md verschieben.
+  VERSCHOBEN=""
+  for t in $(comm -13 <(printf '%s\n' "$ROT_VOR") <(rot_namen Docs/ROT.md)); do
+    [ -f Docs/ROT_NEU.md ] || printf '%s\n\n' '# Von Hermes gemeldete rote Tests (unbestaetigt). Werden vor neuen Punkten repariert. Nur Claude nimmt sie in die Basislinie Docs/ROT.md auf.' > Docs/ROT_NEU.md
+    grep -F -- "- $t" Docs/ROT.md >> Docs/ROT_NEU.md
+    grep -v -F -- "- $t" Docs/ROT.md > Docs/ROT.md.tmp && mv Docs/ROT.md.tmp Docs/ROT.md
+    VERSCHOBEN="$VERSCHOBEN $t"
+  done
+  if [ -n "$VERSCHOBEN" ]; then
+    echo "-- ROT.md-Erweiterung zurueckgenommen:$VERSCHOBEN" >> $LOG
+    melde "Spinnenspiel: Hermes wollte neue rote Tests in die Basislinie schreiben:$VERSCHOBEN. Verschoben nach Docs/ROT_NEU.md, werden zuerst repariert."
+    git --no-optional-locks add Docs/ROT.md Docs/ROT_NEU.md >/dev/null 2>&1
+    git --no-optional-locks commit -q -m "ROT.md: neue Eintraege von Hermes nach ROT_NEU.md verschoben (nur Claude erweitert die Basislinie)" -- Docs/ROT.md Docs/ROT_NEU.md >/dev/null 2>&1
+  fi
+  for t in $(rot_namen Docs/ROT.md Docs/ROT_NEU.md); do
+    n=$(cat "Logs/rot_versuche_$t.count" 2>/dev/null || echo 0)
+    if [ "$n" -ge 2 ] && ! grep -q -F "$t" Logs/rot_uebersprungen.txt 2>/dev/null; then
+      echo "$t" >> Logs/rot_uebersprungen.txt
+      melde "Spinnenspiel: Roter Test $t konnte Hermes in 2 Versuchen nicht beheben, uebersprungen (Overseer kuemmert sich)."
+    fi
+  done
   sleep 10
 done
 echo "== Schleife beendet $(date '+%F %T')" >> $LOG
