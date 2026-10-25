@@ -20,6 +20,8 @@ $logDir = "$project\Logs\ci"
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 
 function Invoke-Unity([string[]]$UnityArgs, [string]$Log) {
+    # RAM-Schutz (Overseer 2026-10-25): Blender und Unity nie gleichzeitig neben Strata (sonst stirbt die Strata-Engine, RAM voll). Blender wird vor dem Unity-Lauf beendet; Modelle sind dann schon exportiert.
+    $bl = Get-Process blender -ErrorAction SilentlyContinue; if ($bl) { $bl | Stop-Process -Force -ErrorAction SilentlyContinue; Get-Process blender-mcp -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue }
     $all = @('-batchmode', '-projectPath', "`"$project`"", '-logFile', "`"$Log`"") + $UnityArgs
     # Nur auf Unity selbst warten (Start-Process -Wait wartet auch auf Hintergrund-Kindprozesse wie den Lizenz-Client).
     $p = Start-Process -FilePath $UnityExe -ArgumentList $all -PassThru -WindowStyle Hidden

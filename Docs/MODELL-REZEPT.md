@@ -20,3 +20,4 @@ Gilt fuer alle Auftraege MODELL0 bis MODELL24 im Backlog. Ziel (Alex 2026-10-25)
 - Blender muss offen bleiben (sichtbar). Vor Unity-Tests prufen, dass der Unity-Editor nicht offen ist.
 - Dreiecksbudget je Instanz steht im Auftrag. Bei Scatter-/Massenpflanzen auf Draw Calls achten (hoechstens +15 Prozent).
 - Texturen: in Blender prozedural erzeugen und nach Assets/_Project/Art/Plants/<Typ>/ backen (PNG 512 bis 1024), Blatt-Alpha als Transparenz, wenn Karten benutzt werden.
+- RAM: Blender und Unity laufen NIE gleichzeitig (Strata braucht 46 GiB, sonst stirbt die Engine). Reihenfolge: Blender-Arbeit und FBX-Export fertig, dann startet ci.ps1 und beendet Blender selbst, danach Unity-Tests; fuer die naechste Blender-Arbeit startet blender_mcp_start.ps1 erst, wenn kein Unity mehr laeuft. Alles, was Blender braucht, vor Schritt 5 (Unity) erledigen und exportieren.
