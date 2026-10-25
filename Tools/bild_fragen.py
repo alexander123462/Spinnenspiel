@@ -23,8 +23,7 @@ def laeuft():
 
 def starten():
     # Kein eigener Serverstart: Schleife/Schalter verwalten Strata (Port 8084). Ein zweiter Server braucht erneut ~46 GiB RAM.
-    sys.stderr.write("[bild_fragen] Strata (Port %d) antwortet nicht; es wird KEIN zweiter Server gestartet. Spaeter erneut versuchen.
-" % PORT)
+    sys.stderr.write("[bild_fragen] Strata (Port %d) antwortet nicht; es wird KEIN zweiter Server gestartet. Spaeter erneut versuchen.\n" % PORT)
     return False
 
 
