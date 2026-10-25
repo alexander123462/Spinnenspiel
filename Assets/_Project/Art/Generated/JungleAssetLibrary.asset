@@ -64,8 +64,8 @@ MonoBehaviour:
   - {fileID: 1149813693110403925, guid: 0d147204918e61d4c87b1270f11295c7, type: 3}
   - {fileID: -7214282968089966947, guid: 36290568a7b11954b9b56e32f14f7fb8, type: 3}
   groundFernLeafMat: {fileID: 2100000, guid: 55890cdf6b32a044eb148551a9adb001, type: 2}
-  groundFernStemMat: {fileID: 0}
-  groundFernLeafSubmesh: 0
+  groundFernStemMat: {fileID: 2100000, guid: 11df63f95c354914086bfe71bb559a3f, type: 2}
+  groundFernLeafSubmesh: 1
   groundCover:
   - {fileID: -8799722270921484849, guid: b94e5972b11c77d4a9392cae2d8bd377, type: 3}
   - {fileID: -8976219707546791707, guid: e4484f2e03a451446b0709e3332793d5, type: 3}
@@ -627,6 +627,7 @@ MonoBehaviour:
   terrainMat: {fileID: 2100000, guid: 5dfbb265af56b7943b63c40eb975428e, type: 2}
   redwoodMat: {fileID: 2100000, guid: 3a84c9e9aeab85041ba60739ec470891, type: 2}
   canopyMat: {fileID: 2100000, guid: 9957e775320820845bb3ada7b51495d7, type: 2}
+  cloverMat: {fileID: 2100000, guid: ee919808d16af1f4b936c2c17dd7a76a, type: 2}
   terrainLayers:
   - {fileID: 8574412962073106934, guid: 12417b5eee9fdf74eb17385638778cf7, type: 2}
   - {fileID: 8574412962073106934, guid: 414ab6540a5f22642a19fb66ea5e3568, type: 2}
