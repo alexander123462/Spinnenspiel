@@ -1074,13 +1074,32 @@ namespace Spinnenspiel.EditorTools
         private static void LoadGroundCover(JungleAssetLibrary lib)
         {
             // A1: more species (nettle, periwinkle) -> the variant-per-Instance Hash01 pick
-            // below spreads them; groundCover[0] stays grass_medium_01 so older code keeps working.
+            // below spreads them; groundCover[0] stays grass so older code keeps working.
+            // MODELL1: grass_medium_01 is replaced by the procedural Blender clump (Gras1.fbx).
             string[] ids = { "grass_medium_01", "grass_medium_02", "weed_plant_02", "nettle_plant", "periwinkle_plant" };
             var meshes = new System.Collections.Generic.List<Mesh>();
             var mats = new System.Collections.Generic.List<Material>();
 
+            Mesh gras1 = LoadBlenderGras1();
+            if (gras1 != null)
+            {
+                Shader hdrpLit = Shader.Find("HDRP/Lit");
+                Material grasMat = GetOrCreateMat("MAT_Gras1", hdrpLit, new Color(0.13f, 0.28f, 0.08f));
+                grasMat.SetFloat("_SurfaceType", 0f);
+                grasMat.SetFloat("_AlphaCutoffEnable", 0f);
+                grasMat.SetFloat("_Smoothness", 0.15f);
+                grasMat.SetFloat("_DoubleSidedEnable", 1f);
+                grasMat.SetFloat("_DoubleSidedNormalMode", 2f);
+                grasMat.enableInstancing = true;
+                HDMaterial.ValidateMaterial(grasMat);
+                EditorUtility.SetDirty(grasMat);
+                meshes.Add(gras1);
+                mats.Add(grasMat);
+            }
+
             foreach (string id in ids)
             {
+                if (id == "grass_medium_01" && gras1 != null) continue; // MODELL1: schon ersetzt
                 if (!ScanModels.IsAvailable(id))
                 {
                     Debug.LogWarning("[Urwald] Bodendecker nicht verfügbar, übersprungen: " + id);
@@ -1117,6 +1136,44 @@ namespace Spinnenspiel.EditorTools
 
             lib.groundCover = meshes.ToArray();
             lib.groundCoverMats = mats.ToArray();
+        }
+
+        /// <summary>MODELL1: prozeduraler Blender-Grasbueschel (30 Halme, V-Rinne, 780 Dreiecke).
+        /// Laedt das FBX aus Plants/Gras1 (kopiert aus ArtSource falls dort aelter) und liefert das Mesh.</summary>
+        private static Mesh LoadBlenderGras1()
+        {
+            const string artPath = "Assets/_Project/Art/Plants/Gras1/Gras1.fbx";
+            const string srcPath = "ArtSource/Gras1/gras1_neu.fbx";
+            if (!System.IO.File.Exists(artPath) && System.IO.File.Exists(srcPath))
+            {
+                AssetUtil.EnsureFolder("Assets/_Project/Art/Plants/Gras1");
+                System.IO.File.Copy(srcPath, artPath, true);
+                AssetDatabase.ImportAsset(artPath, ImportAssetOptions.ForceUpdate);
+            }
+            if (!System.IO.File.Exists(artPath))
+            {
+                Debug.LogWarning("[Urwald] Gras1-FBX fehlt: " + artPath);
+                return null;
+            }
+            Mesh found = null;
+            int bestTris = 0;
+            foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(artPath))
+            {
+                if (obj is Mesh mesh && mesh != null)
+                {
+                    int tris = 0;
+                    for (int s = 0; s < mesh.subMeshCount; s++) tris += mesh.GetSubMesh(s).indexCount / 3;
+                    if (tris > bestTris) { bestTris = tris; found = mesh; }
+                }
+            }
+            if (found == null || bestTris == 0)
+            {
+                Debug.LogWarning("[Urwald] Gras1 ohne Triangles: " + artPath);
+                return null;
+            }
+            Debug.Log("[Urwald] Gras1 geladen: " + found.name + ", Dreiecke " + bestTris
+                      + ", Groesse " + found.bounds.size.ToString("F3"));
+            return found;
         }
 
         /// <summary>A1: extra Busche-Meshes (shrub_03/shrub_04) via ScanModels; missing ones skipped.</summary>
