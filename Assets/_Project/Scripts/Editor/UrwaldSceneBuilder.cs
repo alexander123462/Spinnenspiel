@@ -1076,6 +1076,7 @@ namespace Spinnenspiel.EditorTools
             // A1: more species (nettle, periwinkle) -> the variant-per-Instance Hash01 pick
             // below spreads them; groundCover[0] stays grass so older code keeps working.
             // MODELL1: grass_medium_01 is replaced by the procedural Blender clump (Gras1.fbx).
+            // MODELL2: grass_medium_02 is replaced by the Blender sedge clump (Gras2.fbx).
             string[] ids = { "grass_medium_01", "grass_medium_02", "weed_plant_02", "nettle_plant", "periwinkle_plant" };
             var meshes = new System.Collections.Generic.List<Mesh>();
             var mats = new System.Collections.Generic.List<Material>();
@@ -1097,9 +1098,28 @@ namespace Spinnenspiel.EditorTools
                 mats.Add(grasMat);
             }
 
+            // MODELL2: Seggen-Bueschel (20 breite ueberhaengende Blaetter, 763 Dreiecke).
+            Mesh gras2 = LoadBlenderGras2();
+            if (gras2 != null)
+            {
+                Shader hdrpLit2 = Shader.Find("HDRP/Lit");
+                Material gras2Mat = GetOrCreateMat("MAT_Gras2", hdrpLit2, new Color(0.14f, 0.27f, 0.10f));
+                gras2Mat.SetFloat("_SurfaceType", 0f);
+                gras2Mat.SetFloat("_AlphaCutoffEnable", 0f);
+                gras2Mat.SetFloat("_Smoothness", 0.15f);
+                gras2Mat.SetFloat("_DoubleSidedEnable", 1f);
+                gras2Mat.SetFloat("_DoubleSidedNormalMode", 2f);
+                gras2Mat.enableInstancing = true;
+                HDMaterial.ValidateMaterial(gras2Mat);
+                EditorUtility.SetDirty(gras2Mat);
+                meshes.Add(gras2);
+                mats.Add(gras2Mat);
+            }
+
             foreach (string id in ids)
             {
                 if (id == "grass_medium_01" && gras1 != null) continue; // MODELL1: schon ersetzt
+                if (id == "grass_medium_02" && gras2 != null) continue; // MODELL2: schon ersetzt
                 if (!ScanModels.IsAvailable(id))
                 {
                     Debug.LogWarning("[Urwald] Bodendecker nicht verfügbar, übersprungen: " + id);
@@ -1172,6 +1192,45 @@ namespace Spinnenspiel.EditorTools
                 return null;
             }
             Debug.Log("[Urwald] Gras1 geladen: " + found.name + ", Dreiecke " + bestTris
+                      + ", Groesse " + found.bounds.size.ToString("F3"));
+            return found;
+        }
+
+        /// <summary>MODELL2: prozeduraler Seggen-Grasbueschel (20 breite ueberhaengende
+        /// Blaetter, V-Rinne, 763 Dreiecke). Laedt das FBX aus Plants/Gras2 (kopiert aus
+        /// ArtSource falls dort aelter) und liefert das Mesh.</summary>
+        private static Mesh LoadBlenderGras2()
+        {
+            const string artPath = "Assets/_Project/Art/Plants/Gras2/Gras2.fbx";
+            const string srcPath = "ArtSource/Gras2/gras2_neu.fbx";
+            if (!System.IO.File.Exists(artPath) && System.IO.File.Exists(srcPath))
+            {
+                AssetUtil.EnsureFolder("Assets/_Project/Art/Plants/Gras2");
+                System.IO.File.Copy(srcPath, artPath, true);
+                AssetDatabase.ImportAsset(artPath, ImportAssetOptions.ForceUpdate);
+            }
+            if (!System.IO.File.Exists(artPath))
+            {
+                Debug.LogWarning("[Urwald] Gras2-FBX fehlt: " + artPath);
+                return null;
+            }
+            Mesh found = null;
+            int bestTris = 0;
+            foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(artPath))
+            {
+                if (obj is Mesh mesh && mesh != null)
+                {
+                    int tris = 0;
+                    for (int s = 0; s < mesh.subMeshCount; s++) tris += mesh.GetSubMesh(s).indexCount / 3;
+                    if (tris > bestTris) { bestTris = tris; found = mesh; }
+                }
+            }
+            if (found == null || bestTris == 0)
+            {
+                Debug.LogWarning("[Urwald] Gras2 ohne Triangles: " + artPath);
+                return null;
+            }
+            Debug.Log("[Urwald] Gras2 geladen: " + found.name + ", Dreiecke " + bestTris
                       + ", Groesse " + found.bounds.size.ToString("F3"));
             return found;
         }

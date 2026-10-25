@@ -39,7 +39,7 @@ namespace Spinnenspiel.Tests
             new Typ("Riesenblatt2", "MAT_Riesenblatt_2"),
             new Typ("Riesenblatt3", "MAT_Riesenblatt_3"),
             new Typ("Gras1", "MAT_Gras1"),  // MODELL1: Blender-Neubau ersetzt Scan grass_medium_01
-            new Typ("Gras2", "M_grass_medium_02"),
+            new Typ("Gras2", "MAT_Gras2"),  // MODELL2: Blender-Segge ersetzt Scan grass_medium_02
             new Typ("Unkraut", "M_weed_plant_02"),
             new Typ("Brennnessel", "M_nettle_plant"),
             new Typ("Immergruen", "M_periwinkle_plant"),
