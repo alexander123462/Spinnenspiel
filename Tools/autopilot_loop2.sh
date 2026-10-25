@@ -5,7 +5,7 @@
 set -u
 cd "$(dirname "$0")/.."
 ROOT=$(pwd -W 2>/dev/null || pwd)
-HERMES="$HOME/AppData/Local/hermes/installs/c03e36b7d5e1df4a/environments/29c75efe5ca34d23b94b2772fbe90024/venv/Scripts/hermes.exe"
+HERMES="$HOME/AppData/Local/hermes/bin/hermes.exe"   # stabiler Pfad (die versionierten installs-Ordner werden von Hermes beim Update geloescht, Overseer 2026-10-25)
 PROVIDER="custom:strata_iq3"; MODELL="qwen3.8-flash-next-iq3_s"
 ENDE="${1:-}"
 LOG=Logs/autopilot_loop.log
