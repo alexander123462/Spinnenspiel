@@ -157,13 +157,20 @@ AUF
     printf '%s\n' "Du wurdest unterbrochen (Pause am PC). Mach GENAU dort weiter, wo du aufgehoert hast. Pruefe zuerst kurz git status, damit du siehst, was schon geaendert ist. Der Auftrag und alle Regeln bleiben unveraendert (siehe oben). Wenn du den Punkt fertig hast: committen, pushen, Backlog-Punkt abhaken, aufhoeren." > "$ROOT/Logs/autopilot_weiter.txt"
     QF="$ROOT/Logs/autopilot_weiter.txt"; RES_ARGS="--resume $RESUME_ID"; RESUME_ID=""
   fi
+  # Hermes schreibt in eine Datei (nicht in eine Pipe): MCP-Kindprozesse (blender-mcp/uv) erben sonst die Pipe, halten tee offen
+  # und die Schleife haengt nach dem Rundenende (Overseer 2026-10-25, MODELL1).
+  HLOG="Logs/hermes_runde.tmp"; : > "$HLOG"
   "$HERMES" chat --query-file "$QF" $RES_ARGS --yolo -v \
     --provider "$PROVIDER" -m "$MODELL" --in "$ROOT" --source cli --run-budget 7200 \
-    2>&1 | tee -a Logs/autopilot_runde.out
+    > "$HLOG" 2>&1 &
+  HPID=$!
+  tail -n +1 -f "$HLOG" 2>/dev/null | tee -a Logs/autopilot_runde.out &
+  wait $HPID; HEX=$?
+  sleep 3; pkill -f "tail -n +1 -f $HLOG" 2>/dev/null; taskkill //F //IM blender-mcp.exe >/dev/null 2>&1
   # K2a: Unity-Rauschen (.mat/.asset/.unity, only fileID restamps) auto-reset after each round.
   powershell -ExecutionPolicy Bypass -File "$ROOT/Tools/reset_unity_rauschen.ps1" >> Logs/autopilot_rausch.out 2>&1
   eskaliere "$BLK_VOR"
-  echo "-- Runde $RUNDE Ende $(date '+%T') exit=${PIPESTATUS[0]} HEAD=$(git --no-optional-locks log -1 --format=%h 2>/dev/null)" >> $LOG
+  echo "-- Runde $RUNDE Ende $(date '+%T') exit=$HEX HEAD=$(git --no-optional-locks log -1 --format=%h 2>/dev/null)" >> $LOG
   if grep -q "^- \[!\] $KUERZEL " Docs/BACKLOG.md 2>/dev/null; then
     melde "Spinnenspiel: Hermes kommt bei Punkt $KUERZEL nicht weiter und hat ihn als blockiert markiert ($(date '+%F %T')). Grund steht in Docs/BACKLOG.md. Die Schleife macht mit dem naechsten Punkt weiter."
   fi
