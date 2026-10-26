@@ -166,8 +166,10 @@ AUF
   # Hermes schreibt in eine Datei (nicht in eine Pipe): MCP-Kindprozesse (blender-mcp/uv) erben sonst die Pipe, halten tee offen
   # und die Schleife haengt nach dem Rundenende (Overseer 2026-10-25, MODELL1).
   HLOG="Logs/hermes_runde.tmp"; : > "$HLOG"
+  # Beim Fortsetzen keine --provider/-m-Argumente: Hermes lehnt sie bei --resume ab (Overseer 2026-10-26).
+  PM_ARGS="--provider $PROVIDER -m $MODELL"; [ -n "$RES_ARGS" ] && PM_ARGS=""
   "$HERMES" chat --query-file "$QF" $RES_ARGS --yolo -v \
-    --provider "$PROVIDER" -m "$MODELL" --in "$ROOT" --source cli --run-budget 7200 \
+    $PM_ARGS --in "$ROOT" --source cli --run-budget 7200 \
     > "$HLOG" 2>&1 &
   HPID=$!
   tail -n +1 -f "$HLOG" 2>/dev/null | tee -a Logs/autopilot_runde.out &
