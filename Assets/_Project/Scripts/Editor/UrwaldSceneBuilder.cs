@@ -693,12 +693,13 @@ namespace Spinnenspiel.EditorTools
                 + lib.fernScatterLeafSubmesh + " (idx0 " + idx0 + ", idx1 " + idx1 + ")");
         }
 
-        /// <summary>U3b: Grundfarne (Blender fern_1..5.fbx) — 5 Varianten, je 1 Mesh. Der FBX-Importer
-        /// merges Stem+Leaf into ONE submesh, so we take the largest-area mesh and paint it with one
-        /// opaque leaf material (real geometry -> no Cutout). Fills lib.groundFerns / groundFernLeafMat.</summary>
+        /// <summary>U3b/TEXTUR2: Grundfarne (Blender fern_1..5.fbx) — 5 Varianten, je EIN Mesh mit
+        /// 2 Submeshes (Slot 0 Stiel, Slot 1 Blatt). Real geometry -> opaque mats mit Atlas-Textur.
+        /// Fills lib.groundFerns / groundFernLeafMat / groundFernStemMat / groundFernLeafSubmesh.</summary>
         private static void LoadGroundFerns(JungleAssetLibrary lib)
         {
             const string artFolder = "Assets/_Project/Art/Plants/UrwaldTestFern/";
+            const string texFolder = "Assets/_Project/Art/Plants/UrwaldTestFern/Textures/";
             const string srcFolder = "ArtSource/UrwaldTest/fern/";
             Shader hdrpLit = Shader.Find("HDRP/Lit");
             if (hdrpLit == null)
@@ -722,6 +723,13 @@ namespace Spinnenspiel.EditorTools
                 {
                     Debug.LogWarning("[Urwald] Grundfarn-FBX fehlt: " + artPath);
                     continue;
+                }
+                // TEXTUR2: Read/Write fuer dieses Mesh aktivieren (UV-Check im Test).
+                ModelImporter fimp = AssetImporter.GetAtPath(artPath) as ModelImporter;
+                if (fimp != null && !fimp.isReadable)
+                {
+                    fimp.isReadable = true;
+                    fimp.SaveAndReimport();
                 }
                 Mesh found = null;
                 int bestTris = 0;
@@ -751,14 +759,33 @@ namespace Spinnenspiel.EditorTools
             leaf.SetFloat("_Smoothness", 0.15f);
             leaf.SetFloat("_DoubleSidedEnable", 1f);
             leaf.SetFloat("_DoubleSidedNormalMode", 2f);
+            // TEXTUR2: Atlas-Albedo + Normalmap (je Fieder eine UV-Insel, V entlang der
+            // Mittelrippe). Weisser Tint: Farbe kommt aus der Karte, Instanz-Tinte ist ein
+            // hell-multipikativer Faktor (ApplyInstanceTint).
+            SetPHTexture(leaf, texFolder + "Farn_Grund_Atlas_Albedo.png", true);
+            SetPHTexture(leaf, texFolder + "Farn_Grund_Atlas_Normal.png", false);
+            leaf.SetColor("_BaseColor", Color.white);
             leaf.enableInstancing = true;
 
+            Material stem = GetOrCreateMat("MAT_Grundfarn_Stem", hdrpLit, new Color(0.10f, 0.145f, 0.075f));
+            stem.SetFloat("_SurfaceType", 0f);
+            stem.SetFloat("_AlphaCutoffEnable", 0f);
+            stem.SetFloat("_Smoothness", 0.2f);
+            SetPHTexture(stem, texFolder + "Farn_Grund_Atlas_Albedo.png", true);
+            SetPHTexture(stem, texFolder + "Farn_Grund_Atlas_Normal.png", false);
+            stem.SetColor("_BaseColor", Color.white);
+            stem.enableInstancing = true;
+
             HDMaterial.ValidateMaterial(leaf);
+            HDMaterial.ValidateMaterial(stem);
             EditorUtility.SetDirty(leaf);
+            EditorUtility.SetDirty(stem);
             AssetDatabase.SaveAssets();
 
             lib.groundFernLeafMat = leaf;
-            Debug.Log("[Urwald] Grundfarne: " + lib.groundFerns.Length + " Varianten loaded (opaque, single leaf-mat)");
+            lib.groundFernStemMat = stem;
+            lib.groundFernLeafSubmesh = 1; // FBX-Slot-Reihenfolge unveraenderlich: 0 Stiel, 1 Blatt
+            Debug.Log("[Urwald] Grundfarne: " + lib.groundFerns.Length + " Varianten loaded (opaque, atlas-textured, stem+leaf submeshes)");
         }
 
         /// <summary>U4: load or create an HDRP/Lit material asset in MatFolder with a base color.</summary>

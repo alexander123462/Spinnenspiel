@@ -1087,7 +1087,19 @@ namespace Spinnenspiel
             g.transform.localScale = Vector3.one * scale;
             g.AddComponent<MeshFilter>().sharedMesh = mesh;
             var r = g.AddComponent<MeshRenderer>();
-            r.sharedMaterials = new Material[] { library.groundFernLeafMat };
+            // TEXTUR2: Stiel+Blatt sind jetzt ein Mesh mit 2 Submeshes (Slot 0 Stiel, 1 Blatt).
+            int leafIdx = library.groundFernLeafSubmesh;
+            if (mesh.subMeshCount >= 2 && library.groundFernStemMat != null)
+            {
+                Material[] mats = new Material[mesh.subMeshCount];
+                for (int mi = 0; mi < mats.Length; mi++)
+                    mats[mi] = mi == leafIdx ? library.groundFernLeafMat : library.groundFernStemMat;
+                r.sharedMaterials = mats;
+            }
+            else
+            {
+                r.sharedMaterials = new Material[] { library.groundFernLeafMat };
+            }
             ApplyInstanceTint(r, pos, 72);
 
             Bounds b = mesh.bounds;

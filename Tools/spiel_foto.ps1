@@ -1,12 +1,15 @@
 # Startet den gebauten Player (Builds\Windows64) im Foto-Modus: der Player speichert das
 # Foto selbst (ScreenCapture) und beendet sich dann. Wartet auf die Datei, hoechstens 120 s.
 # Fehlt die Datei nach 120 s, macht die PowerShell ein Fenster-Foto (altes Verhalten) und killt den Player.
-# Aufruf: powershell -ExecutionPolicy Bypass -File Tools\spiel_foto.ps1 -Out Logs\ci\spiel_foto.png [-Seed 4242] [-Pitch 0] [-Warte 25]
+# Aufruf: powershell -ExecutionPolicy Bypass -File Tools\spiel_foto.ps1 -Out Logs\ci\spiel_foto.png [-Seed 4242] [-Pitch 0] [-Warte 25] [-Boden]
 param(
     [string]$Out = "Logs\ci\spiel_foto.png",
     [int]$Seed = 4242,
     [double]$Pitch = 0,
-    [int]$Warte = 25
+    [int]$Warte = 25,
+    [string]$Near = "",
+    [double]$Zoom = 0,
+    [switch]$Boden
 )
 Add-Type -AssemblyName System.Drawing
 Add-Type -TypeDefinition @'
@@ -19,10 +22,14 @@ $full = if ([System.IO.Path]::IsPathRooted($Out)) { $Out } else { Join-Path $roo
 New-Item -ItemType Directory -Path (Split-Path -Parent $full) -Force | Out-Null
 Remove-Item $full -ErrorAction SilentlyContinue
 
-$p = Start-Process "$root\Builds\Windows64\Spinnenspiel.exe" -ArgumentList @(
+$pArgs = @(
     '-screen-fullscreen','0','-screen-width','1280','-screen-height','720',
     '-fotopfad', "`"$full`"", '-fotoseed', "$Seed", '-fotopitch', "$Pitch", '-fotowarte', "$Warte"
-) -PassThru
+)
+if ($Boden) { $pArgs += '-fotoboden' }
+if ($Near) { $pArgs += @('-fotonear', "`"$Near`"") }
+if ($Zoom -gt 0) { $pArgs += @('-fotozoom', "$Zoom") }
+$p = Start-Process "$root\Builds\Windows64\Spinnenspiel.exe" -ArgumentList $pArgs -PassThru
 
 # Auf die Foto-Datei warten: sie gilt als fertig, wenn sie ueber 100 KB hat und ihre
 # Groesse ueber mehrere Abfragen stabil ist. Hoechstens 120 s.

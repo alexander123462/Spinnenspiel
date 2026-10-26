@@ -58,11 +58,11 @@ MonoBehaviour:
   treeFernLeafMat: {fileID: 2100000, guid: bb3ba566a0c082545a588f49fc8a0a07, type: 2}
   treeFernStemMat: {fileID: 2100000, guid: 4fb9f269db86c804193d0f547f667ce9, type: 2}
   groundFerns:
-  - {fileID: 3129918406511309173, guid: 3dfca27843507f34799d08d7fef76878, type: 3}
-  - {fileID: -7069332446871774785, guid: 19aa2add9d013a74d9c117861b75dcb7, type: 3}
-  - {fileID: -8968446306258006906, guid: 17e203eab95032d44b685ec3540b9f05, type: 3}
-  - {fileID: 1149813693110403925, guid: 0d147204918e61d4c87b1270f11295c7, type: 3}
-  - {fileID: -7214282968089966947, guid: 36290568a7b11954b9b56e32f14f7fb8, type: 3}
+  - {fileID: 2438149760092122888, guid: 3dfca27843507f34799d08d7fef76878, type: 3}
+  - {fileID: -5122914383080843734, guid: 19aa2add9d013a74d9c117861b75dcb7, type: 3}
+  - {fileID: -7720490640219614677, guid: 17e203eab95032d44b685ec3540b9f05, type: 3}
+  - {fileID: -5005608230610036416, guid: 0d147204918e61d4c87b1270f11295c7, type: 3}
+  - {fileID: 14068902962549764, guid: 36290568a7b11954b9b56e32f14f7fb8, type: 3}
   groundFernLeafMat: {fileID: 2100000, guid: 55890cdf6b32a044eb148551a9adb001, type: 2}
   groundFernStemMat: {fileID: 2100000, guid: 11df63f95c354914086bfe71bb559a3f, type: 2}
   groundFernLeafSubmesh: 1
