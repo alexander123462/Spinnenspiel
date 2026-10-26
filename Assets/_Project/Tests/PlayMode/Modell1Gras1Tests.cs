@@ -93,5 +93,55 @@ namespace Spinnenspiel.Tests
                       + " -> 0 -> " + (floating == 0 ? "OK" : "NOK"));
             Assert.AreEqual(0, floating, "MODELL1: schwebende Gras-Instanzen gefunden");
         }
+
+        [UnityTest]
+        public IEnumerator Modell1_Gras1_Textur()
+        {
+            JungleWorldGenerator gen = null;
+            yield return LoadWorld(g => gen = g);
+
+            // Prueft das Quell-Mesh aus der Asset-Bibliothek (die Renderer in der Welt
+            // nutzen statisch kombinierte Batch-Meshes ohne Read/Write).
+            Mesh mesh = null;
+            Material mat = null;
+            var meshes = gen.library.groundCover;
+            var mats = gen.library.groundCoverMats;
+            Assert.IsNotNull(meshes, "TEXTUR1: keine groundCover-Meshes in der Bibliothek.");
+            for (int i = 0; i < meshes.Length && i < mats.Length; i++)
+                if (mats[i] != null && mats[i].name == GrasMat) { mesh = meshes[i]; mat = mats[i]; break; }
+            Assert.IsNotNull(mesh, "TEXTUR1: kein groundCover-Mesh mit Material " + GrasMat + ".");
+
+            // UVs je Halm: eine Koordinate je Vertex, alle in 0..1, 30 Zellen belegt.
+            var uvs = mesh.uv;
+            Debug.Log("[TEXTUR1] UV-Eintraege " + uvs.Length + " / VertexCount " + mesh.vertexCount);
+            Assert.AreEqual(mesh.vertexCount, uvs.Length, "TEXTUR1: Mesh ohne vollstaendige UVs");
+            bool inRange = true;
+            var cells = new HashSet<string>();
+            foreach (var uv in uvs)
+            {
+                if (uv.x < 0f || uv.x > 1f || uv.y < 0f || uv.y > 1f) inRange = false;
+                int cx = Mathf.Min(5, Mathf.Max(0, Mathf.FloorToInt(uv.x * 6f)));
+                int cy = Mathf.Min(4, Mathf.Max(0, Mathf.FloorToInt(uv.y * 5f)));
+                cells.Add(cx + "," + cy);
+            }
+            Debug.Log("[TEXTUR1] UV in 0..1 -> " + (inRange ? "OK" : "NOK")
+                      + ", belegte Zellen " + cells.Count + " -> 30 -> "
+                      + (cells.Count == 30 ? "OK" : "NOK"));
+            Assert.IsTrue(inRange, "TEXTUR1: UVs ausserhalb 0..1");
+            Assert.AreEqual(30, cells.Count, "TEXTUR1: erwartet 30 getrennte UV-Zellen (keine Ueberlappung)");
+
+            // Albedo- und Normalmap im Material gesetzt, mindestens 512 px.
+            var albedo = mat.GetTexture("_BaseColorMap") as Texture2D;
+            var normal = mat.GetTexture("_NormalMap") as Texture2D;
+            Debug.Log("[TEXTUR1] Albedo " + (albedo == null ? "null" : albedo.width + "x" + albedo.height)
+                      + " -> mindestens 512 -> "
+                      + (albedo != null && albedo.width >= 512 && albedo.height >= 512 ? "OK" : "NOK"));
+            Debug.Log("[TEXTUR1] Normal " + (normal == null ? "null" : normal.width + "x" + normal.height)
+                      + " -> gesetzt -> " + (normal != null ? "OK" : "NOK"));
+            Assert.IsNotNull(albedo, "TEXTUR1: MAT_Gras1 ohne _BaseColorMap");
+            Assert.That(albedo.width, Is.GreaterThanOrEqualTo(512), "TEXTUR1: Albedo breiter als 512 px erforderlich");
+            Assert.That(albedo.height, Is.GreaterThanOrEqualTo(512), "TEXTUR1: Albedo hoeher als 512 px erforderlich");
+            Assert.IsNotNull(normal, "TEXTUR1: MAT_Gras1 ohne _NormalMap");
+        }
     }
 }

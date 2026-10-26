@@ -34,7 +34,7 @@ def fragen(bild, frage):
     payload = {
         "model": MODELL,
         "temperature": 0.2,
-        "max_tokens": 400,
+        "max_tokens": 1200,
         "messages": [{"role": "user", "content": [
             {"type": "text", "text": frage},
             {"type": "image_url", "image_url": {"url": "data:%s;base64,%s" % (mime, b64)}},
@@ -45,7 +45,10 @@ def fragen(bild, frage):
                                  headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=300) as r:
         d = json.loads(r.read().decode("utf-8"))
-    return d["choices"][0]["message"]["content"].strip()
+    m = d["choices"][0]["message"]
+    # Manche Modelle fuellen das Denkfeld, wenn content durchs Token-Limit leer bleibt.
+    text = (m.get("content") or m.get("reasoning_content") or "").strip()
+    return text
 
 
 def main():

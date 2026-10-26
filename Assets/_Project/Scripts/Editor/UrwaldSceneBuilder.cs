@@ -1091,6 +1091,11 @@ namespace Spinnenspiel.EditorTools
                 grasMat.SetFloat("_Smoothness", 0.15f);
                 grasMat.SetFloat("_DoubleSidedEnable", 1f);
                 grasMat.SetFloat("_DoubleSidedNormalMode", 2f);
+                // TEXTUR1: Albedo (Scan-Vorlage + Verlauf) und Normalmap je Halm;
+                // UV-Raster im FBX, V entlang des Halms. Weisser Tint: Farbe kommt aus der Karte.
+                SetPHTexture(grasMat, "Assets/_Project/Art/Plants/Gras1/Textures/Gras1_Albedo.png", true);
+                SetPHTexture(grasMat, "Assets/_Project/Art/Plants/Gras1/Textures/Gras1_Normal.png", false);
+                grasMat.SetColor("_BaseColor", Color.white);
                 grasMat.enableInstancing = true;
                 HDMaterial.ValidateMaterial(grasMat);
                 EditorUtility.SetDirty(grasMat);
@@ -1169,6 +1174,14 @@ namespace Spinnenspiel.EditorTools
                 AssetUtil.EnsureFolder("Assets/_Project/Art/Plants/Gras1");
                 System.IO.File.Copy(srcPath, artPath, true);
                 AssetDatabase.ImportAsset(artPath, ImportAssetOptions.ForceUpdate);
+            }
+            // TEXTUR1: Read/Write fuer dieses eine Mesh aktivieren (UV-Check im Test).
+            // Nur eine zusaetzliche CPU-Kopie (~30 KB), zur Laufzeit liest sie nichts.
+            ModelImporter grim = AssetImporter.GetAtPath(artPath) as ModelImporter;
+            if (grim != null && !grim.isReadable)
+            {
+                grim.isReadable = true;
+                grim.SaveAndReimport();
             }
             if (!System.IO.File.Exists(artPath))
             {
