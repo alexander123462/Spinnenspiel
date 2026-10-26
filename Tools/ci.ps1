@@ -5,8 +5,10 @@ param(
     [string]$Name = "ci",
     [string[]]$Method = @(),
     [switch]$Tests,
-    [string]$Filter = ""
+    [string]$Filter = "",
+    [string]$Typ = ""   # Q1_Galerie nur fuer diese Typen, z. B. -Typ "Gras1,Farn_Grund" (setzt GALERIE_TYP)
 )
+if ($Typ) { $env:GALERIE_TYP = $Typ } else { Remove-Item Env:GALERIE_TYP -ErrorAction SilentlyContinue }
 
 # Eigenes Konsolenfenster verstecken (sonst poppt es bei jedem CI-Lauf kurz auf, wenn Hermes den Aufruf startet).
 try { Add-Type -Name W -Namespace CiWin -MemberDefinition '[DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c); [DllImport("kernel32.dll")] public static extern IntPtr GetConsoleWindow();'; [void][CiWin.W]::ShowWindow([CiWin.W]::GetConsoleWindow(), 0) } catch {}

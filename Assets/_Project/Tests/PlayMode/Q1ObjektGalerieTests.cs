@@ -290,8 +290,14 @@ namespace Spinnenspiel.Tests
 
             int typCount = 0;
 
+            // GALERIE_TYP="Gras1,Farn_Grund": nur diese Typen fotografieren (Asset-Auftraege brauchen nicht alle 27, spart Minuten). Leer = alles.
+            string[] nurTypen = null;
+            string nurEnv = System.Environment.GetEnvironmentVariable("GALERIE_TYP");
+            if (!string.IsNullOrWhiteSpace(nurEnv)) nurTypen = nurEnv.Split(new[] { ',', ';' }, System.StringSplitOptions.RemoveEmptyEntries);
+
             foreach (var t in Typen)
             {
+                if (nurTypen != null && System.Array.IndexOf(nurTypen, t.Name) < 0) continue;
                 var mr = FindNearest(t.Tag, sp);
                 if (mr == null)
                 {
@@ -337,6 +343,7 @@ namespace Spinnenspiel.Tests
             if (lib != null && lib.rocks != null && lib.rocks.Length > 0) libTypen.Add(("Stein", lib.rocks[0], lib.rockMat));
             foreach (var lt in libTypen)
             {
+                if (nurTypen != null && System.Array.IndexOf(nurTypen, lt.n) < 0) continue;
                 var go = new GameObject("Galerie_" + lt.n);
                 go.AddComponent<MeshFilter>().sharedMesh = lt.m;
                 go.AddComponent<MeshRenderer>().sharedMaterial = lt.mat;
@@ -353,6 +360,7 @@ namespace Spinnenspiel.Tests
             Object.Destroy(floor);
             SetFog(true);
 
+            if (nurTypen == null)
             {
                 Bounds b = SpiderBounds(spider.gameObject);
                 yield return Views(cam, "Spinne", b, veg);
@@ -361,6 +369,7 @@ namespace Spinnenspiel.Tests
                 typCount++;
             }
 
+            if (nurTypen == null)
             {
                 Vector3 hub = sp + new Vector3(1.2f, 0.8f, 0f);
                 Vector3[] anchors =
@@ -382,6 +391,7 @@ namespace Spinnenspiel.Tests
                 }
             }
 
+            if (nurTypen == null)
             {
                 MeshRenderer wr = null;
                 foreach (var mr in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
@@ -411,7 +421,7 @@ namespace Spinnenspiel.Tests
 
             System.IO.File.WriteAllText("Logs/ci/galerie/index.txt", _index.ToString());
             Debug.Log("[Q1] Galerie: " + typCount + " Typen, " + _images + " Bilder");
-            Assert.Greater(_images, 20, "Zu wenige Galerie-Bilder: " + _images);
+            Assert.Greater(_images, nurTypen == null ? 20 : 0, "Zu wenige Galerie-Bilder: " + _images);
         }
     }
 }
