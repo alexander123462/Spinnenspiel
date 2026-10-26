@@ -26,6 +26,12 @@ namespace Spinnenspiel.Tests
         [UnityTest]
         public IEnumerator B4c_OnRope_SpaceLetsGoAndLands()
         {
+            // Seed fest wie in allen anderen Urwald-Tests (B3/A2/BotPlaytest): mit
+            // zufaelligem Seed konnte ein PH-Baum-Ast (TreeCollider) direkt ueber dem
+            // Spawnpunkt haengen — die Spinne landet dann korrekt am Ast und der
+            // 0,3-s-Nachweis "haengt noch frei" schlug rot auf (Seed 356024, r103:
+            // TreeCollider-Treffer bei y=9,50 m, 0,58 m unter dem Testfaden).
+            JungleWorldGenerator.NextSeed = 4242;
             SceneManager.LoadScene("Urwald");
             yield return null;
             yield return new WaitForSeconds(1f);
