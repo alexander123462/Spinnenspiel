@@ -52,7 +52,8 @@ namespace Spinnenspiel
         public Material[] groundCoverMats;
 
         /// <summary>U4: Farn-Scatter-Patch (Blender scatter.py, determinist Poisson-Disc).
-        /// fernScatterMeshes = 245 Instance-Meshes (2 Submeshes je: 0 = Stem, 1 = Leaf),
+        /// fernScatterMeshes = 245 Mesh-REFERENZEN auf 3 Einzelwedel-Varianten (MODELL6;
+        /// je Mesh 2 Submeshes: 0 = Stem, 1 = Leaf — gemessen),
         /// fernScatterXZ = XZ-Positions per Instance (y=0, Y comes from SampleHeight at runtime),
         /// fernScatterCount = Anzahl Instances im Patch.</summary>
         public Mesh[] fernScatterMeshes;

@@ -569,116 +569,178 @@ namespace Spinnenspiel.EditorTools
         }
 
         /// <summary>
-        /// U4: Loads the Blender fern-scatter patch (ArtSource/UrwaldTest/fern/scatter.py ->
-        /// Assets/_Project/Art/Plants/UrwaldTestFern/fern_scatter.fbx). Copies the FBX if missing,
-        /// imports it, measures the per-instance meshes (2 Submeshes: stem + leaf, order measured
-        /// via GetSubMesh(i).bounds) and builds two opaque HDRP materials with the Blender tints.
-        /// Fern-Form ist echte Geometrie -> Opaque, KEIN Alpha-Cutout (Blender-Materials Alpha ignorieren).
-        /// Fills the library fields: meshes, XZ-offsets (from mesh bounds), count, leaf-submesh index, mats.
+        /// MODELL6: Farn-Scatter-Patch aus EINZELWEDDELN (ArtSource/UrwaldTest/fern/wedel_build.py
+        /// -> fern_wedel.fbx, 3 Varianten je 2 Submeshes) plus Poisson-Disc-Patch-Zusammenstellung
+        /// (wedel_patch.py -> fern_patch.txt, 245 Punkte wie U4: Patch 8 m, MIN_D 0.42 m).
+        /// Je Instanz wird die im Patch-File gesetzte Variante referenziert: die Library haelt
+        /// 245 Mesh-REFERENZEN auf nur 3 Mesh-Assets (geteilte Geometrie statt 245 Kopien).
+        /// Blatt-/Stiel-Submesh-Reihenfolge wird gemessen (GetSubMesh(i).indexCount), nie angenommen.
+        /// Opaque HDRP-Materialien mit prozeduralem Atlas (FarnWedel_Albedo/Normal, 8x4-Zellen).
         /// </summary>
         private static void LoadFernScatter(JungleAssetLibrary lib)
         {
             const string artFolder = "Assets/_Project/Art/Plants/UrwaldTestFern/";
-            const string fbxAsset = artFolder + "fern_scatter.fbx";
+            const string fbxAsset = artFolder + "fern_wedel.fbx";
+            const string patchTxt = artFolder + "fern_patch.txt";
 
-            // Copy the FBX from ArtSource into the Unity-Asset-Tree (only if missing).
+            // FBX und Patch-Datei aus ArtSource in den Asset-Baum kopieren (nur wenn fehlend).
+            AssetUtil.EnsureFolder("Assets/_Project/Art/Plants/UrwaldTestFern");
             if (!System.IO.File.Exists(fbxAsset))
             {
-                string srcFbx = "ArtSource/UrwaldTest/fern/fern_scatter.fbx";
+                string srcFbx = "ArtSource/UrwaldTest/fern/fern_wedel.fbx";
                 if (!System.IO.File.Exists(srcFbx))
                 {
-                    Debug.LogWarning("[Urwald] Fern-Scatter-FBX missing: " + srcFbx);
+                    Debug.LogWarning("[Urwald] Fern-Wedel-FBX missing: " + srcFbx);
                     return;
                 }
-                AssetUtil.EnsureFolder("Assets/_Project/Art/Plants/UrwaldTestFern");
                 System.IO.File.Copy(srcFbx, fbxAsset, true);
                 AssetDatabase.ImportAsset(fbxAsset, ImportAssetOptions.ForceUpdate);
             }
+            if (!System.IO.File.Exists(patchTxt))
+            {
+                string srcTxt = "ArtSource/UrwaldTest/fern/fern_patch.txt";
+                if (!System.IO.File.Exists(srcTxt))
+                {
+                    Debug.LogWarning("[Urwald] Fern-Patch-Datei missing: " + srcTxt);
+                    return;
+                }
+                System.IO.File.Copy(srcTxt, patchTxt, true);
+                AssetDatabase.ImportAsset(patchTxt, ImportAssetOptions.ForceUpdate);
+            }
 
-            // The HDRP materials are built here; FBX material slots are ignored.
+            // Die HDRP-Materialien baut dieser Builder; die FBX-Slots liefern nur die
+            // Submesh-Aufteilung (Stiel/Fiedern). Darum Material-Import AN lassen und
+            // Read/Write aktivieren (UV-Zugriff im Test).
             ModelImporter modelImporter = AssetImporter.GetAtPath(fbxAsset) as ModelImporter;
             if (modelImporter == null)
             {
                 Debug.LogWarning("[Urwald] Kein ModelImporter für: " + fbxAsset);
                 return;
             }
-            modelImporter.materialImportMode = ModelImporterMaterialImportMode.None;
-            modelImporter.SaveAndReimport();
+            bool importerDirty = false;
+            if (!modelImporter.isReadable)
+            {
+                modelImporter.isReadable = true;
+                importerDirty = true;
+            }
+            // Material-Import explizit zuruecksetzen: ein frueherer Stand hatte ihn auf
+            // None gestellt, was die Submeshes (Stiel/Fiedern) zu einem verschmilzt.
+            if (modelImporter.materialImportMode != ModelImporterMaterialImportMode.ImportStandard)
+            {
+                modelImporter.materialImportMode = ModelImporterMaterialImportMode.ImportStandard;
+                importerDirty = true;
+            }
+            if (importerDirty)
+            {
+                modelImporter.SaveAndReimport();
+            }
 
-            // Collect the joined instance meshes (2 Submeshes each, transforms baked).
-            var collected = new System.Collections.Generic.List<Mesh>();
+            // Die 3 Varianten-Meshes (je 2 Submeshes: Stiel + Fiedern) aus dem FBX holen.
+            var variants = new System.Collections.Generic.List<Mesh>();
             foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(fbxAsset))
             {
-                if (obj is Mesh mesh && mesh.subMeshCount > 0)
+                if (obj is Mesh mesh && mesh.subMeshCount >= 2)
                 {
-                    collected.Add(mesh);
+                    variants.Add(mesh);
                 }
             }
-            if (collected.Count == 0)
+            if (variants.Count == 0)
             {
-                Debug.LogWarning("[Urwald] Kein Mesh im Fern-Scatter-FBX: " + fbxAsset);
+                Debug.LogWarning("[Urwald] Kein Varianten-Mesh im Fern-Wedel-FBX: " + fbxAsset);
                 return;
             }
 
-            // Measure the submesh order on the first mesh: leaf = wider crown (XZ-extents),
-            // stem = schmal. Never assume the FBX material order (known Blender pitfall).
-            Mesh probe = collected[0];
-            if (probe.subMeshCount < 2)
-            {
-                Debug.LogWarning("[Urwald] Fern-Scatter-Mesh has < 2 Submeshes: " + fbxAsset);
-                return;
-            }
-            // Leaf-crown has far more triangles than the schmal stem-cylinder -> measure by index count.
+            // Submesh-Reihenfolge messen: das Fieder-Submesh hat klar mehr Dreiecke als der Stiel.
+            Mesh probe = variants[0];
             int idx0 = probe.GetSubMesh(0).indexCount;
             int idx1 = probe.GetSubMesh(1).indexCount;
             lib.fernScatterLeafSubmesh = idx1 > idx0 ? 1 : 0;
-
-            // XZ-Positions: mesh bounds centre (transforms baked into the vertices).
-            // Centred around the patch centre so the generator can add them to an anchor point.
-            var xz = new System.Collections.Generic.List<Vector3>();
-            Vector3 min = new Vector3(float.MaxValue, 0f, float.MaxValue);
-            Vector3 max = new Vector3(-float.MaxValue, 0f, -float.MaxValue);
-            foreach (Mesh m in collected)
+            for (int vi = 0; vi < variants.Count; vi++)
             {
-                var b = m.bounds;
-                min.x = System.Math.Min(min.x, b.center.x - b.extents.x);
-                min.z = System.Math.Min(min.z, b.center.z - b.extents.z);
-                max.x = System.Math.Max(max.x, b.center.x + b.extents.x);
-                max.z = System.Math.Max(max.z, b.center.z + b.extents.z);
-                xz.Add(new Vector3(b.center.x, 0f, b.center.z));
+                int tris = variants[vi].GetSubMesh(0).indexCount / 3
+                    + variants[vi].GetSubMesh(1).indexCount / 3;
+                Debug.Log("[Urwald] Fern-Wedel Variante " + vi + ": " + tris + " Dreiecke, Hoehe "
+                    + variants[vi].bounds.size.y.ToString("F2") + " m, Breite "
+                    + variants[vi].bounds.size.x.ToString("F2") + " m");
             }
-            Vector3 patchCenter = new Vector3((min.x + max.x) * 0.5f, 0f, (min.z + max.z) * 0.5f);
+
+            // Patch-Zusammenstellung (Poisson-Disc, 245 Punkte): Zeile = "x z variante".
+            var xz = new System.Collections.Generic.List<Vector3>();
+            var picked = new System.Collections.Generic.List<Mesh>();
+            string[] lines = System.IO.File.ReadAllLines(patchTxt);
+            for (int li = 0; li < lines.Length; li++)
+            {
+                string ln = lines[li].Trim();
+                if (ln.Length == 0 || ln.StartsWith("#")) continue;
+                string[] parts = ln.Split(' ');
+                if (parts.Length < 3) continue;
+                try
+                {
+                    var ci = System.Globalization.CultureInfo.InvariantCulture;
+                    float px = float.Parse(parts[0], ci);
+                    float pz = float.Parse(parts[1], ci);
+                    int vr = int.Parse(parts[2], ci);
+                    xz.Add(new Vector3(px, 0f, pz));
+                    picked.Add(variants[((vr % variants.Count) + variants.Count) % variants.Count]);
+                }
+                catch (System.FormatException fe)
+                {
+                    Debug.LogWarning("[Urwald] Fern-Patch-Zeile unlesbar (" + li + "): " + ln + " " + fe.Message);
+                }
+            }
+            if (picked.Count == 0)
+            {
+                Debug.LogWarning("[Urwald] Keine Patch-Punkte gelesen aus: " + patchTxt);
+                return;
+            }
+
+            // XZ um die Patch-Mitte zentrieren (der Generator addiert sie auf den Patch-Anker).
+            float minX = float.MaxValue, maxX = -float.MaxValue;
+            float minZ = float.MaxValue, maxZ = -float.MaxValue;
+            foreach (Vector3 q in xz)
+            {
+                if (q.x < minX) minX = q.x;
+                if (q.x > maxX) maxX = q.x;
+                if (q.z < minZ) minZ = q.z;
+                if (q.z > maxZ) maxZ = q.z;
+            }
+            float cx = (minX + maxX) * 0.5f, cz = (minZ + maxZ) * 0.5f;
             for (int pi = 0; pi < xz.Count; pi++)
             {
                 Vector3 q = xz[pi];
-                q.x -= patchCenter.x;
-                q.z -= patchCenter.z;
+                q.x -= cx;
+                q.z -= cz;
                 xz[pi] = q;
             }
-            lib.fernScatterPatchSize = System.Math.Max(max.x - min.x, max.z - min.z);
+            lib.fernScatterPatchSize = System.Math.Max(maxX - minX, maxZ - minZ);
 
-            lib.fernScatterMeshes = collected.ToArray();
+            lib.fernScatterMeshes = picked.ToArray();
             lib.fernScatterXZ = xz.ToArray();
-            lib.fernScatterCount = collected.Count;
+            lib.fernScatterCount = picked.Count;
 
-            // Opaque HDRP materials with the Blender tints (leaf green, stem brown).
+            // Opaque HDRP-Materialien mit dem prozeduralen Wedel-Atlas (8x4 Zellen, 1024 px).
             Shader hdrpLit = Shader.Find("HDRP/Lit");
             if (hdrpLit == null)
                 throw new System.InvalidOperationException("[Urwald] Shader nicht gefunden: HDRP/Lit");
 
+            const string texFolder = "Assets/_Project/Art/Plants/UrwaldTestFern/Textures/";
             Material leaf = GetOrCreateMat("MAT_FernScatter_Leaf", hdrpLit, new Color(0.10f, 0.27f, 0.06f));
-            leaf.SetFloat("_SurfaceType", 0f);      // Opaque: Form is real geometry, no Cutout
+            leaf.SetFloat("_SurfaceType", 0f);      // Opaque: Form ist echte Geometrie, kein Cutout
             leaf.SetFloat("_AlphaCutoffEnable", 0f);
             leaf.SetFloat("_Smoothness", 0.15f);
             leaf.SetFloat("_DoubleSidedEnable", 1f);
-            leaf.SetFloat("_DoubleSidedNormalMode", 2f); // Flip: backfaces visible
+            leaf.SetFloat("_DoubleSidedNormalMode", 2f); // Flip: Rückseiten sichtbar
             leaf.enableInstancing = true;
+            SetPHTexture(leaf, texFolder + "FarnWedel_Albedo.png", true);
+            SetPHTexture(leaf, texFolder + "FarnWedel_Normal.png", false);
 
             Material stem = GetOrCreateMat("MAT_FernScatter_Stem", hdrpLit, new Color(0.13f, 0.11f, 0.05f));
             stem.SetFloat("_SurfaceType", 0f);
             stem.SetFloat("_AlphaCutoffEnable", 0f);
             stem.SetFloat("_Smoothness", 0.2f);
             stem.enableInstancing = true;
+            SetPHTexture(stem, texFolder + "FarnWedel_Albedo.png", true);
+            SetPHTexture(stem, texFolder + "FarnWedel_Normal.png", false);
 
             HDMaterial.ValidateMaterial(leaf);
             HDMaterial.ValidateMaterial(stem);
@@ -689,7 +751,8 @@ namespace Spinnenspiel.EditorTools
             lib.fernScatterLeafMat = leaf;
             lib.fernScatterStemMat = stem;
 
-            Debug.Log("[Urwald] Fern-Scatter: " + lib.fernScatterCount + " Instances, leaf-submesh "
+            Debug.Log("[Urwald] Fern-Scatter (MODELL6): " + lib.fernScatterCount + " Instances, "
+                + variants.Count + " Varianten, leaf-submesh "
                 + lib.fernScatterLeafSubmesh + " (idx0 " + idx0 + ", idx1 " + idx1 + ")");
         }
 

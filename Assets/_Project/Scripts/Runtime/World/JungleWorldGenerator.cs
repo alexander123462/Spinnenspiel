@@ -372,7 +372,8 @@ namespace Spinnenspiel
                 UnityEngine.Debug.Log("[Jungle] Baumfarne: " + fernN + " (inkl. 3 garantiert vor dem Spawn)");
             }
 
-            // 6a) Farn-Scatter-Patch (U4): der Blender-Patch (fern_scatter.fbx, 245 Instance-Meshes)
+            // 6a) Farn-Scatter-Patch (MODELL6): Einzelwedel in 3 Varianten (fern_wedel.fbx),
+            //     245 Patch-Punkte aus Poisson-Disc (fern_patch.txt), Meshes nur referenziert.
             // tilett ueber der Urwald. Per Instance: Zufalls-Cell als Patch-Anker, Y = SampleHeight.
             // XZ come Library-offsets (Baked im FBX), Patch-Footprint = fernScatterPatchSize m.
             if (library.fernScatterMeshes != null && library.fernScatterCount > 0
@@ -405,8 +406,19 @@ namespace Spinnenspiel
                             // Y per SampleHeight (Terrain-Surface), FBX-Bottom im Mesh y=0 -> sink 0.02 m.
                             float fy = terrain.SampleHeight(new Vector3(px, 0f, pz)) + terrain.transform.position.y - 0.02f;
                             g.transform.position = new Vector3(px, fy, pz);
-                            g.transform.rotation = Quaternion.Euler(0f, World.Hash01(i, j, 110 + k % 97) * 360f, 0f);
-                            g.transform.localScale = Vector3.one;
+                            // MODELL6: Einzelwedel stehen nicht lotrecht — Neigung in der Wedel-
+                            // ebene (±13 deg Streuung) plus Groessen-Streuung (siehe unten).
+                            // Einzelwedel sind flaechiger als der alte Busch-Patch: bewusst
+                            // groesser skaliert, damit sich bei 0.42 m Punktabstand ein dichter
+                            // Teppich ueberlappt (Deckungsflaeche waechst mit dem Quadrat).
+                            const float fernScaleMin = 1.10f;
+                            const float fernScaleMax = 1.60f;
+                            float yawW = World.Hash01(i, j, 110 + k % 97) * 360f;
+                            float leanW = (World.Hash01(i, j, 121 + k % 97) - 0.5f) * 26f;
+                            g.transform.rotation = Quaternion.Euler(leanW, yawW, 0f);
+                            float scaleW = fernScaleMin
+                                + (fernScaleMax - fernScaleMin) * World.Hash01(i, j, 131 + k % 97);
+                            g.transform.localScale = Vector3.one * scaleW;
                             g.AddComponent<MeshFilter>().sharedMesh = fm;
                             var r = g.AddComponent<MeshRenderer>();
                             // Submesh-Order measured in LoadFernScatter: leaf index fernScatterLeafSubmesh.

@@ -33,3 +33,5 @@ Ursache: kein Spielcode-Fehler; Beweisbild grau wegen Aufnahme-Pipeline (auch Wa
 - 2026-10-25 02:45 LICHT1 (Overseer): blockiert wegen Messaufbau (Foto zeigt Spinne statt Boden). Player gebaut, Foto nachher gemessen (Std-Faktor 0,9). Zerlegt in LICHT1a/LICHT1b, Code-Aenderung gestasht. Nichts Gameplay-seitig committet.
 
 2026-10-26 TEXTUR2 (Overseer): [!] war Zeitbudget-Abbruch, kein Fehler. Foto und gezielte Tests geprueft (alle gruen ausser Vorab-Rot E1), Farn-Dateien committet, Punkt [x].
+
+2026-10-26 MODELL6 (Overseer): [!] wegen B4c (Seil/Space) Wackler, einzeln gruen -> ROT.md, Farn-Arbeit committet, Punkt [x].
