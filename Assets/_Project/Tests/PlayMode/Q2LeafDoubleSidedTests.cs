@@ -17,7 +17,7 @@ namespace Spinnenspiel.Tests
         private static readonly string[] LeafTags =
         {
             "M_periwinkle_plant", // Immergruen
-            "M_weed_plant_02",    // Unkraut
+            "MAT_Unkraut",        // Unkraut (MODELL3: Blender-Rosette ersetzt M_weed_plant_02)
             "M_nettle_plant",     // Brennnessel
             "MAT_BushTropisch",   // Busch1
         };

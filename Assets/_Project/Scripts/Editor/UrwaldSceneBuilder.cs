@@ -1148,10 +1148,34 @@ namespace Spinnenspiel.EditorTools
                 mats.Add(gras2Mat);
             }
 
+            // MODELL3: Unkraut-Rosette (12 gezaeckte Blaetter, 624 Dreiecke,
+            // Loewenzahn-/Ampfer-Typ) ersetzt den Poly-Haven-Scan weed_plant_02.
+            Mesh unkraut = LoadBlenderUnkraut();
+            if (unkraut != null)
+            {
+                Shader hdrpLit3 = Shader.Find("HDRP/Lit");
+                Material unkrautMat = GetOrCreateMat("MAT_Unkraut", hdrpLit3, Color.white);
+                unkrautMat.SetFloat("_SurfaceType", 0f);
+                unkrautMat.SetFloat("_AlphaCutoffEnable", 0f);
+                unkrautMat.SetFloat("_Smoothness", 0.15f);
+                unkrautMat.SetFloat("_DoubleSidedEnable", 1f);
+                unkrautMat.SetFloat("_DoubleSidedNormalMode", 2f);
+                // TEXTUR: Albedo/Normal je Blattzelle im 4x3-Atlas, UV im FBX.
+                SetPHTexture(unkrautMat, "Assets/_Project/Art/Plants/Unkraut/Textures/Unkraut_Albedo.png", true);
+                SetPHTexture(unkrautMat, "Assets/_Project/Art/Plants/Unkraut/Textures/Unkraut_Normal.png", false);
+                unkrautMat.SetColor("_BaseColor", Color.white);
+                unkrautMat.enableInstancing = true;
+                HDMaterial.ValidateMaterial(unkrautMat);
+                EditorUtility.SetDirty(unkrautMat);
+                meshes.Add(unkraut);
+                mats.Add(unkrautMat);
+            }
+
             foreach (string id in ids)
             {
                 if (id == "grass_medium_01" && gras1 != null) continue; // MODELL1: schon ersetzt
                 if (id == "grass_medium_02" && gras2 != null) continue; // MODELL2: schon ersetzt
+                if (id == "weed_plant_02" && unkraut != null) continue; // MODELL3: schon ersetzt
                 if (!ScanModels.IsAvailable(id))
                 {
                     Debug.LogWarning("[Urwald] Bodendecker nicht verfügbar, übersprungen: " + id);
@@ -1271,6 +1295,52 @@ namespace Spinnenspiel.EditorTools
                 return null;
             }
             Debug.Log("[Urwald] Gras2 geladen: " + found.name + ", Dreiecke " + bestTris
+                      + ", Groesse " + found.bounds.size.ToString("F3"));
+            return found;
+        }
+
+        /// <summary>MODELL3: prozedurale Unkraut-Rosette (12 gezaeckte Blaetter,
+        /// Mittelrippe, 624 Dreiecke, 0.49 m Durchmesser). Laedt das FBX aus
+        /// Plants/Unkraut (kopiert aus ArtSource falls dort aelter) und liefert das Mesh.</summary>
+        private static Mesh LoadBlenderUnkraut()
+        {
+            const string artPath = "Assets/_Project/Art/Plants/Unkraut/Unkraut.fbx";
+            const string srcPath = "ArtSource/Unkraut/unkraut_neu.fbx";
+            if (!System.IO.File.Exists(artPath) && System.IO.File.Exists(srcPath))
+            {
+                AssetUtil.EnsureFolder("Assets/_Project/Art/Plants/Unkraut");
+                System.IO.File.Copy(srcPath, artPath, true);
+                AssetDatabase.ImportAsset(artPath, ImportAssetOptions.ForceUpdate);
+            }
+            // MODELL3: Read/Write fuer dieses Mesh aktivieren (UV-Check im Test).
+            ModelImporter uim = AssetImporter.GetAtPath(artPath) as ModelImporter;
+            if (uim != null && !uim.isReadable)
+            {
+                uim.isReadable = true;
+                uim.SaveAndReimport();
+            }
+            if (!System.IO.File.Exists(artPath))
+            {
+                Debug.LogWarning("[Urwald] Unkraut-FBX fehlt: " + artPath);
+                return null;
+            }
+            Mesh found = null;
+            int bestTris = 0;
+            foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(artPath))
+            {
+                if (obj is Mesh mesh && mesh != null)
+                {
+                    int tris = 0;
+                    for (int s = 0; s < mesh.subMeshCount; s++) tris += mesh.GetSubMesh(s).indexCount / 3;
+                    if (tris > bestTris) { bestTris = tris; found = mesh; }
+                }
+            }
+            if (found == null || bestTris == 0)
+            {
+                Debug.LogWarning("[Urwald] Unkraut ohne Triangles: " + artPath);
+                return null;
+            }
+            Debug.Log("[Urwald] Unkraut geladen: " + found.name + ", Dreiecke " + bestTris
                       + ", Groesse " + found.bounds.size.ToString("F3"));
             return found;
         }
