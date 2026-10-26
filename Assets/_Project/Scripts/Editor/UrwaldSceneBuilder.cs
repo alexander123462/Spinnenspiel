@@ -1196,12 +1196,39 @@ namespace Spinnenspiel.EditorTools
                 mats.Add(igMat);
             }
 
+            // MODELL5: Brennnessel (eckiger 4-kantiger Stengel mit 5 gegen-
+            // staendigen Blattpaaren + Endpaar, gezaeckte herzfoermige Blatt-
+            // spreiten, 766 Dreiecke, 0.74 m) ersetzt den Poly-Haven-Scan
+            // nettle_plant.
+            Mesh brennessel = LoadBlenderBrennnessel();
+            if (brennessel != null)
+            {
+                Shader hdrpLit5 = Shader.Find("HDRP/Lit");
+                Material bnMat = GetOrCreateMat("MAT_Brennnessel", hdrpLit5, Color.white);
+                bnMat.SetFloat("_SurfaceType", 0f);
+                bnMat.SetFloat("_AlphaCutoffEnable", 0f);
+                bnMat.SetFloat("_Smoothness", 0.18f);
+                bnMat.SetFloat("_DoubleSidedEnable", 1f);
+                bnMat.SetFloat("_DoubleSidedNormalMode", 2f);
+                // TEXTUR: Albedo/Normal je Blattzelle im 8x4-Atlas (Zellen
+                // 0..11 Blaetter, 12..21 Stiele, 24 Stengel), V entlang der Rippe.
+                SetPHTexture(bnMat, "Assets/_Project/Art/Plants/Brennnessel/Textures/Brennnessel_Albedo.png", true);
+                SetPHTexture(bnMat, "Assets/_Project/Art/Plants/Brennnessel/Textures/Brennnessel_Normal.png", false);
+                bnMat.SetColor("_BaseColor", Color.white);
+                bnMat.enableInstancing = true;
+                HDMaterial.ValidateMaterial(bnMat);
+                EditorUtility.SetDirty(bnMat);
+                meshes.Add(brennessel);
+                mats.Add(bnMat);
+            }
+
             foreach (string id in ids)
             {
                 if (id == "grass_medium_01" && gras1 != null) continue; // MODELL1: schon ersetzt
                 if (id == "grass_medium_02" && gras2 != null) continue; // MODELL2: schon ersetzt
                 if (id == "weed_plant_02" && unkraut != null) continue; // MODELL3: schon ersetzt
                 if (id == "periwinkle_plant" && immergruen != null) continue; // MODELL4: schon ersetzt
+                if (id == "nettle_plant" && brennessel != null) continue; // MODELL5: schon ersetzt
                 if (!ScanModels.IsAvailable(id))
                 {
                     Debug.LogWarning("[Urwald] Bodendecker nicht verfügbar, übersprungen: " + id);
@@ -1414,6 +1441,55 @@ namespace Spinnenspiel.EditorTools
                 return null;
             }
             Debug.Log("[Urwald] Immergruen geladen: " + found.name + ", Dreiecke " + bestTris
+                      + ", Groesse " + found.bounds.size.ToString("F3"));
+            return found;
+        }
+
+        /// <summary>MODELL5: prozedurale Brennnessel (4-kantiger Stengel, 5 gegen-
+        /// staendige Blattpaare + Endpaar, gezaeckte herzfoermige Spreiten,
+        /// 766 Dreiecke, 0.74 m). Laedt das FBX aus Plants/Brennnessel
+        /// (kopiert aus ArtSource falls dort aelter) und liefert das Mesh.</summary>
+        private static Mesh LoadBlenderBrennnessel()
+        {
+            const string artPath = "Assets/_Project/Art/Plants/Brennnessel/Brennnessel.fbx";
+            const string srcPath = "ArtSource/Brennnessel/brennnessel_neu.fbx";
+            if (System.IO.File.Exists(srcPath) &&
+                (!System.IO.File.Exists(artPath) ||
+                 System.IO.File.GetLastWriteTimeUtc(srcPath) > System.IO.File.GetLastWriteTimeUtc(artPath)))
+            {
+                AssetUtil.EnsureFolder("Assets/_Project/Art/Plants/Brennnessel");
+                System.IO.File.Copy(srcPath, artPath, true);
+                AssetDatabase.ImportAsset(artPath, ImportAssetOptions.ForceUpdate);
+            }
+            // MODELL5: Read/Write fuer dieses Mesh aktivieren (UV-Check im Test).
+            ModelImporter bim = AssetImporter.GetAtPath(artPath) as ModelImporter;
+            if (bim != null && !bim.isReadable)
+            {
+                bim.isReadable = true;
+                bim.SaveAndReimport();
+            }
+            if (!System.IO.File.Exists(artPath))
+            {
+                Debug.LogWarning("[Urwald] Brennnessel-FBX fehlt: " + artPath);
+                return null;
+            }
+            Mesh found = null;
+            int bestTris = 0;
+            foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(artPath))
+            {
+                if (obj is Mesh mesh && mesh != null)
+                {
+                    int tris = 0;
+                    for (int s = 0; s < mesh.subMeshCount; s++) tris += mesh.GetSubMesh(s).indexCount / 3;
+                    if (tris > bestTris) { bestTris = tris; found = mesh; }
+                }
+            }
+            if (found == null || bestTris == 0)
+            {
+                Debug.LogWarning("[Urwald] Brennnessel ohne Triangles: " + artPath);
+                return null;
+            }
+            Debug.Log("[Urwald] Brennnessel geladen: " + found.name + ", Dreiecke " + bestTris
                       + ", Groesse " + found.bounds.size.ToString("F3"));
             return found;
         }

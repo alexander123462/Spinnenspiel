@@ -18,7 +18,7 @@ namespace Spinnenspiel.Tests
         {
             "MAT_Immergruen",     // Immergruen (MODELL4: Blender-Bodendecker ersetzt M_periwinkle_plant)
             "MAT_Unkraut",        // Unkraut (MODELL3: Blender-Rosette ersetzt M_weed_plant_02)
-            "M_nettle_plant",     // Brennnessel
+            "MAT_Brennnessel",    // Brennnessel (MODELL5: Blender-Neubau ersetzt M_nettle_plant)
             "MAT_BushTropisch",   // Busch1
         };
 
