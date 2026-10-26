@@ -65,9 +65,15 @@ namespace Spinnenspiel.EditorTools
             lib.redwoodMat = RedwoodMaterial();
             lib.canopyMat = CanopyMaterial();
             lib.cloverMat = CloverMaterial();
-            lib.fern = ScanMesh("Assets/_Project/Art/Scans/Models/fern_02/fern_02_1k.fbx", LoadMesh("VM_Fern"));
+            // MODELL7: Schwertfarn-Neubau (Rosette aus 8 bogigen Wedeln mit je
+            // 25 Fiederpaaren, 2964 Dreiecke, 0.87 m) ersetzt den Scan fern_02;
+            // fehlt das FBX, bleibt der Scan als Fallback stehen.
+            Mesh farnTropisch = LoadBlenderFarnTropisch();
+            if (farnTropisch != null) lib.fern = farnTropisch;
+            else lib.fern = ScanMesh("Assets/_Project/Art/Scans/Models/fern_02/fern_02_1k.fbx", LoadMesh("VM_Fern"));
             // G4: Scan-Farn/-Strauch wirken mitteleuropäisch-braun → grün getönte Kopien (Originale bleiben unverändert).
             lib.fernMat = TropischMaterial(ScanMaterial("Assets/_Project/Art/Scans/Materials/M_fern_02.mat", LoadMaterial("MAT_Fern")), "MAT_FernTropisch");
+            if (farnTropisch != null && lib.fernMat != null) FernTropischOpaque(lib.fernMat);
             lib.bush = ScanMesh("Assets/_Project/Art/Scans/Models/shrub_02/shrub_02_2k.fbx", LoadMesh("VM_Bush"));
             lib.bushMat = TropischMaterial(ScanMaterial("Assets/_Project/Art/Scans/Materials/M_shrub_02.mat", LoadMaterial("MAT_Grass")), "MAT_BushTropisch");
             // A1: extra Busche-Varianten (shrub_03/04) with matching tropische Materials.
@@ -1555,6 +1561,74 @@ namespace Spinnenspiel.EditorTools
             Debug.Log("[Urwald] Brennnessel geladen: " + found.name + ", Dreiecke " + bestTris
                       + ", Groesse " + found.bounds.size.ToString("F3"));
             return found;
+        }
+
+        /// <summary>MODELL7: Schwertfarn Farn_Tropisch (aufrechte Rosette aus 8
+        /// bogigen Wedeln mit je 25 Fiederpaaren, 2 junge Krumme, Rhizom-Kegel;
+        /// 2964 Dreiecke, 0.87 m, EIN Slot). Laedt das FBX aus Plants/Farn_Tropisch
+        /// (kopiert aus ArtSource falls dort aelter) und liefert das Mesh.</summary>
+        private static Mesh LoadBlenderFarnTropisch()
+        {
+            const string artPath = "Assets/_Project/Art/Plants/Farn_Tropisch/Farn_Tropisch.fbx";
+            const string srcPath = "ArtSource/Farn_Tropisch/farn_tropisch_neu.fbx";
+            if (System.IO.File.Exists(srcPath) &&
+                (!System.IO.File.Exists(artPath) ||
+                 System.IO.File.GetLastWriteTimeUtc(srcPath) > System.IO.File.GetLastWriteTimeUtc(artPath)))
+            {
+                AssetUtil.EnsureFolder("Assets/_Project/Art/Plants/Farn_Tropisch");
+                System.IO.File.Copy(srcPath, artPath, true);
+                AssetDatabase.ImportAsset(artPath, ImportAssetOptions.ForceUpdate);
+            }
+            // MODELL7: Read/Write fuer dieses Mesh aktivieren (UV-Check im Test).
+            ModelImporter fmi = AssetImporter.GetAtPath(artPath) as ModelImporter;
+            if (fmi != null && !fmi.isReadable)
+            {
+                fmi.isReadable = true;
+                fmi.SaveAndReimport();
+            }
+            if (!System.IO.File.Exists(artPath))
+            {
+                Debug.LogWarning("[Urwald] Farn_Tropisch-FBX fehlt: " + artPath);
+                return null;
+            }
+            Mesh found = null;
+            int bestTris = 0;
+            foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(artPath))
+            {
+                if (obj is Mesh mesh && mesh != null)
+                {
+                    int tris = 0;
+                    for (int s = 0; s < mesh.subMeshCount; s++) tris += mesh.GetSubMesh(s).indexCount / 3;
+                    if (tris > bestTris) { bestTris = tris; found = mesh; }
+                }
+            }
+            if (found == null || bestTris == 0)
+            {
+                Debug.LogWarning("[Urwald] Farn_Tropisch ohne Triangles: " + artPath);
+                return null;
+            }
+            Debug.Log("[Urwald] Farn_Tropisch geladen: " + found.name + ", Dreiecke " + bestTris
+                      + ", Groesse " + found.bounds.size.ToString("F3"));
+            return found;
+        }
+
+        /// <summary>MODELL7: MAT_FernTropisch auf den Blender-Neubau umstellen:
+        /// echte Geometrie statt Scan-Cards -> opakes Material (kein Cutout),
+        /// Albedo/Normal aus dem 8x4-Zellen-Atlas, weisser Basaton.</summary>
+        private static void FernTropischOpaque(Material m)
+        {
+            m.SetFloat("_SurfaceType", 0f);
+            m.SetFloat("_AlphaCutoffEnable", 0f);
+            m.SetFloat("_Smoothness", 0.15f);
+            m.SetFloat("_DoubleSidedEnable", 1f);
+            m.SetFloat("_DoubleSidedNormalMode", 2f);
+            SetPHTexture(m, "Assets/_Project/Art/Plants/Farn_Tropisch/Textures/FarnTropisch_Albedo.png", true);
+            SetPHTexture(m, "Assets/_Project/Art/Plants/Farn_Tropisch/Textures/FarnTropisch_Normal.png", false);
+            m.color = Color.white;
+            m.SetColor("_BaseColor", Color.white);
+            m.enableInstancing = true;
+            HDMaterial.ValidateMaterial(m);
+            EditorUtility.SetDirty(m);
         }
 
         /// <summary>A1: extra Busche-Meshes (shrub_03/shrub_04) via ScanModels; missing ones skipped.</summary>

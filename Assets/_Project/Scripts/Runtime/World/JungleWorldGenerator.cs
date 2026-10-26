@@ -244,7 +244,8 @@ namespace Spinnenspiel
                 (i, j) => 0.7f + World.Hash01(i, j, 14) * 0.7f, Mathf.RoundToInt(1500 * bushFactor));
             FernCount = PlaceGrid(unterholz.transform, size, 0.6f, library.fern, library.fernMat,
                 (i, j, x, z) => World.Hash01(i, j, 23) < Mathf.Min(1f, World.Density(x, z) * 0.7f * swordFernFactor),
-                (i, j) => 0.8f + World.Hash01(i, j, 24) * 0.8f, Mathf.RoundToInt(1500 * swordFernFactor));
+                (i, j) => 0.8f + World.Hash01(i, j, 24) * 0.8f, Mathf.RoundToInt(1500 * swordFernFactor),
+                0.5f); // MODELL7: Kletter-Kern nur 0.5 m (bogige Wedel durchkrabbelbar)
             ReedCount = PlaceGrid(unterholz.transform, size, 0.7f, library.reed, library.reedMat,
                 (i, j, x, z) => World.Height(x, z) >= JungleWorld.WaterLevel - 0.3f
                     && World.Height(x, z) <= JungleWorld.WaterLevel + 0.2f
@@ -301,7 +302,7 @@ namespace Spinnenspiel
                     float rot = World.Hash01(tIdx, k, 304) * 360f;
                     float scale = 0.8f + World.Hash01(tIdx, k, 305) * 0.9f; // skaliert Gebuesch-Hoehe
                     AddPlant(unterholz.transform, library.fern, library.fernMat,
-                        new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale);
+                        new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale, 0.5f); // MODELL7: Kern 0.5 m
                     PlantColliderCount++;
                 }
             }
@@ -828,7 +829,7 @@ namespace Spinnenspiel
         /// für Farne, davor Versatz per Hash01). Maximal maxCount Exemplare.
         /// </summary>
         private int PlaceGrid(Transform parent, float size, float step, Mesh mesh, Material mat,
-            PlantPredicate ok, PlantScale scale, int maxCount)
+            PlantPredicate ok, PlantScale scale, int maxCount, float coreHeight = 0f)
         {
             int n = 0;
             int cells = Mathf.FloorToInt(size / step);
@@ -843,7 +844,7 @@ namespace Spinnenspiel
                     if (NearSpawn(x, z, 1.0f)) continue; // Unterholz: 1 m um den Spawnplatz frei
                     if (!ok(i, j, x, z)) continue;
                     float rot = World.Hash01(i, j, SaltA(step) + 4) * 360f;
-                    AddPlant(parent, mesh, mat, new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale(i, j));
+                    AddPlant(parent, mesh, mat, new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale(i, j), coreHeight);
                     PlantColliderCount++;
                     n++;
                 }
@@ -968,7 +969,7 @@ namespace Spinnenspiel
         }
 
         /// <summary>Mesh-Objekt mit Kind „PflanzenCollider“ erzeugen (Spinne/Netze können andocken).</summary>
-        private GameObject AddPlant(Transform parent, Mesh mesh, Material mat, Vector3 pos, float rotY, float scale)
+        private GameObject AddPlant(Transform parent, Mesh mesh, Material mat, Vector3 pos, float rotY, float scale, float coreHeight = 0f)
         {
             GameObject g = new GameObject();
             g.transform.SetParent(parent, false);
@@ -989,9 +990,14 @@ namespace Spinnenspiel
             Vector3 s = g.transform.localScale;
             var cc = c.AddComponent<CapsuleCollider>();
             cc.direction = 1; // Y-Achse
-            cc.height = b.size.y * s.y;
+            // MODELL7: coreHeight > 0 (Schwertfarn) -> duenner Kletter-Kern am
+            // Stand fuss hoch; die bogigen Wedel bleiben durchkrabbelbar, die
+            // Spinne klettert nicht bis ueber 1 m und kippt (B2-Regression).
+            float capH = coreHeight > 0f ? Mathf.Min(b.size.y, coreHeight) : b.size.y;
+            cc.height = capH * s.y;
             cc.radius = Mathf.Clamp(0.25f * Mathf.Min(b.size.x * s.x, b.size.z * s.z), 0.015f, 0.12f);
-            c.transform.position = g.transform.TransformPoint(b.center);
+            float capCenterY = coreHeight > 0f ? b.min.y + capH * 0.5f : b.center.y;
+            c.transform.position = g.transform.TransformPoint(new Vector3(b.center.x, capCenterY, b.center.z));
             AddPlantLod(g);
             return g;
         }
