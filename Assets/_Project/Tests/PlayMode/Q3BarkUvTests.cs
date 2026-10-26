@@ -42,7 +42,14 @@ namespace Spinnenspiel.Tests
                 Assert.IsNotNull(wood, "Wood material " + i + " null.");
                 var st = wood.GetVector("_BaseColorMap_ST");
 
+                // Hoehe des Holzes: Holz-Submesh (Slot-Name trunk/wood/bark), sonst ganzer Baum. Der Jacaranda hat im Holz-Slot nur den nackten Stamm.
                 float worldH = lib.phTreeLod0[i].bounds.size.y * lib.phTreeScales[i];
+                string[] slots = (lib.phTreeSlotNames != null && i < lib.phTreeSlotNames.Length && lib.phTreeSlotNames[i] != null) ? lib.phTreeSlotNames[i].Split('|') : new string[0];
+                for (int k = 0; k < slots.Length && k < lib.phTreeLod0[i].subMeshCount; k++)
+                {
+                    string sn = slots[k].ToLowerInvariant();
+                    if (sn.Contains("trunk") || sn.Contains("wood") || sn.Contains("bark")) { worldH = lib.phTreeLod0[i].GetSubMesh(k).bounds.size.y * lib.phTreeScales[i]; break; }
+                }
                 float metersPerRepeatV = worldH / Mathf.Max(0.01f, st.y);
                 Debug.Log(string.Format("[Q3] {0}: worldH={1:0.0} m ST=({2:0.0}x{3:0.0}) V-Meter/Repeat={4:0.00}",
                     wood.name, worldH, st.x, st.y, metersPerRepeatV));

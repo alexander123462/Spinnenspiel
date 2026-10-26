@@ -85,8 +85,8 @@ namespace Spinnenspiel.Tests
                 {
                     CapsuleCollider cap = (CapsuleCollider)trunkCollider;
                     float half = cap.height * 0.5f - cap.radius;
-                    axisA = trunkCollider.transform.TransformPoint(new Vector3(0f, -half, 0f));
-                    axisB = trunkCollider.transform.TransformPoint(new Vector3(0f, half, 0f));
+                    axisA = trunkCollider.transform.TransformPoint(cap.center + new Vector3(0f, -half, 0f));
+                    axisB = trunkCollider.transform.TransformPoint(cap.center + new Vector3(0f, half, 0f));
                     capRadius = cap.radius * Mathf.Max(Mathf.Max(trunkCollider.transform.localScale.x, trunkCollider.transform.localScale.y), trunkCollider.transform.localScale.z);
                 }
                 float minAxisDist = 99f;
@@ -110,6 +110,9 @@ namespace Spinnenspiel.Tests
                         float dAxis = Vector3.Distance(p, axisA + ab * tt);
                         minAxisDist = Mathf.Min(minAxisDist, dAxis);
                         inside = dAxis < capRadius;
+                        // Oberhalb der Kapselspitze (Stammende) ist die Spinne auf dem Astwerk (das ueber den Mesh-Collider getragen wird), nicht im Stamm:
+                        // die Kuppel der Kapsel ueberlappt dort mit den Astansaetzen, das ist keine Durchdringung (neuer Jacaranda, Stamm-Slot nur Stamm).
+                        if (tt >= 0.999f && p.y > axisB.y) inside = false;
                     }
                     else
                     {
@@ -121,7 +124,11 @@ namespace Spinnenspiel.Tests
                         firstBelowAt = t;
                         firstWhere = "pos=" + p.ToString("F2") + " terrainY=" + terrainY.ToString("F2");
                     }
-                    if (firstInsideAt < 0f && inside) firstInsideAt = t;
+                    if (firstInsideAt < 0f && inside)
+                    {
+                        firstInsideAt = t;
+                        if (isCapsule) firstWhere = "p=" + p.ToString("F2") + " axisA=" + axisA.ToString("F2") + " axisB=" + axisB.ToString("F2") + " start=" + mv.transform.position.ToString("F2");
+                    }
                 }
                 mv.SetExternalMoveLocal(null);
                 mv.SetExternalSprint(false);

@@ -9,8 +9,23 @@ param(
     [int]$Warte = 25,
     [string]$Near = "",
     [double]$Zoom = 0,
-    [switch]$Boden
+    [switch]$Boden,
+    [switch]$Immer   # Nutzer-Wache ueberspringen (nur fuer Overseer-Tests)
 )
+# Nutzer-Wache (Alex 2026-10-26: ein sichtbares Spielfenster stoert beim Zocken): nur starten, wenn seit mindestens 180 s keine Eingabe an Tastatur/Maus kam.
+Add-Type -TypeDefinition @'
+using System; using System.Runtime.InteropServices;
+public class LeerlaufWache { [StructLayout(LayoutKind.Sequential)] struct LII { public uint cb; public uint t; }
+ [DllImport("user32.dll")] static extern bool GetLastInputInfo(ref LII p);
+ public static double Sekunden() { LII l = new LII(); l.cb = (uint)Marshal.SizeOf(typeof(LII)); GetLastInputInfo(ref l); return ((uint)Environment.TickCount - l.t) / 1000.0; } }
+'@
+if (-not $Immer) {
+    $idle = [LeerlaufWache]::Sekunden()
+    if ($idle -lt 180) {
+        Write-Output ("NUTZER AKTIV (letzte Eingabe vor {0:N0} s): Foto verschoben, in 5 Minuten erneut versuchen (Start-Sleep 300), hoechstens 6 Mal; danach Foto-Schritt zurueckstellen." -f $idle)
+        exit 3
+    }
+}
 Add-Type -AssemblyName System.Drawing
 Add-Type -TypeDefinition @'
 using System; using System.Runtime.InteropServices;

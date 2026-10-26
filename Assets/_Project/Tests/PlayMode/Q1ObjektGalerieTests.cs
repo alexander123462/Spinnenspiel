@@ -223,6 +223,13 @@ namespace Spinnenspiel.Tests
             if (veg != null) veg.RenderForCamera(cam);
             string file = "Logs/ci/galerie/" + name + "_" + view + ".png";
             Vector4 st = UrwaldTests.SaveFrameHdr(cam, W, H, file);
+            // Warmup (KLEE1b-Lehre): HDRP kompiliert Shader nach dem Editor-Start asynchron, das erste Bild ist dann einfarbig (Mittel == Max).
+            for (int warm = 0; warm < 15 && st.y - st.x < 1f; warm++)
+            {
+                yield return new WaitForSecondsRealtime(1f);
+                yield return null;
+                st = UrwaldTests.SaveFrameHdr(cam, W, H, file);
+            }
             float magPct = 100f * st.z / (W * H);
             bool ok = st.x >= 30f && st.x <= 220f && magPct < 0.5f;
             _index.AppendLine(file + ";" + name + ";mittel=" + st.x.ToString("F0") + ";max=" + st.y.ToString("F0")

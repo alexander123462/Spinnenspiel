@@ -693,7 +693,7 @@ namespace Spinnenspiel
                         found = true;
                     }
                     if (!found) continue; // no Branch there -> skip
-                    float groundY = World.Height(anchor.x, anchor.z);
+                    float groundY = terrain != null ? terrain.SampleHeight(anchor) + terrain.transform.position.y : World.Height(anchor.x, anchor.z); // gebautes Gelaende, nicht die Rohfunktion (Spawn-Mulde etc.)
                     float gap = 0.2f + World.Hash01(tIdx, a, 74) * 0.6f; // unteres Ende 0.2..0.8 m
                     float len = (anchor.y - groundY) - gap;
                     if (len < 1.5f || len > 30f) continue; // too short / Branch too high
@@ -1529,6 +1529,8 @@ namespace Spinnenspiel
                 CapsuleCollider cap = trunk.AddComponent<CapsuleCollider>();
                 cap.radius = tradius;
                 cap.height = Mathf.Max(theight, tradius * 2f + 0.01f);
+                // Untere Kuppel unter das Gelaende legen: sonst kann die Spinne am Stammfuss (Kapsel nur so hoch wie der nackte Stamm) in die Kuppel laufen.
+                cap.height += tradius; cap.center = new Vector3(0f, -tradius * 0.5f, 0f);
                 cap.direction = 1; // Y-Axis (Stemachse)
                 UnityEngine.Debug.Log("[R6] TrunkCapsule variant=" + variant + " radius->" + tradius.ToString("F3")
                     + " height->" + theight.ToString("F3") + " convex->true");
