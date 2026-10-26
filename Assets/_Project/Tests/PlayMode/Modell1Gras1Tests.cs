@@ -43,6 +43,10 @@ namespace Spinnenspiel.Tests
 
             Mesh mesh = null;
             int instances = 0;
+            // StaticBatchingUtility.Combine erzeugt Batch-Meshes mit allen
+            // Dreiecken; wie in Modell3 deterministisch das Einzel-Instanz-Mesh
+            // (Name 'Gras1', sonst kleinstes Match) holen, nicht das letzte.
+            float bestSize = float.MaxValue;
             foreach (var mr in Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None))
             {
                 bool hit = false;
@@ -51,7 +55,11 @@ namespace Spinnenspiel.Tests
                 if (!hit) continue;
                 instances++;
                 var mf = mr.GetComponent<MeshFilter>();
-                if (mf != null && mf.sharedMesh != null) mesh = mf.sharedMesh;
+                if (mf == null || mf.sharedMesh == null) continue;
+                var sh = mf.sharedMesh;
+                if (sh.name == "Gras1") { mesh = sh; break; }
+                float s = sh.bounds.size.magnitude;
+                if (s < bestSize) { bestSize = s; mesh = sh; }
             }
 
             Assert.IsNotNull(mesh, "MODELL1: kein Mesh mit Material " + GrasMat + " in der Welt.");

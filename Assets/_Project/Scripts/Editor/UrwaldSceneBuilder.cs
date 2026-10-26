@@ -1171,11 +1171,37 @@ namespace Spinnenspiel.EditorTools
                 mats.Add(unkrautMat);
             }
 
+            // MODELL4: Immergruen-Bodendecker (Vinca-Typ: 3 Ranken mit
+            // gegenstaendigen Blattpaaren, Rosette; 868 Dreiecke, 0.10 m hoch)
+            // ersetzt den Poly-Haven-Scan periwinkle_plant.
+            Mesh immergruen = LoadBlenderImmergruen();
+            if (immergruen != null)
+            {
+                Shader hdrpLit4 = Shader.Find("HDRP/Lit");
+                Material igMat = GetOrCreateMat("MAT_Immergruen", hdrpLit4, Color.white);
+                igMat.SetFloat("_SurfaceType", 0f);
+                igMat.SetFloat("_AlphaCutoffEnable", 0f);
+                igMat.SetFloat("_Smoothness", 0.42f); // Vinca: glaenzende Blattoberseite
+                igMat.SetFloat("_DoubleSidedEnable", 1f);
+                igMat.SetFloat("_DoubleSidedNormalMode", 2f);
+                // TEXTUR: Albedo/Normal je Blattzelle im 8x4-Atlas (Ranke Zellen
+                // 29..31), UV im FBX, V entlang der Mittelrippe.
+                SetPHTexture(igMat, "Assets/_Project/Art/Plants/Immergruen/Textures/Immergruen_Albedo.png", true);
+                SetPHTexture(igMat, "Assets/_Project/Art/Plants/Immergruen/Textures/Immergruen_Normal.png", false);
+                igMat.SetColor("_BaseColor", Color.white);
+                igMat.enableInstancing = true;
+                HDMaterial.ValidateMaterial(igMat);
+                EditorUtility.SetDirty(igMat);
+                meshes.Add(immergruen);
+                mats.Add(igMat);
+            }
+
             foreach (string id in ids)
             {
                 if (id == "grass_medium_01" && gras1 != null) continue; // MODELL1: schon ersetzt
                 if (id == "grass_medium_02" && gras2 != null) continue; // MODELL2: schon ersetzt
                 if (id == "weed_plant_02" && unkraut != null) continue; // MODELL3: schon ersetzt
+                if (id == "periwinkle_plant" && immergruen != null) continue; // MODELL4: schon ersetzt
                 if (!ScanModels.IsAvailable(id))
                 {
                     Debug.LogWarning("[Urwald] Bodendecker nicht verfügbar, übersprungen: " + id);
@@ -1341,6 +1367,53 @@ namespace Spinnenspiel.EditorTools
                 return null;
             }
             Debug.Log("[Urwald] Unkraut geladen: " + found.name + ", Dreiecke " + bestTris
+                      + ", Groesse " + found.bounds.size.ToString("F3"));
+            return found;
+        }
+
+        /// <summary>MODELL4: prozeduraler Immergruen-Bodendecker (Vinca-Typ:
+        /// 3 Ranken mit je 4 gegenstaendigen Blattpaaren, Mitteldoppelrosette,
+        /// 868 Dreiecke, 0.10 m hoch). Laedt das FBX aus Plants/Immergruen
+        /// (kopiert aus ArtSource falls dort aelter) und liefert das Mesh.</summary>
+        private static Mesh LoadBlenderImmergruen()
+        {
+            const string artPath = "Assets/_Project/Art/Plants/Immergruen/Immergruen.fbx";
+            const string srcPath = "ArtSource/Immergruen/immergruen_neu.fbx";
+            if (!System.IO.File.Exists(artPath) && System.IO.File.Exists(srcPath))
+            {
+                AssetUtil.EnsureFolder("Assets/_Project/Art/Plants/Immergruen");
+                System.IO.File.Copy(srcPath, artPath, true);
+                AssetDatabase.ImportAsset(artPath, ImportAssetOptions.ForceUpdate);
+            }
+            // MODELL4: Read/Write fuer dieses Mesh aktivieren (UV-Check im Test).
+            ModelImporter iim = AssetImporter.GetAtPath(artPath) as ModelImporter;
+            if (iim != null && !iim.isReadable)
+            {
+                iim.isReadable = true;
+                iim.SaveAndReimport();
+            }
+            if (!System.IO.File.Exists(artPath))
+            {
+                Debug.LogWarning("[Urwald] Immergruen-FBX fehlt: " + artPath);
+                return null;
+            }
+            Mesh found = null;
+            int bestTris = 0;
+            foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(artPath))
+            {
+                if (obj is Mesh mesh && mesh != null)
+                {
+                    int tris = 0;
+                    for (int s = 0; s < mesh.subMeshCount; s++) tris += mesh.GetSubMesh(s).indexCount / 3;
+                    if (tris > bestTris) { bestTris = tris; found = mesh; }
+                }
+            }
+            if (found == null || bestTris == 0)
+            {
+                Debug.LogWarning("[Urwald] Immergruen ohne Triangles: " + artPath);
+                return null;
+            }
+            Debug.Log("[Urwald] Immergruen geladen: " + found.name + ", Dreiecke " + bestTris
                       + ", Groesse " + found.bounds.size.ToString("F3"));
             return found;
         }
