@@ -37,3 +37,6 @@ Ursache: kein Spielcode-Fehler; Beweisbild grau wegen Aufnahme-Pipeline (auch Wa
 2026-10-26 MODELL6 (Overseer): [!] wegen B4c (Seil/Space) Wackler, einzeln gruen -> ROT.md, Farn-Arbeit committet, Punkt [x].
 
 - 2026-10-27 Overseer MODELL15: Hermes-Runde ohne Zeit (Blender-Export offen, Atlas S 0.78 ueber Ziel). Zu gross fuer einen Eingriff -> in MODELL15a (Atlas), 15b (Blender/FBX), 15c (Unity-Abnahme) zerlegt; Atlas-PNGs gestasht, Skripte bleiben im Arbeitsbaum.
+
+## 2026-10-28 MODELL17 (Overseer)
+Ursache: Hermes brach ab, weil HDRP-Lit die Vertexfarbe (Moos) nicht zeigt und Blender-PNG-Save schwarz lieferte; Geometrie/Tests waren fertig. Aktion: gezielte Tests geprueft (M17 gruen; Q1/Vegetation/Urwald gruen ausser Z9, E1 lastabhaengig), Hermes-Dateien committet, Moos als MODELL17b neu geplant, E1 in ROT.md.

@@ -13,3 +13,4 @@ Commit mitnehmen.
 (Baseline currently empty: RedPreview_WhenSpotGoesBad made deterministic and green in R7.)
 
 - Spinnenspiel.Tests.UrwaldTests.Performance_Z9CostBreakdownPerSystem — Base frame time 17.5 ms > 16.7 ms nur, wenn die lokale KI (Strata/Hermes) die GPU mitbenutzt (Overseer 2026-10-24, FARBE1b); ohne laufende KI gruen.
+- Spinnenspiel.Tests.UrwaldTests.E1_WaterProofImageIsSharp — SharpFrac knapp unter 0.10 bzw. 0 (lastabhaengig/Offscreen-Bild; Overseer 2026-10-28, MODELL17: rot auch ohne Bezug zu Steinen, Backlog-Hinweis 'E1 lastabhaengig').

@@ -58,7 +58,12 @@ namespace Spinnenspiel.EditorTools
             Mesh[] totholzNeu = LoadTotholzMeshes();
             if (totholzNeu != null) lib.logs = totholzNeu;
             lib.logHulls = LoadTotholzHulls();
-            lib.rocks = LoadMeshes(new[] { "M_Rock0", "M_Rock1", "M_Rock2", "M_Rock3", "M_Rock4" });
+            // MODELL17: Blender-Steine (ArtSource/Steine, 5 Varianten je ~1400 Dreiecke,
+            // gebrochene Facetten, Schichtung, Moos als Vertexfarbe) ersetzen M_Rock0..4;
+            // fehlt ein FBX, bleibt der prozedurale Fallback aus MeshFactory aktiv.
+            Mesh[] steineNeu = LoadSteineMeshes();
+            if (steineNeu != null) lib.rocks = steineNeu;
+            else lib.rocks = LoadMeshes(new[] { "M_Rock0", "M_Rock1", "M_Rock2", "M_Rock3", "M_Rock4" });
 
             lib.leaves = LoadMaterial("MAT_Leaves");
             lib.reedMat = ReedMaterial(LoadMaterial("MAT_Reed"));
@@ -1024,6 +1029,45 @@ namespace Spinnenspiel.EditorTools
                 {
                     if (obj is Mesh mesh) { result[i] = mesh; break; }
                 }
+            }
+            return result;
+        }
+
+        /// <summary>MODELL17: Blender-Stein-FBX (5 Varianten, je 1 Submesh, Vertexfarbe
+        /// 'Col' mit Moos oben). Read/Write wie Totholz (MeshCollider convex noetig).</summary>
+        private static Mesh[] LoadSteineMeshes()
+        {
+            const string folder = "Assets/_Project/Art/Plants/Steine/";
+            var result = new Mesh[5];
+            for (int i = 0; i < 5; i++)
+            {
+                string path = folder + "Stein_" + (i + 1) + ".fbx";
+                if (!System.IO.File.Exists(path))
+                {
+                    Debug.LogWarning("[Urwald] Stein-FBX fehlt: " + path);
+                    return null;
+                }
+                ModelImporter imp = AssetImporter.GetAtPath(path) as ModelImporter;
+                if (imp != null && !imp.isReadable)
+                {
+                    imp.isReadable = true;
+                    imp.SaveAndReimport();
+                }
+                foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(path))
+                {
+                    if (obj is Mesh mesh) { result[i] = mesh; break; }
+                }
+                if (result[i] == null)
+                {
+                    Debug.LogWarning("[Urwald] Kein Mesh im Stein-FBX: " + path);
+                    return null;
+                }
+                Mesh m = result[i];
+                int tris = 0;
+                for (int s = 0; s < m.subMeshCount; s++) tris += m.GetSubMesh(s).indexCount / 3;
+                bool hasCol = m.colors32 != null && m.colors32.Length == m.vertexCount;
+                Debug.Log("[Urwald] Stein_" + (i + 1) + " Dreiecke=" + tris + " submeshes=" + m.subMeshCount
+                    + " vertexColors=" + hasCol + " bounds=" + m.bounds.size);
             }
             return result;
         }
