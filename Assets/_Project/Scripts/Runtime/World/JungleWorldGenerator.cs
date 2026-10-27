@@ -239,6 +239,8 @@ namespace Spinnenspiel
             // determinist from Seed (Hash01), Zufalls-Rot/Scale as before.
             BushCount = PlaceGridVariants(unterholz.transform, size, 1.0f,
                 VariantMeshes(library.bush, library.bushVariants), VariantMats(library.bushMat, library.bushVariantMats),
+                // MODELL8: der Busch1-Neubau hat 2 Submeshes (Ast/Blatt) -> Zweitmaterial.
+                BranchMats(library.buschBranchMat, library.bushVariants != null ? library.bushVariants.Length : 0),
                 (i, j, x, z) => World.Height(x, z) >= JungleWorld.WaterLevel + 0.2f
                     && World.Hash01(i, j, 13) < World.Density(x, z) * 0.6f * bushFactor,
                 (i, j) => 0.7f + World.Hash01(i, j, 14) * 0.7f, Mathf.RoundToInt(1500 * bushFactor));
@@ -308,12 +310,14 @@ namespace Spinnenspiel
             }
 
             // WALD6: Jungbaeumchen/Nadelwedel als Gebuesch (fedrige Coniferen-Zweige, 0.5-2 m).
-            if (youngConifersOn && library.bushMat != null)
+            // MODELL8: weiter am Scan-Material bushScanMat (fedrige Einzelnetz-Optik).
+            if (youngConifersOn && library.bushScanMat != null)
             {
                 var coniferMeshes = new System.Collections.Generic.List<Mesh>(3);
                 for (int v = 0; v < 3; v++) coniferMeshes.Add(JunglePlantFactory.YoungConifer(Seed * 17 + v + 1));
                 YoungConiferCount = PlaceGridVariants(unterholz.transform, size, 1.0f,
-                    coniferMeshes.ToArray(), VariantMats(library.bushMat, library.bushVariantMats),
+                    coniferMeshes.ToArray(), VariantMats(library.bushScanMat, library.bushVariantMats),
+                    null,
                     (i, j, x, z) => World.Height(x, z) >= JungleWorld.WaterLevel + 0.2f
                         && World.Hash01(i, j, 413) < Mathf.Min(1f, World.Density(x, z) * 0.8f * bushFactor),
                     (i, j) => 0.45f + World.Hash01(i, j, 414) * 1.2f, // 0.45..1.65 -> ~0.5-2 m high
@@ -876,9 +880,21 @@ namespace Spinnenspiel
             return list.ToArray();
         }
 
-        /// <summary>A1: PlaceGrid but variant per Cell, determinist from Seed (Hash01 salt +5).</summary>
+        /// <summary>MODELL8: Zweitmaterial-Liste indexgleich zu VariantMats: nur fuer die
+        /// erste Variante (Busch1-Neubau mit 2 Submeshes) gesetzt, fuer die Scan-Varianten null.</summary>
+        private static Material[] BranchMats(Material branchMat, int extraVariants)
+        {
+            if (branchMat == null) return null;
+            var mats = new Material[1 + Mathf.Max(0, extraVariants)];
+            mats[0] = branchMat;
+            return mats;
+        }
+
+        /// <summary>A1: PlaceGrid but variant per Cell, determinist from Seed (Hash01 salt +5).
+        /// MODELL8: secondMats (optional, indexgleich zu mats) = Zweitmaterial fuer Meshes mit
+        /// 2 Submeshes (Busch1: Ast/Blatt); null-Eintraege = nur ein Material.</summary>
         private int PlaceGridVariants(Transform parent, float size, float step, Mesh[] meshes, Material[] mats,
-            PlantPredicate ok, PlantScale scale, int maxCount)
+            Material[] secondMats, PlantPredicate ok, PlantScale scale, int maxCount)
         {
             int n = 0;
             int variants = Mathf.Min(meshes.Length, mats.Length);
@@ -898,7 +914,8 @@ namespace Spinnenspiel
                     if (v < 0) v = 0;
                     if (v >= variants) v = variants - 1;
                     float rot = World.Hash01(i, j, SaltA(step) + 4) * 360f;
-                    AddPlant(parent, meshes[v], mats[v], new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale(i, j));
+                    Material second = secondMats != null && v < secondMats.Length ? secondMats[v] : null;
+                    AddPlant(parent, meshes[v], mats[v], new Vector3(x, World.Height(x, z) - 0.05f, z), rot, scale(i, j), 0f, second);
                     PlantColliderCount++;
                     n++;
                 }
@@ -969,7 +986,7 @@ namespace Spinnenspiel
         }
 
         /// <summary>Mesh-Objekt mit Kind „PflanzenCollider“ erzeugen (Spinne/Netze können andocken).</summary>
-        private GameObject AddPlant(Transform parent, Mesh mesh, Material mat, Vector3 pos, float rotY, float scale, float coreHeight = 0f)
+        private GameObject AddPlant(Transform parent, Mesh mesh, Material mat, Vector3 pos, float rotY, float scale, float coreHeight = 0f, Material secondMat = null)
         {
             GameObject g = new GameObject();
             g.transform.SetParent(parent, false);
@@ -978,7 +995,18 @@ namespace Spinnenspiel
             g.transform.localScale = Vector3.one * scale;
             g.AddComponent<MeshFilter>().sharedMesh = mesh;
             var plantRenderer = g.AddComponent<MeshRenderer>();
-            plantRenderer.sharedMaterial = mat;
+            // MODELL8: Meshes mit 2 Submeshes (Busch1-Neubau) bekommen Blatt- und
+            // Ast-Material; welcher Submesh das Blatt ist, wurde im Builder gemessen.
+            if (secondMat != null && mesh != null && mesh.subMeshCount >= 2)
+            {
+                Material[] pm = new Material[mesh.subMeshCount];
+                for (int mi = 0; mi < pm.Length; mi++) pm[mi] = mi == library.buschLeafSubmesh ? mat : secondMat;
+                plantRenderer.sharedMaterials = pm;
+            }
+            else
+            {
+                plantRenderer.sharedMaterial = mat;
+            }
             ApplyInstanceTint(plantRenderer, pos, 71);
 
             // Dünnkapsel in der Mesh-Mitte: klein genug, dass die Spinne nicht feststeckt,

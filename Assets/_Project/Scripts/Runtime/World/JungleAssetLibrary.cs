@@ -22,6 +22,16 @@ namespace Spinnenspiel
         public Material fernMat;
         public Material reedMat;
 
+        /// <summary>MODELL8: Busch1-Neubau (Blender, verzweigtes Astgeruest + 172 Blatt-
+        /// Geometrien). 2 Submeshes: Ast und Blatt; welcher Submesh das Blatt ist, wurde
+        /// beim Build gemessen (buschLeafSubmesh). bush bleibt der Mesh-Platzhalter
+        /// (Neubau oder Scan-Fallback); bushMat = Blatt-Material, buschBranchMat = Ast.</summary>
+        public Material buschBranchMat;
+        public int buschLeafSubmesh = 1;
+        /// <summary>MODELL8: gruen getoentes Scan-Material MAT_BushTropisch (Nutzer:
+        /// Jungnadelbaeume WALD6; Busch1-Neubau nutzt MAT_Busch1_Leaf/Branch).</summary>
+        public Material bushScanMat;
+
         /// <summary>A1: Busche-Varianten (Scan shrub_02/03/04), same length/order as the materials.
         /// bush/bushMat stay the first variant so older code keeps working.</summary>
         public Mesh[] bushVariants;
