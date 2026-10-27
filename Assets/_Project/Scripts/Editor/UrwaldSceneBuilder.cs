@@ -90,9 +90,24 @@ namespace Spinnenspiel.EditorTools
             lib.bushScanMat = TropischMaterial(ScanMaterial("Assets/_Project/Art/Scans/Materials/M_shrub_02.mat", LoadMaterial("MAT_Grass")), "MAT_BushTropisch");
             if (buschNeu != null && buschLeafMat != null) lib.bushMat = buschLeafMat;
             else lib.bushMat = lib.bushScanMat;
-            // A1: extra Busche-Varianten (shrub_03/04) with matching tropische Materials.
-            lib.bushVariants = LoadBushVariantMeshes();
-            lib.bushVariantMats = CreateBushVariantMats();
+            // MODELL9: Busch2-Neubau (Blender: 6 Haupttriebe mit Sekundaer- und
+            // Tertiaerzweigen, 150 ovale Blaetter als echte Geometrie, 5552 Dreiecke,
+            // 1.07 m, 2 Slots Ast/Blatt) ersetzt den Scan shrub_03 als Variante 0;
+            // fehlt das FBX, bleibt der Scan als Fallback stehen.
+            Mesh busch2Neu = LoadBlenderBusch(out int busch2LeafSub,
+                "Assets/_Project/Art/Plants/Busch2/Busch2.fbx", "ArtSource/Busch2/busch2_neu.fbx", "Busch2");
+            Material busch2LeafMat = CreateBuschAtlasMat("MAT_Busch2_Leaf",
+                "Assets/_Project/Art/Plants/Busch2/Textures/", "Busch2_Albedo.png", "Busch2_Normal.png", 0.15f);
+            lib.busch2BranchMat = CreateBuschAtlasMat("MAT_Busch2_Branch",
+                "Assets/_Project/Art/Plants/Busch2/Textures/", "Busch2_Albedo.png", "Busch2_Normal.png", 0.2f);
+            // A1: extra Busche-Varianten (MODELL9: Busch2-Neubau statt shrub_03; dann shrub_04).
+            lib.bushVariants = LoadBushVariantMeshes(busch2Neu);
+            lib.bushVariantMats = CreateBushVariantMats(busch2LeafMat);
+            if (busch2Neu == null || busch2LeafMat == null)
+                Debug.LogWarning("[Urwald] MODELL9: Busch2-Neubau unvollstaendig, Variante 0 bleibt Scan shrub_03.");
+            else if (busch2LeafSub != lib.buschLeafSubmesh)
+                Debug.Log("[Urwald] Busch2 Blatt-Submesh " + busch2LeafSub + " (AddPlant nutzt buschLeafSubmesh "
+                          + lib.buschLeafSubmesh + ").");
 
             // Riesenbläter (Blender, 3 Varianten): tropische Pflanze mit Blattschnitt-Mask und Normal.
             LoadRiesenblatt(lib);
@@ -1645,19 +1660,17 @@ namespace Spinnenspiel.EditorTools
             EditorUtility.SetDirty(m);
         }
 
-        /// <summary>MODELL8: Busch1-Neubau (Blender-Strauch, 2 Slots). Laedt das FBX aus
-        /// Plants/Busch1 (kopiert aus ArtSource falls dort neuer), misst den Blatt-Submesh
-        /// anhand der Bounds (Blatt sitzt hoeher als Ast) und liefert ihn per out.</summary>
-        private static Mesh LoadBlenderBusch1(out int leafSubmesh)
+        /// <summary>MODELL8/9: generischer Lader fuer Blender-Busch-FBX (Busch1/Busch2).
+        /// Laedt das FBX aus Plants/<label> (kopiert aus ArtSource falls dort neuer), misst
+        /// den Blatt-Submesh anhand der Bounds (Blatt sitzt hoeher als Ast) per out.</summary>
+        private static Mesh LoadBlenderBusch(out int leafSubmesh, string artPath, string srcPath, string label)
         {
             leafSubmesh = 1;
-            const string artPath = "Assets/_Project/Art/Plants/Busch1/Busch1.fbx";
-            const string srcPath = "ArtSource/Busch1/busch1_neu.fbx";
             if (System.IO.File.Exists(srcPath) &&
                 (!System.IO.File.Exists(artPath) ||
                  System.IO.File.GetLastWriteTimeUtc(srcPath) > System.IO.File.GetLastWriteTimeUtc(artPath)))
             {
-                AssetUtil.EnsureFolder("Assets/_Project/Art/Plants/Busch1");
+                AssetUtil.EnsureFolder(System.IO.Path.GetDirectoryName(artPath).Replace('\\', '/'));
                 System.IO.File.Copy(srcPath, artPath, true);
                 AssetDatabase.ImportAsset(artPath, ImportAssetOptions.ForceUpdate);
             }
@@ -1669,7 +1682,7 @@ namespace Spinnenspiel.EditorTools
             }
             if (!System.IO.File.Exists(artPath))
             {
-                Debug.LogWarning("[Urwald] Busch1-FBX fehlt: " + artPath);
+                Debug.LogWarning("[Urwald] " + label + "-FBX fehlt: " + artPath);
                 return null;
             }
             Mesh found = null;
@@ -1685,7 +1698,7 @@ namespace Spinnenspiel.EditorTools
             }
             if (found == null || bestTris == 0)
             {
-                Debug.LogWarning("[Urwald] Busch1 ohne Triangles: " + artPath);
+                Debug.LogWarning("[Urwald] " + label + " ohne Triangles: " + artPath);
                 return null;
             }
             // Blatt-Submesh messen: der Blatthugel sitzt deutlich hoeher als das Astgeruest.
@@ -1701,54 +1714,52 @@ namespace Spinnenspiel.EditorTools
             return found;
         }
 
+        private static Mesh LoadBlenderBusch1(out int leafSubmesh)
+            => LoadBlenderBusch(out leafSubmesh,
+                "Assets/_Project/Art/Plants/Busch1/Busch1.fbx", "ArtSource/Busch1/busch1_neu.fbx", "Busch1");
+
         /// <summary>MODELL8: MAT_Busch1_Leaf — opakes Blatt-Material (echte Geometrie,
         /// kein Cutout) mit Atlas-Albedo/Normal, DoubleSided Flip wie Grundfarn.</summary>
         private static Material CreateBusch1LeafMat()
+            => CreateBuschAtlasMat("MAT_Busch1_Leaf", "Assets/_Project/Art/Plants/Busch1/Textures/",
+                "Busch1_Albedo.png", "Busch1_Normal.png", 0.15f);
+
+        /// <summary>MODELL8/9: opakes Busch-Material (Blatt oder Ast) mit eigener
+        /// Atlas-Albedo/Normal; echte Geometrie statt Cutout, DoubleSided Flip wie
+        /// Grundfarn (Q2: Mirror macht Rueckseite schwarz), Instancing an.</summary>
+        private static Material CreateBuschAtlasMat(string matName, string texFolder,
+            string albedoName, string normalName, float smoothness)
         {
-            const string texFolder = "Assets/_Project/Art/Plants/Busch1/Textures/";
             Shader hdrpLit = Shader.Find("HDRP/Lit");
             if (hdrpLit == null) { Debug.LogWarning("[Urwald] HDRP/Lit nicht gefunden."); return null; }
-            Material leaf = GetOrCreateMat("MAT_Busch1_Leaf", hdrpLit, Color.white);
-            leaf.SetFloat("_SurfaceType", 0f);
-            leaf.SetFloat("_AlphaCutoffEnable", 0f);
-            leaf.SetFloat("_Smoothness", 0.15f);
-            leaf.SetFloat("_DoubleSidedEnable", 1f);
-            leaf.SetFloat("_DoubleSidedNormalMode", 2f); // Flip (Q2: Mirror macht Rueckseite schwarz)
-            SetPHTexture(leaf, texFolder + "Busch1_Albedo.png", true);
-            SetPHTexture(leaf, texFolder + "Busch1_Normal.png", false);
-            leaf.SetColor("_BaseColor", Color.white);
-            leaf.enableInstancing = true;
-            HDMaterial.ValidateMaterial(leaf);
-            EditorUtility.SetDirty(leaf);
-            return leaf;
+            Material m = GetOrCreateMat(matName, hdrpLit, Color.white);
+            m.SetFloat("_SurfaceType", 0f);
+            m.SetFloat("_AlphaCutoffEnable", 0f);
+            m.SetFloat("_Smoothness", smoothness);
+            m.SetFloat("_DoubleSidedEnable", 1f);
+            m.SetFloat("_DoubleSidedNormalMode", 2f); // Flip (Q2: Mirror macht Rueckseite schwarz)
+            SetPHTexture(m, texFolder + albedoName, true);
+            SetPHTexture(m, texFolder + normalName, false);
+            m.SetColor("_BaseColor", Color.white);
+            m.enableInstancing = true;
+            HDMaterial.ValidateMaterial(m);
+            EditorUtility.SetDirty(m);
+            return m;
         }
 
         /// <summary>MODELL8: MAT_Busch1_Branch — opakes Ast-Material (Rindenband der
         ///selben Atlas-Textur), DoubleSided an (duenne, offene Rohrenden).</summary>
         private static Material CreateBusch1BranchMat()
-        {
-            const string texFolder = "Assets/_Project/Art/Plants/Busch1/Textures/";
-            Shader hdrpLit = Shader.Find("HDRP/Lit");
-            Material branch = GetOrCreateMat("MAT_Busch1_Branch", hdrpLit, Color.white);
-            branch.SetFloat("_SurfaceType", 0f);
-            branch.SetFloat("_AlphaCutoffEnable", 0f);
-            branch.SetFloat("_Smoothness", 0.2f);
-            branch.SetFloat("_DoubleSidedEnable", 1f);
-            branch.SetFloat("_DoubleSidedNormalMode", 2f);
-            SetPHTexture(branch, texFolder + "Busch1_Albedo.png", true);
-            SetPHTexture(branch, texFolder + "Busch1_Normal.png", false);
-            branch.SetColor("_BaseColor", Color.white);
-            branch.enableInstancing = true;
-            HDMaterial.ValidateMaterial(branch);
-            EditorUtility.SetDirty(branch);
-            return branch;
-        }
+            => CreateBuschAtlasMat("MAT_Busch1_Branch", "Assets/_Project/Art/Plants/Busch1/Textures/",
+                "Busch1_Albedo.png", "Busch1_Normal.png", 0.2f);
 
-        /// <summary>A1: extra Busche-Meshes (shrub_03/shrub_04) via ScanModels; missing ones skipped.</summary>
-        private static Mesh[] LoadBushVariantMeshes()
+        /// <summary>A1/MODELL9: Busche-Varianten-Meshes. Variante 0 ist der Busch2-Neubau
+        /// (Blender), danach Scan shrub_04; fehlt der Neubau, bleibt shrub_03 als Fallback.</summary>
+        private static Mesh[] LoadBushVariantMeshes(Mesh busch2)
         {
             var meshes = new System.Collections.Generic.List<Mesh>();
-            foreach (string id in new[] { "shrub_03", "shrub_04" })
+            if (busch2 != null) meshes.Add(busch2);
+            foreach (string id in busch2 != null ? new[] { "shrub_04" } : new[] { "shrub_03", "shrub_04" })
             {
                 if (!ScanModels.IsAvailable(id))
                 {
@@ -1767,11 +1778,14 @@ namespace Spinnenspiel.EditorTools
             return meshes.ToArray();
         }
 
-        /// <summary>A1: tropische Materials for the extra Busche (same green tint as shrub_02).</summary>
-        private static Material[] CreateBushVariantMats()
+        /// <summary>A1/MODELL9: Materialien fuer die Busche-Varianten, indexgleich zu
+        /// LoadBushVariantMeshes: Variante 0 = Busch2-Blatt-Material (Neubau) oder
+        /// gruen getoenter Scan shrub_03 (Fallback), dann Scan shrub_04.</summary>
+        private static Material[] CreateBushVariantMats(Material busch2Leaf)
         {
             var mats = new System.Collections.Generic.List<Material>();
-            foreach (string id in new[] { "shrub_03", "shrub_04" })
+            if (busch2Leaf != null) mats.Add(busch2Leaf);
+            foreach (string id in busch2Leaf != null ? new[] { "shrub_04" } : new[] { "shrub_03", "shrub_04" })
             {
                 Material src = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_" + id + ".mat", null);
                 if (src == null)

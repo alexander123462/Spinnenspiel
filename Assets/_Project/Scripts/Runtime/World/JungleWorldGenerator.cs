@@ -239,8 +239,10 @@ namespace Spinnenspiel
             // determinist from Seed (Hash01), Zufalls-Rot/Scale as before.
             BushCount = PlaceGridVariants(unterholz.transform, size, 1.0f,
                 VariantMeshes(library.bush, library.bushVariants), VariantMats(library.bushMat, library.bushVariantMats),
-                // MODELL8: der Busch1-Neubau hat 2 Submeshes (Ast/Blatt) -> Zweitmaterial.
-                BranchMats(library.buschBranchMat, library.bushVariants != null ? library.bushVariants.Length : 0),
+                // MODELL8/9: Busch1- und Busch2-Neubau haben 2 Submeshes (Ast/Blatt)
+                // -> Zweitmaterial je Variante (Busch1-Ast an 0, Busch2-Ast an 1).
+                BranchMats(library.buschBranchMat, library.busch2BranchMat,
+                    library.bushVariants != null ? library.bushVariants.Length : 0),
                 (i, j, x, z) => World.Height(x, z) >= JungleWorld.WaterLevel + 0.2f
                     && World.Hash01(i, j, 13) < World.Density(x, z) * 0.6f * bushFactor,
                 (i, j) => 0.7f + World.Hash01(i, j, 14) * 0.7f, Mathf.RoundToInt(1500 * bushFactor));
@@ -887,6 +889,18 @@ namespace Spinnenspiel
             if (branchMat == null) return null;
             var mats = new Material[1 + Mathf.Max(0, extraVariants)];
             mats[0] = branchMat;
+            return mats;
+        }
+
+        /// <summary>MODELL9: Zweitmaterial-Liste mit Eintraegen pro Variante (Busch1-Ast
+        /// an 0, Busch2-Ast an 1); null-Eintrag = nur ein Material. Laengenanpassung
+        /// wie bei VariantMats/VariantMeshes.</summary>
+        private static Material[] BranchMats(Material branchMat1, Material branchMat2, int extraVariants)
+        {
+            if (branchMat1 == null && branchMat2 == null) return null;
+            var mats = new Material[1 + Mathf.Max(0, extraVariants)];
+            mats[0] = branchMat1;
+            if (mats.Length > 1) mats[1] = branchMat2;
             return mats;
         }
 

@@ -28,6 +28,11 @@ namespace Spinnenspiel
         /// (Neubau oder Scan-Fallback); bushMat = Blatt-Material, buschBranchMat = Ast.</summary>
         public Material buschBranchMat;
         public int buschLeafSubmesh = 1;
+        /// <summary>MODELL9: Busch2-Neubau (Blender, 6 Haupttriebe mit Sekundaer-/
+        /// Tertiaerzweigen, 150 ovale Blaetter, 5552 Dreiecke, 1.07 m). Ersetzt den
+        /// Scan shrub_03 als Busche-Variante 0; busch2BranchMat = Ast-Material,
+        /// Blatt-Material liegt an bushVariantMats[0].</summary>
+        public Material busch2BranchMat;
         /// <summary>MODELL8: gruen getoentes Scan-Material MAT_BushTropisch (Nutzer:
         /// Jungnadelbaeume WALD6; Busch1-Neubau nutzt MAT_Busch1_Leaf/Branch).</summary>
         public Material bushScanMat;
