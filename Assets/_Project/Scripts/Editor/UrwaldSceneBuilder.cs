@@ -48,6 +48,11 @@ namespace Spinnenspiel.EditorTools
             lib.bush = LoadMesh("VM_Bush");
             lib.fern = LoadMesh("VM_Fern");
             lib.reed = LoadMesh("VM_Reed");
+            // MODELL11: Blender-Schilf (Horst: 6 Knoten-Halme, ueberhaengende Klingen,
+            // 3 Rohrkolben, 1032 Dreiecke, 1.60 m, UV-Atlas) ersetzt den prozeduralen
+            // GrassClump. Quelle ArtSource/Schilf/schilf_neu.fbx; fehlt sie, bleibt VM_Reed.
+            Mesh schilfNeu = LoadBlenderSchilf();
+            if (schilfNeu != null) lib.reed = schilfNeu;
             lib.logs = LoadMeshes(new[] { "M_Log0", "M_Log1", "M_Log2" });
             lib.rocks = LoadMeshes(new[] { "M_Rock0", "M_Rock1", "M_Rock2", "M_Rock3", "M_Rock4" });
 
@@ -1730,6 +1735,52 @@ namespace Spinnenspiel.EditorTools
             => LoadBlenderBusch(out leafSubmesh,
                 "Assets/_Project/Art/Plants/Busch1/Busch1.fbx", "ArtSource/Busch1/busch1_neu.fbx", "Busch1");
 
+        /// <summary>MODELL11: Schilf-Horst aus Blender (Einzelobjekt, ein Slot MAT_Reed,
+        /// UV-Atlas). Liefert das Mesh mit den meisten Dreiecken; fehlt die Quelle, null.</summary>
+        private static Mesh LoadBlenderSchilf()
+        {
+            const string artPath = "Assets/_Project/Art/Plants/Schilf/Schilf.fbx";
+            const string srcPath = "ArtSource/Schilf/schilf_neu.fbx";
+            if (System.IO.File.Exists(srcPath) &&
+                (!System.IO.File.Exists(artPath) ||
+                 System.IO.File.GetLastWriteTimeUtc(srcPath) > System.IO.File.GetLastWriteTimeUtc(artPath)))
+            {
+                AssetUtil.EnsureFolder(System.IO.Path.GetDirectoryName(artPath).Replace('\\', '/'));
+                System.IO.File.Copy(srcPath, artPath, true);
+                AssetDatabase.ImportAsset(artPath, ImportAssetOptions.ForceUpdate);
+            }
+            ModelImporter simp = AssetImporter.GetAtPath(artPath) as ModelImporter;
+            if (simp != null && !simp.isReadable)
+            {
+                simp.isReadable = true;
+                simp.SaveAndReimport();
+            }
+            if (!System.IO.File.Exists(artPath))
+            {
+                Debug.LogWarning("[Urwald] MODELL11: Schilf-FBX fehlt: " + artPath);
+                return null;
+            }
+            Mesh found = null;
+            int bestTris = 0;
+            foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(artPath))
+            {
+                if (obj is Mesh mesh && mesh != null)
+                {
+                    int tris = 0;
+                    for (int s = 0; s < mesh.subMeshCount; s++) tris += mesh.GetSubMesh(s).indexCount / 3;
+                    if (tris > bestTris) { bestTris = tris; found = mesh; }
+                }
+            }
+            if (found == null || bestTris == 0)
+            {
+                Debug.LogWarning("[Urwald] MODELL11: Schilf ohne Triangles: " + artPath);
+                return null;
+            }
+            Debug.Log("[Urwald] Schilf geladen: " + found.name + ", Dreiecke " + bestTris
+                      + ", Groesse " + found.bounds.size.ToString("F3"));
+            return found;
+        }
+
         /// <summary>MODELL8: MAT_Busch1_Leaf — opakes Blatt-Material (echte Geometrie,
         /// kein Cutout) mit Atlas-Albedo/Normal, DoubleSided Flip wie Grundfarn.</summary>
         private static Material CreateBusch1LeafMat()
@@ -1974,6 +2025,20 @@ namespace Spinnenspiel.EditorTools
             }
             reed.SetColor("_BaseColor", new Color(ReedBaseR, ReedBaseG, ReedBaseB, 1f));
             reed.SetFloat("_Smoothness", ReedSmoothness);
+            // MODELL11: UV-Atlas-Textur (Halm-/Blatt-/Kolben-Baender) auf die neue
+            // Blender-Form. Der Q4-Ton bleibt als Multiplikator erhalten, deshalb ist
+            // die Textur selbst heller (~0.6-0.85) ausgelegt.
+            const string texDir = "Assets/_Project/Art/Plants/Schilf/Textures/";
+            if (System.IO.File.Exists(texDir + "Schilf_Albedo.png"))
+            {
+                SetPHTexture(reed, texDir + "Schilf_Albedo.png", true);
+                SetPHTexture(reed, texDir + "Schilf_Normal.png", false);
+            }
+            else
+            {
+                Debug.LogWarning("[Urwald] MODELL11: Schilf-Atlas fehlt, MAT_Reed bleibt einfarbig: " + texDir);
+            }
+            HDMaterial.ValidateMaterial(reed);
             EditorUtility.SetDirty(reed);
             return reed;
         }
