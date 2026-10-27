@@ -10,6 +10,7 @@ param(
     [string]$Near = "",
     [double]$Zoom = 0,
     [switch]$Boden,
+    [switch]$Riesen,  # MODELL12: Riesenblaetter trotz WALD6 ins Player-Foto (-fotoriesen)
     [switch]$Immer   # Nutzer-Wache ueberspringen (nur fuer Overseer-Tests)
 )
 # Nutzer-Wache (Alex 2026-10-26: ein sichtbares Spielfenster stoert beim Zocken): nur starten, wenn seit mindestens 180 s keine Eingabe an Tastatur/Maus kam.
@@ -42,6 +43,7 @@ $pArgs = @(
     '-fotopfad', "`"$full`"", '-fotoseed', "$Seed", '-fotopitch', "$Pitch", '-fotowarte', "$Warte"
 )
 if ($Boden) { $pArgs += '-fotoboden' }
+if ($Riesen) { $pArgs += '-fotoriesen' }
 if ($Near) { $pArgs += @('-fotonear', "`"$Near`"") }
 if ($Zoom -gt 0) { $pArgs += @('-fotozoom', "$Zoom") }
 $p = Start-Process "$root\Builds\Windows64\Spinnenspiel.exe" -ArgumentList $pArgs -PassThru

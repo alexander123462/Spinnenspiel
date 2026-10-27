@@ -17,6 +17,9 @@ namespace Spinnenspiel
         public JungleAssetLibrary library;
         public int fixedSeed;
         public static int NextSeed;
+        // MODELL12: Einmal-Override wie NextSeed: Galerie-/Player-Foto-Tests brauchen
+        // Riesenblatt-Bilder, obwohl WALD6 GiantLeavesOn=false. Wird in Awake consumed.
+        public static bool ForceGiantLeaves;
 
         public int Seed { get; private set; }
         public JungleWorld World { get; private set; }
@@ -81,6 +84,8 @@ namespace Spinnenspiel
                 ? NextSeed
                 : (fixedSeed != 0 ? fixedSeed : 1 + (System.Environment.TickCount & 0x7fffffff) % 999999);
             NextSeed = 0;
+            bool forceGiant = ForceGiantLeaves;   // MODELL12: Einmal-Override, hier consumed
+            ForceGiantLeaves = false;
             World = new JungleWorld(Seed);
             // Spawnplatz früh merken: Bäume, Unterholz, Totholz und Steine halten darum Platz frei.
             _spawnXZ = World.FindSpawnPoint();
@@ -261,7 +266,7 @@ namespace Spinnenspiel
             // Riesenbläter (Blender, 3 Varianten): groß tropische Blattschnitte mit
             // Cutout-Maske und Normal. Im selben statischen Batching wie das restliche Unterholz.
             // WALD6: giantLeavesOn=false -> Riesenblaetter ut dem Waldbereich.
-            if (giantLeavesOn && library.giantLeaves != null && library.giantLeafMats != null)
+            if ((giantLeavesOn || forceGiant) && library.giantLeaves != null && library.giantLeafMats != null)
             {
                 int giantN = 0;
                 int gcells = Mathf.FloorToInt(size / 2.0f);

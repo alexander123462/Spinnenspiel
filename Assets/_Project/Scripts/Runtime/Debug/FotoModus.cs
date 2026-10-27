@@ -20,6 +20,8 @@ namespace Spinnenspiel
         public const string FlagNear = "-fotonear";
         // FOTO2: Tele-FOV fuer Makro-Fotos (z. B. 25 statt 60 Grad). Nur zusammen mit -fotonear sinnvoll.
         public const string FlagZoom = "-fotozoom";
+        // MODELL12: Riesenblaetter trotz WALD6 ins Bild holen (Player-Foto fuer Asset-Nachweis).
+        public const string FlagRiesen = "-fotoriesen";
 
         public const int DefaultSeed = 4242;
         public const float DefaultPitch = 0f;
@@ -39,14 +41,15 @@ namespace Spinnenspiel
                 GetArgFloat(FlagPitch, DefaultPitch),
                 GetArgFloat(FlagWarte, DefaultWarteS),
                 GetArgValue(FlagNear),
-                GetArgFloat(FlagZoom, 0f));
+                GetArgFloat(FlagZoom, 0f),
+                HasArgFlag(FlagRiesen));
         }
 
         /// <summary>
         /// FOTO1: Aktiviert den Foto-Modus: Seed vor dem Szenenladen setzen, Runner anlegen.
         /// Gibt true zurueck, wenn der Modus aktiv wurde (leerer Pfad -> false, Spiel laeuft normal weiter).
         /// </summary>
-        public static bool TryInstall(string pfad, int seed, float pitch, float warteS, string nearMat = null, float zoomFov = 0f)
+        public static bool TryInstall(string pfad, int seed, float pitch, float warteS, string nearMat = null, float zoomFov = 0f, bool riesenblaetter = false)
         {
             if (string.IsNullOrEmpty(pfad))
             {
@@ -54,6 +57,10 @@ namespace Spinnenspiel
             }
 
             JungleWorldGenerator.NextSeed = seed;
+            if (riesenblaetter)
+            {
+                JungleWorldGenerator.ForceGiantLeaves = true;   // MODELL12: Einmal-Override
+            }
 
             var go = new GameObject("FotoModus");
             go.AddComponent<FotoModusRunner>().Configure(pfad, pitch, warteS, nearMat, zoomFov);
@@ -88,6 +95,15 @@ namespace Spinnenspiel
         {
             string v = GetArgValue(flag);
             return float.TryParse(v, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float f) ? f : fallback;
+        }
+
+        /// <summary>true, wenn ein Schalter-Flag (ohne Wert) in der Kommandozeile steht.</summary>
+        public static bool HasArgFlag(string flag)
+        {
+            string[] args = System.Environment.GetCommandLineArgs();
+            string alt = flag.StartsWith("--") ? flag.Substring(1) : "-" + flag;
+            foreach (string a in args) if (a == flag || a == alt) return true;
+            return false;
         }
     }
 

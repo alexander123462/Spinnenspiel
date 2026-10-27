@@ -425,6 +425,13 @@ namespace Spinnenspiel.EditorTools
                     Debug.LogWarning("[Urwald] Riesenblatt-FBX fehlt: " + path);
                     continue;
                 }
+                // MODELL12: M12-Test liest UV und Submesh-Grenzen am Asset.
+                ModelImporter rim = AssetImporter.GetAtPath(path) as ModelImporter;
+                if (rim != null && !rim.isReadable)
+                {
+                    rim.isReadable = true;
+                    rim.SaveAndReimport();
+                }
                 foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(path))
                 {
                     if (obj is Mesh mesh && mesh.subMeshCount > 0)

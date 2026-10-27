@@ -59,6 +59,10 @@ namespace Spinnenspiel.Tests
         private static IEnumerator LoadWorld(System.Action<JungleWorldGenerator> done)
         {
             JungleWorldGenerator.NextSeed = 4242;
+            // MODELL12: -Typ "Riesenblatt..." erzwingt Riesenblaetter trotz WALD6 (Galerie-Bilder).
+            string typEnv = System.Environment.GetEnvironmentVariable("GALERIE_TYP");
+            if (!string.IsNullOrEmpty(typEnv) && typEnv.Contains("Riesenblatt"))
+                JungleWorldGenerator.ForceGiantLeaves = true;
             SceneManager.LoadScene("Urwald");
             yield return null;
             float timeout = 60f;
