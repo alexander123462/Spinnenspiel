@@ -53,7 +53,11 @@ namespace Spinnenspiel.EditorTools
             // GrassClump. Quelle ArtSource/Schilf/schilf_neu.fbx; fehlt sie, bleibt VM_Reed.
             Mesh schilfNeu = LoadBlenderSchilf();
             if (schilfNeu != null) lib.reed = schilfNeu;
-            lib.logs = LoadMeshes(new[] { "M_Log0", "M_Log1", "M_Log2" });
+            // MODELL16: Blender-Totholz (ArtSource/Totholz) ersetzt M_Log0..2; fehlt das
+            // FBX, bleibt der prozeduralue Fallback aus MeshFactory aktiv.
+            Mesh[] totholzNeu = LoadTotholzMeshes();
+            if (totholzNeu != null) lib.logs = totholzNeu;
+            lib.logHulls = LoadTotholzHulls();
             lib.rocks = LoadMeshes(new[] { "M_Rock0", "M_Rock1", "M_Rock2", "M_Rock3", "M_Rock4" });
 
             lib.leaves = LoadMaterial("MAT_Leaves");
@@ -63,6 +67,8 @@ namespace Spinnenspiel.EditorTools
             // Scan-Assets (Poly Haven) ersetzen die prozeduralen Klötzchen; fehlt einer, bleibt der bisherige Wert.
             lib.bark = ScanBark(LoadMaterial("MAT_TreeBark"));
             lib.logMat = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_dead_tree_trunk.mat", LoadMaterial("MAT_Bark"));
+            // MODELL16: Borke/Holz-Materialien (HDRP/Lit mit Albedo+Normal aus ArtSource-Texturen).
+            lib.logMats = CreateTotholzMats();
             lib.rockMat = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_mossy_rock.mat", LoadMaterial("MAT_Rock"));
             // WALD7: ONE shared Moos-Material (Alpha-Cutout with v-gradient) for all shells/cards.
             lib.moosMat = MoosMaterial();
@@ -948,6 +954,111 @@ namespace Spinnenspiel.EditorTools
             if (normal != null) mat.SetTexture("_NormalMap", AssetDatabase.LoadAssetAtPath<Texture2D>(normal));
             mat.color = Color.white;
             return mat;
+        }
+
+        /// <summary>MODELL16: Blender-Totholz-FBX (3 Varianten, je 2 Submeshes:
+        /// 0 = Borke, 1 = Holz/Bruchflaeche; Reihenfolge gemessen ueber indexCount,
+        /// Borke ist der deutlich groessere Anteil). Read/Write wie Baumfarn (M16-Test).</summary>
+        private static Mesh[] LoadTotholzMeshes()
+        {
+            const string folder = "Assets/_Project/Art/Plants/Totholz/";
+            var result = new Mesh[3];
+            for (int i = 0; i < 3; i++)
+            {
+                string path = folder + "Totholz_" + (i + 1) + ".fbx";
+                if (!System.IO.File.Exists(path))
+                {
+                    Debug.LogWarning("[Urwald] Totholz-FBX fehlt: " + path);
+                    return null;
+                }
+                ModelImporter imp = AssetImporter.GetAtPath(path) as ModelImporter;
+                if (imp != null && !imp.isReadable)
+                {
+                    imp.isReadable = true;
+                    imp.SaveAndReimport();
+                }
+                foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(path))
+                {
+                    if (obj is Mesh mesh && !mesh.name.Contains("_Hull"))
+                    {
+                        result[i] = mesh;
+                        break;
+                    }
+                }
+                if (result[i] == null)
+                {
+                    Debug.LogWarning("[Urwald] Kein Mesh im Totholz-FBX: " + path);
+                    return null;
+                }
+                Mesh m = result[i];
+                if (m.subMeshCount >= 2)
+                {
+                    int a = m.GetSubMesh(0).indexCount, b = m.GetSubMesh(1).indexCount;
+                    Debug.Log("[Urwald] Totholz_" + (i + 1) + " Submesh-IndexCounts: 0=" + a + " 1=" + b
+                        + " (erwartet: 0=Borke deutlich groesser als 1=Holz)");
+                }
+            }
+            return result;
+        }
+
+        /// <summary>MODELL16: konvexe Hull-FBXs (20 Verts je Prisma) zu den Totholz-Varianten.</summary>
+        private static Mesh[] LoadTotholzHulls()
+        {
+            const string folder = "Assets/_Project/Art/Plants/Totholz/";
+            var result = new Mesh[3];
+            for (int i = 0; i < 3; i++)
+            {
+                string path = folder + "Totholz_" + (i + 1) + "_Hull.fbx";
+                if (!System.IO.File.Exists(path))
+                {
+                    Debug.LogWarning("[Urwald] Totholz-Hull-FBX fehlt: " + path);
+                    continue;
+                }
+                ModelImporter himp = AssetImporter.GetAtPath(path) as ModelImporter;
+                if (himp != null && !himp.isReadable)
+                {
+                    himp.isReadable = true;
+                    himp.SaveAndReimport();
+                }
+                foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(path))
+                {
+                    if (obj is Mesh mesh) { result[i] = mesh; break; }
+                }
+            }
+            return result;
+        }
+
+        /// <summary>MODELL16: HDRP-Lit-Materialien MAT_Totholz_Bark / MAT_Totholz_Wood
+        /// (opak, Alpha-Cutoff aus, DoubleSided Mirror, Smoothness 0.15 wie PH-Plant-Standard).</summary>
+        private static Material[] CreateTotholzMats()
+        {
+            const string tex = "Assets/_Project/Art/Plants/Totholz/Textures/";
+            Shader hdrpLit = Shader.Find("HDRP/Lit");
+            if (hdrpLit == null)
+                throw new System.InvalidOperationException("[Urwald] Shader nicht gefunden: HDRP/Lit");
+
+            Material bark = CreateBaumfarnMat("MAT_Totholz_Bark", hdrpLit,
+                tex + "Totholz_Bark_Albedo.png", null, tex + "Totholz_Bark_Normal.png");
+            bark.SetFloat("_SurfaceType", 0f);
+            bark.SetFloat("_AlphaCutoffEnable", 0f);
+            bark.SetFloat("_DoubleSidedEnable", 1f);
+            bark.SetFloat("_DoubleSidedNormalMode", 1f);   // Mirror (Rinde innen sichtbar an Bruchkanten)
+            bark.SetFloat("_Smoothness", 0.15f);
+
+            Material wood = CreateBaumfarnMat("MAT_Totholz_Wood", hdrpLit,
+                tex + "Totholz_Wood_Albedo.png", null, tex + "Totholz_Wood_Normal.png");
+            wood.SetFloat("_SurfaceType", 0f);
+            wood.SetFloat("_AlphaCutoffEnable", 0f);
+            wood.SetFloat("_DoubleSidedEnable", 1f);
+            wood.SetFloat("_DoubleSidedNormalMode", 1f);
+            wood.SetFloat("_Smoothness", 0.2f);
+
+            HDMaterial.ValidateMaterial(bark);
+            HDMaterial.ValidateMaterial(wood);
+            EditorUtility.SetDirty(bark);
+            EditorUtility.SetDirty(wood);
+            AssetDatabase.SaveAssets();
+            return new[] { bark, wood };
         }
 
         /// <summary>

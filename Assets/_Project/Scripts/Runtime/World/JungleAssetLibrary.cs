@@ -101,6 +101,11 @@ namespace Spinnenspiel
         public Mesh[] logs;
         public Mesh[] rocks;
         public Material logMat;
+        /// <summary>MODELL16: Materialien je Submesh (0 = Borke, 1 = Holz/Bruchflaeche)
+        /// fuer die Blender-Totholz-FBX.</summary>
+        public Material[] logMats;
+        /// <summary>MODELL16: konvexe Hull-Prismen (MeshCollider convex) je Variante.</summary>
+        public Mesh[] logHulls;
         public Material rockMat;
 
         /// <summary>WALD7: ONE shared Moos-Material (MAT_Moos) for all shells/cards — no per-object mats.</summary>

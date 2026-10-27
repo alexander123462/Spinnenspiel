@@ -755,10 +755,11 @@ namespace Spinnenspiel
                 if (NearSpawn(x, z, 2.0f)) continue;
                 float h = World.Height(x, z);
                 var logMesh = library.logs[placedLogs % Math.Min(3, library.logs.Length)];
+                int hullIdx = placedLogs % Math.Min(3, library.logs.Length);
                 float logScale = 0.8f + World.Hash01(0, i, 45) * 0.4f;
                 float logRot = World.Hash01(0, i, 44) * 360f;
-                GameObject logGo = CreateProp(totholz.transform, logMesh,
-                    library.logMat, new Vector3(x, h - 0.05f, z),
+                GameObject logGo = AddTotholz(totholz.transform, logMesh, library.logHulls != null ? (hullIdx < library.logHulls.Length ? library.logHulls[hullIdx] : null) : null,
+                    library.logMats, library.logMat, new Vector3(x, h - 0.05f, z),
                     logRot, logScale, SurfaceType.Wood);
                 // WALD7: Moos-Karten on the UPPER side of the Totholz (same shared MAT_Moos).
                 // Fix: Karten an der WELT-Huelle des Stamms ausrichten (gleiche Drehung wie der Stamm, Mitte und Oberkante
@@ -1286,6 +1287,46 @@ namespace Spinnenspiel
             var mc = g.AddComponent<MeshCollider>();
             mc.sharedMesh = mesh;
             mc.convex = true;
+            g.AddComponent<SurfaceTag>().surfaceType = surface;
+            return g;
+        }
+
+        /// <summary>MODELL16: Totholz aus dem Blender-FBX: MeshRenderer mit 2 Materialien
+        /// in Submesh-Reihenfolge (0 = Borke, 1 = Holz) + konvexes Hull-Prisma als Kind
+        /// (MeshCollider convex, umhuellt Stamm und Stummel). Fallback ohne Hull/FBX-Mats:
+        /// einzelne logMat + MeshCollider am Stamm-Mesh wie frueher.</summary>
+        private GameObject AddTotholz(Transform parent, Mesh mesh, Mesh hull, Material[] mats,
+            Material fallbackMat, Vector3 pos, float rotY, float scale, SurfaceType surface)
+        {
+            GameObject g = new GameObject();
+            g.transform.SetParent(parent, false);
+            g.transform.position = pos;
+            g.transform.rotation = Quaternion.Euler(0f, rotY, 0f);
+            g.transform.localScale = Vector3.one * scale;
+            g.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var r = g.AddComponent<MeshRenderer>();
+            if (mats != null && mats.Length >= 2 && mesh.subMeshCount >= 2)
+                r.sharedMaterials = mats;
+            else
+                r.sharedMaterial = fallbackMat;
+
+            if (hull != null)
+            {
+                GameObject c = new GameObject("HullCollider");
+                c.transform.SetParent(g.transform, false);
+                // MeshFilter dazu: WALD7-Moos-Test haengt an jedem MeshCollider-Kind auch
+                // den MeshFilter (Huelle fuer Moos-Karten). Kein Renderer -> unsichtbar.
+                c.AddComponent<MeshFilter>().sharedMesh = hull;
+                var mc = c.AddComponent<MeshCollider>();
+                mc.sharedMesh = hull;
+                mc.convex = true;
+            }
+            else
+            {
+                var mc = g.AddComponent<MeshCollider>();
+                mc.sharedMesh = mesh;
+                mc.convex = true;
+            }
             g.AddComponent<SurfaceTag>().surfaceType = surface;
             return g;
         }

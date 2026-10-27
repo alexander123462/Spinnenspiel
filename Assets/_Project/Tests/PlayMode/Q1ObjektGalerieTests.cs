@@ -352,15 +352,16 @@ namespace Spinnenspiel.Tests
             }
 
             var lib = gen.library;
-            var libTypen = new List<(string n, Mesh m, Material mat)>();
-            if (lib != null && lib.logs != null && lib.logs.Length > 0) libTypen.Add(("Totholz", lib.logs[0], lib.logMat));
-            if (lib != null && lib.rocks != null && lib.rocks.Length > 0) libTypen.Add(("Stein", lib.rocks[0], lib.rockMat));
+            var libTypen = new List<(string n, Mesh m, Material[] mats)>();
+            if (lib != null && lib.logs != null && lib.logs.Length > 0)
+                libTypen.Add(("Totholz", lib.logs[0], lib.logMats != null ? lib.logMats : new[] { lib.logMat }));  // MODELL16: 2 Mats in Submesh-Reihenfolge
+            if (lib != null && lib.rocks != null && lib.rocks.Length > 0) libTypen.Add(("Stein", lib.rocks[0], new[] { lib.rockMat }));
             foreach (var lt in libTypen)
             {
                 if (nurTypen != null && System.Array.IndexOf(nurTypen, lt.n) < 0) continue;
                 var go = new GameObject("Galerie_" + lt.n);
                 go.AddComponent<MeshFilter>().sharedMesh = lt.m;
-                go.AddComponent<MeshRenderer>().sharedMaterial = lt.mat;
+                go.AddComponent<MeshRenderer>().sharedMaterials = lt.mats;
                 go.transform.position = studioPos;
                 Bounds b = BoundsOf(go);
                 go.transform.position += new Vector3(studioPos.x - b.center.x, studioPos.y - b.min.y, studioPos.z - b.center.z);
