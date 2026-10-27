@@ -420,6 +420,9 @@ namespace Spinnenspiel.EditorTools
             for (int i = 0; i < 3; i++)
             {
                 string path = folder + "Riesenblatt_" + (i + 1) + ".fbx";
+                // MODELL13: Variante 2+ hat eigene Texturen (Riesenblatt2_*), Variante 1
+                // behaelt die alten Namen bei. So aendert ein Asset nie die Optik der anderen.
+                string texTag = (i == 0) ? "Riesenblatt_" : ("Riesenblatt" + (i + 1) + "_");
                 if (!System.IO.File.Exists(path))
                 {
                     Debug.LogWarning("[Urwald] Riesenblatt-FBX fehlt: " + path);
@@ -478,9 +481,9 @@ namespace Spinnenspiel.EditorTools
                         mat.name = "MAT_Riesenblatt_" + (i + 1);
                         AssetDatabase.CreateAsset(mat, matPath);
                     }
-                    mat.SetTexture("_BaseColorMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + "Riesenblatt_Leaf_Albedo.png"));
-                    mat.SetTexture("_MaskMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + "Riesenblatt_Leaf_Mask.png"));
-                    mat.SetTexture("_NormalMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + "Riesenblatt_Leaf_Normal.png"));
+                    mat.SetTexture("_BaseColorMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + texTag + "Leaf_Albedo.png"));
+                    mat.SetTexture("_MaskMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + texTag + "Leaf_Mask.png"));
+                    mat.SetTexture("_NormalMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + texTag + "Leaf_Normal.png"));
                     mat.SetFloat("_SurfaceType", 1f); // Cutout (Blattschnitt)
                     mat.SetFloat("_AlphaCutoffEnable", 1f);
                     mat.SetFloat("_AlphaCutoff", 0.5f);
@@ -506,7 +509,7 @@ namespace Spinnenspiel.EditorTools
                         stem.name = "MAT_Riesenblatt_" + (i + 1) + "_Stem";
                         AssetDatabase.CreateAsset(stem, stemPath);
                     }
-                    stem.SetTexture("_BaseColorMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + "Riesenblatt_Stem_Albedo.png"));
+                    stem.SetTexture("_BaseColorMap", AssetDatabase.LoadAssetAtPath<Texture2D>(tex + texTag + "Stem_Albedo.png"));
                     stem.SetFloat("_SurfaceType", 0f); // Opaque
                     stem.SetFloat("_AlphaCutoffEnable", 0f);
                     stem.SetFloat("_DoubleSidedEnable", 0f);
