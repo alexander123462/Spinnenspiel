@@ -20,6 +20,9 @@ namespace Spinnenspiel
         // MODELL12: Einmal-Override wie NextSeed: Galerie-/Player-Foto-Tests brauchen
         // Riesenblatt-Bilder, obwohl WALD6 GiantLeavesOn=false. Wird in Awake consumed.
         public static bool ForceGiantLeaves;
+        // MODELL15: Einmal-Override wie ForceGiantLeaves: Galerie-/Player-Foto-Tests und
+        // der M15-Test brauchen Baumfarn-Bilder, obwohl WALD6 TreeFernsOn=false. Awake consumed.
+        public static bool ForceTreeFerns;
 
         public int Seed { get; private set; }
         public JungleWorld World { get; private set; }
@@ -86,6 +89,8 @@ namespace Spinnenspiel
             NextSeed = 0;
             bool forceGiant = ForceGiantLeaves;   // MODELL12: Einmal-Override, hier consumed
             ForceGiantLeaves = false;
+            bool forceFern = ForceTreeFerns;      // MODELL15: Einmal-Override, hier consumed
+            ForceTreeFerns = false;
             World = new JungleWorld(Seed);
             // Spawnplatz früh merken: Bäume, Unterholz, Totholz und Steine halten darum Platz frei.
             _spawnXZ = World.FindSpawnPoint();
@@ -338,7 +343,8 @@ namespace Spinnenspiel
             // Kein statisches Batching: jeder Farn trägt einen eigenen Kletter-Collider.
             // Plus 3 garantierte Exemplare 6–10 m vor dem Spawn, in Blickrichtung der Startkamera.
             // WALD6: treeFernsOn=false -> Palmen-Baumfarne ut dem Waldbereich.
-            if (treeFernsOn && library.treeFerns != null && library.treeFernLeafMat != null && library.treeFernStemMat != null)
+            // MODELL15: forceFern (einmalig) holt sie fuer Galerie-/Player-Foto und M15-Test zurueck.
+            if ((treeFernsOn || forceFern) && library.treeFerns != null && library.treeFernLeafMat != null && library.treeFernStemMat != null)
             {
                 GameObject baumfarne = new GameObject("Baumfarne");
                 int fernN = 0;

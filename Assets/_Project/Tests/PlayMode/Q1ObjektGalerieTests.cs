@@ -63,6 +63,9 @@ namespace Spinnenspiel.Tests
             string typEnv = System.Environment.GetEnvironmentVariable("GALERIE_TYP");
             if (!string.IsNullOrEmpty(typEnv) && typEnv.Contains("Riesenblatt"))
                 JungleWorldGenerator.ForceGiantLeaves = true;
+            // MODELL15: -Typ "Farn_Baum" erzwingt Baumfarne trotz WALD6 (Galerie-Bilder).
+            if (!string.IsNullOrEmpty(typEnv) && typEnv.Contains("Farn_Baum"))
+                JungleWorldGenerator.ForceTreeFerns = true;
             SceneManager.LoadScene("Urwald");
             yield return null;
             float timeout = 60f;

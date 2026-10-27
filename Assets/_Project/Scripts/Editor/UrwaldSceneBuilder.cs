@@ -579,6 +579,13 @@ namespace Spinnenspiel.EditorTools
                     Debug.LogWarning("[Urwald] Baumfarn-FBX fehlt: " + path);
                     continue;
                 }
+                // MODELL15: Read/Write fuer dieses Mesh aktivieren (Dreiecke/Submeshes im M15-Test).
+                ModelImporter bimp = AssetImporter.GetAtPath(path) as ModelImporter;
+                if (bimp != null && !bimp.isReadable)
+                {
+                    bimp.isReadable = true;
+                    bimp.SaveAndReimport();
+                }
                 foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(path))
                 {
                     if (obj is Mesh mesh)

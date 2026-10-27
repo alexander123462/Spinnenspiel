@@ -22,6 +22,8 @@ namespace Spinnenspiel
         public const string FlagZoom = "-fotozoom";
         // MODELL12: Riesenblaetter trotz WALD6 ins Bild holen (Player-Foto fuer Asset-Nachweis).
         public const string FlagRiesen = "-fotoriesen";
+        // MODELL15: Baumfarne trotz WALD6 ins Bild holen (Player-Foto fuer Asset-Nachweis).
+        public const string FlagBaumfarn = "-fotobaumfarn";
 
         public const int DefaultSeed = 4242;
         public const float DefaultPitch = 0f;
@@ -42,14 +44,15 @@ namespace Spinnenspiel
                 GetArgFloat(FlagWarte, DefaultWarteS),
                 GetArgValue(FlagNear),
                 GetArgFloat(FlagZoom, 0f),
-                HasArgFlag(FlagRiesen));
+                HasArgFlag(FlagRiesen),
+                HasArgFlag(FlagBaumfarn));
         }
 
         /// <summary>
         /// FOTO1: Aktiviert den Foto-Modus: Seed vor dem Szenenladen setzen, Runner anlegen.
         /// Gibt true zurueck, wenn der Modus aktiv wurde (leerer Pfad -> false, Spiel laeuft normal weiter).
         /// </summary>
-        public static bool TryInstall(string pfad, int seed, float pitch, float warteS, string nearMat = null, float zoomFov = 0f, bool riesenblaetter = false)
+        public static bool TryInstall(string pfad, int seed, float pitch, float warteS, string nearMat = null, float zoomFov = 0f, bool riesenblaetter = false, bool baumfarne = false)
         {
             if (string.IsNullOrEmpty(pfad))
             {
@@ -60,6 +63,10 @@ namespace Spinnenspiel
             if (riesenblaetter)
             {
                 JungleWorldGenerator.ForceGiantLeaves = true;   // MODELL12: Einmal-Override
+            }
+            if (baumfarne)
+            {
+                JungleWorldGenerator.ForceTreeFerns = true;     // MODELL15: Einmal-Override
             }
 
             var go = new GameObject("FotoModus");
