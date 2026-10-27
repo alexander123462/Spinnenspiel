@@ -241,7 +241,9 @@ namespace Spinnenspiel
                 VariantMeshes(library.bush, library.bushVariants), VariantMats(library.bushMat, library.bushVariantMats),
                 // MODELL8/9: Busch1- und Busch2-Neubau haben 2 Submeshes (Ast/Blatt)
                 // -> Zweitmaterial je Variante (Busch1-Ast an 0, Busch2-Ast an 1).
+                // MODELL10: Busch3-Neubau (Variante 2) mit eigenem Ast-Material.
                 BranchMats(library.buschBranchMat, library.busch2BranchMat,
+                    library.busch3BranchMat,
                     library.bushVariants != null ? library.bushVariants.Length : 0),
                 (i, j, x, z) => World.Height(x, z) >= JungleWorld.WaterLevel + 0.2f
                     && World.Hash01(i, j, 13) < World.Density(x, z) * 0.6f * bushFactor,
@@ -901,6 +903,19 @@ namespace Spinnenspiel
             var mats = new Material[1 + Mathf.Max(0, extraVariants)];
             mats[0] = branchMat1;
             if (mats.Length > 1) mats[1] = branchMat2;
+            return mats;
+        }
+
+        /// <summary>MODELL10: Zweitmaterial-Liste fuer drei Neubau-Varianten
+        /// (Busch1-Ast an 0, Busch2-Ast an 1, Busch3-Ast an 2).</summary>
+        private static Material[] BranchMats(Material branchMat1, Material branchMat2,
+            Material branchMat3, int extraVariants)
+        {
+            if (branchMat1 == null && branchMat2 == null && branchMat3 == null) return null;
+            var mats = new Material[1 + Mathf.Max(0, extraVariants)];
+            mats[0] = branchMat1;
+            if (mats.Length > 1) mats[1] = branchMat2;
+            if (mats.Length > 2) mats[2] = branchMat3;
             return mats;
         }
 

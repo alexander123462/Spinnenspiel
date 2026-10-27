@@ -100,13 +100,25 @@ namespace Spinnenspiel.EditorTools
                 "Assets/_Project/Art/Plants/Busch2/Textures/", "Busch2_Albedo.png", "Busch2_Normal.png", 0.15f);
             lib.busch2BranchMat = CreateBuschAtlasMat("MAT_Busch2_Branch",
                 "Assets/_Project/Art/Plants/Busch2/Textures/", "Busch2_Albedo.png", "Busch2_Normal.png", 0.2f);
-            // A1: extra Busche-Varianten (MODELL9: Busch2-Neubau statt shrub_03; dann shrub_04).
-            lib.bushVariants = LoadBushVariantMeshes(busch2Neu);
-            lib.bushVariantMats = CreateBushVariantMats(busch2LeafMat);
+            // A1: extra Busche-Varianten (MODELL9: Busch2-Neubau statt shrub_03;
+            // MODELL10: Busch3-Neubau statt shrub_04).
+            Mesh busch3Neu = LoadBlenderBusch(out int busch3LeafSub,
+                "Assets/_Project/Art/Plants/Busch3/Busch3.fbx", "ArtSource/Busch3/busch3_neu.fbx", "Busch3");
+            Material busch3LeafMat = CreateBuschAtlasMat("MAT_Busch3_Leaf",
+                "Assets/_Project/Art/Plants/Busch3/Textures/", "Busch3_Albedo.png", "Busch3_Normal.png", 0.15f);
+            lib.busch3BranchMat = CreateBuschAtlasMat("MAT_Busch3_Branch",
+                "Assets/_Project/Art/Plants/Busch3/Textures/", "Busch3_Albedo.png", "Busch3_Normal.png", 0.2f);
+            lib.bushVariants = LoadBushVariantMeshes(busch2Neu, busch3Neu);
+            lib.bushVariantMats = CreateBushVariantMats(busch2LeafMat, busch3LeafMat);
             if (busch2Neu == null || busch2LeafMat == null)
                 Debug.LogWarning("[Urwald] MODELL9: Busch2-Neubau unvollstaendig, Variante 0 bleibt Scan shrub_03.");
             else if (busch2LeafSub != lib.buschLeafSubmesh)
                 Debug.Log("[Urwald] Busch2 Blatt-Submesh " + busch2LeafSub + " (AddPlant nutzt buschLeafSubmesh "
+                          + lib.buschLeafSubmesh + ").");
+            if (busch3Neu == null || busch3LeafMat == null)
+                Debug.LogWarning("[Urwald] MODELL10: Busch3-Neubau unvollstaendig, Variante bleibt Scan shrub_04.");
+            else if (busch3LeafSub != lib.buschLeafSubmesh)
+                Debug.Log("[Urwald] Busch3 Blatt-Submesh " + busch3LeafSub + " (AddPlant nutzt buschLeafSubmesh "
                           + lib.buschLeafSubmesh + ").");
 
             // Riesenbläter (Blender, 3 Varianten): tropische Pflanze mit Blattschnitt-Mask und Normal.
@@ -1753,13 +1765,18 @@ namespace Spinnenspiel.EditorTools
             => CreateBuschAtlasMat("MAT_Busch1_Branch", "Assets/_Project/Art/Plants/Busch1/Textures/",
                 "Busch1_Albedo.png", "Busch1_Normal.png", 0.2f);
 
-        /// <summary>A1/MODELL9: Busche-Varianten-Meshes. Variante 0 ist der Busch2-Neubau
-        /// (Blender), danach Scan shrub_04; fehlt der Neubau, bleibt shrub_03 als Fallback.</summary>
-        private static Mesh[] LoadBushVariantMeshes(Mesh busch2)
+        /// <summary>A1/MODELL9+10: Busche-Varianten-Meshes. Variante 0 ist der Busch2-Neubau
+        /// (Blender), Variante 1 der Busch3-Neubau; fehlt ein Neubau, bleibt der jeweilige
+        /// Scan (shrub_03/shrub_04) als Fallback stehen.</summary>
+        private static Mesh[] LoadBushVariantMeshes(Mesh busch2, Mesh busch3)
         {
             var meshes = new System.Collections.Generic.List<Mesh>();
             if (busch2 != null) meshes.Add(busch2);
-            foreach (string id in busch2 != null ? new[] { "shrub_04" } : new[] { "shrub_03", "shrub_04" })
+            if (busch3 != null) meshes.Add(busch3);
+            string[] fallback = busch3 != null
+                ? (busch2 != null ? new string[0] : new[] { "shrub_03" })
+                : (busch2 != null ? new[] { "shrub_04" } : new[] { "shrub_03", "shrub_04" });
+            foreach (string id in fallback)
             {
                 if (!ScanModels.IsAvailable(id))
                 {
@@ -1778,14 +1795,18 @@ namespace Spinnenspiel.EditorTools
             return meshes.ToArray();
         }
 
-        /// <summary>A1/MODELL9: Materialien fuer die Busche-Varianten, indexgleich zu
-        /// LoadBushVariantMeshes: Variante 0 = Busch2-Blatt-Material (Neubau) oder
-        /// gruen getoenter Scan shrub_03 (Fallback), dann Scan shrub_04.</summary>
-        private static Material[] CreateBushVariantMats(Material busch2Leaf)
+        /// <summary>A1/MODELL9+10: Materialien fuer die Busche-Varianten, indexgleich zu
+        /// LoadBushVariantMeshes: Variante 0 = Busch2-Blatt-Material (Neubau),
+        /// Variante 1 = Busch3-Blatt-Material (Neubau); sonst gruen getoente Scans.</summary>
+        private static Material[] CreateBushVariantMats(Material busch2Leaf, Material busch3Leaf)
         {
             var mats = new System.Collections.Generic.List<Material>();
             if (busch2Leaf != null) mats.Add(busch2Leaf);
-            foreach (string id in busch2Leaf != null ? new[] { "shrub_04" } : new[] { "shrub_03", "shrub_04" })
+            if (busch3Leaf != null) mats.Add(busch3Leaf);
+            string[] fallback = busch3Leaf != null
+                ? (busch2Leaf != null ? new string[0] : new[] { "shrub_03" })
+                : (busch2Leaf != null ? new[] { "shrub_04" } : new[] { "shrub_03", "shrub_04" });
+            foreach (string id in fallback)
             {
                 Material src = ScanMaterial("Assets/_Project/Art/Scans/Materials/M_" + id + ".mat", null);
                 if (src == null)

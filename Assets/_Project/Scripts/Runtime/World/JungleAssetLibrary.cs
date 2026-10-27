@@ -33,6 +33,11 @@ namespace Spinnenspiel
         /// Scan shrub_03 als Busche-Variante 0; busch2BranchMat = Ast-Material,
         /// Blatt-Material liegt an bushVariantMats[0].</summary>
         public Material busch2BranchMat;
+        /// <summary>MODELL10: Busch3-Neubau (Blender, 6 aussere + 3 Innenstaelle,
+        /// Sekundaer-/Tertiaerzweige, Kronenfueller, ~740 Nadelblaetter als echte
+        /// Geometrie, 5926 Dreiecke, 1.01 m). Ersetzt den Scan shrub_04 als Busche-
+        /// Variante 1; busch3BranchMat = Ast-Material, Blatt-Material an bushVariantMats[1].</summary>
+        public Material busch3BranchMat;
         /// <summary>MODELL8: gruen getoentes Scan-Material MAT_BushTropisch (Nutzer:
         /// Jungnadelbaeume WALD6; Busch1-Neubau nutzt MAT_Busch1_Leaf/Branch).</summary>
         public Material bushScanMat;
