@@ -35,3 +35,5 @@ Ursache: kein Spielcode-Fehler; Beweisbild grau wegen Aufnahme-Pipeline (auch Wa
 2026-10-26 TEXTUR2 (Overseer): [!] war Zeitbudget-Abbruch, kein Fehler. Foto und gezielte Tests geprueft (alle gruen ausser Vorab-Rot E1), Farn-Dateien committet, Punkt [x].
 
 2026-10-26 MODELL6 (Overseer): [!] wegen B4c (Seil/Space) Wackler, einzeln gruen -> ROT.md, Farn-Arbeit committet, Punkt [x].
+
+- 2026-10-27 Overseer MODELL15: Hermes-Runde ohne Zeit (Blender-Export offen, Atlas S 0.78 ueber Ziel). Zu gross fuer einen Eingriff -> in MODELL15a (Atlas), 15b (Blender/FBX), 15c (Unity-Abnahme) zerlegt; Atlas-PNGs gestasht, Skripte bleiben im Arbeitsbaum.
