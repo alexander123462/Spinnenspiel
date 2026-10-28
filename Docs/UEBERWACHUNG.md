@@ -46,3 +46,6 @@ Ursache: Testannahme falsch - Dach-Dichte kann den Std-Faktor nicht auf 1,25 heb
 
 ## 2026-10-28 LICHT1c (Overseer)
 Ursache: kein technischer Fehler - Punkt wartet auf Look-Entscheidung von Alex (ALEX-FRAGEN.md "LICHT1c": mehr Direktlicht/Kontrast vs. weicher Dschungel-Look, dann LICHT1c streichen). Aktion: nichts am Code geaendert, Stash "Hermes LICHT1b" unangetastet, Punkt bleibt [!]; Schleife soll mit STAMM1 weitermachen. Unity lief nicht, keine CI noetig.
+
+## 2026-10-28 LICHT1c zweite Runde (Overseer)
+Ursache: Alex-Entscheidung liegt vor (mehr Sonnenlicht). Look-Code gruen im eigenen Test, aber drei Altteste rot: J5 (Dach-Oeffnungen aus LICHT1b lassen Mond durch), T7 (Vorbedingung bei duennem Nebel nicht erfuellbar), G6-Himmel (170 statt >200). Zu gross und Test-Neukalibrierung noetig (>60 Zeilen). Aktion: alles in Stash 'Hermes LICHT1c' gesichert, Punkt in LICHT1c1 (Look ohne Dach-Oeffnungen), LICHT1c2 (T7), LICHT1c3 (Dach-Schatten + Foto) zerlegt. Unity-Editor lief nicht (nur Hub), keine CI gefahren.
