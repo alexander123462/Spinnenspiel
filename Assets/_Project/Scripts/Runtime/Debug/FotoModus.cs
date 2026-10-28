@@ -24,6 +24,9 @@ namespace Spinnenspiel
         public const string FlagRiesen = "-fotoriesen";
         // MODELL15: Baumfarne trotz WALD6 ins Bild holen (Player-Foto fuer Asset-Nachweis).
         public const string FlagBaumfarn = "-fotobaumfarn";
+        // MODELL20: Nachtszene erzwingen (Tagesfortschritt 0.95) — nur so existieren
+        // nachtaktige Insekten (Motte) im Player-Foto ueberhaupt.
+        public const string FlagNacht = "-fotonacht";
 
         public const int DefaultSeed = 4242;
         public const float DefaultPitch = 0f;
@@ -45,14 +48,15 @@ namespace Spinnenspiel
                 GetArgValue(FlagNear),
                 GetArgFloat(FlagZoom, 0f),
                 HasArgFlag(FlagRiesen),
-                HasArgFlag(FlagBaumfarn));
+                HasArgFlag(FlagBaumfarn),
+                HasArgFlag(FlagNacht));
         }
 
         /// <summary>
         /// FOTO1: Aktiviert den Foto-Modus: Seed vor dem Szenenladen setzen, Runner anlegen.
         /// Gibt true zurueck, wenn der Modus aktiv wurde (leerer Pfad -> false, Spiel laeuft normal weiter).
         /// </summary>
-        public static bool TryInstall(string pfad, int seed, float pitch, float warteS, string nearMat = null, float zoomFov = 0f, bool riesenblaetter = false, bool baumfarne = false)
+        public static bool TryInstall(string pfad, int seed, float pitch, float warteS, string nearMat = null, float zoomFov = 0f, bool riesenblaetter = false, bool baumfarne = false, bool nacht = false)
         {
             if (string.IsNullOrEmpty(pfad))
             {
@@ -70,7 +74,7 @@ namespace Spinnenspiel
             }
 
             var go = new GameObject("FotoModus");
-            go.AddComponent<FotoModusRunner>().Configure(pfad, pitch, warteS, nearMat, zoomFov);
+            go.AddComponent<FotoModusRunner>().Configure(pfad, pitch, warteS, nearMat, zoomFov, nacht);
             Debug.Log("[FotoModus] aktiv: pfad=" + pfad + " seed=" + seed
                 + " pitch=" + pitch + " warte=" + warteS + " near=" + (nearMat ?? "-")
                 + " zoom=" + zoomFov);
@@ -132,16 +136,18 @@ namespace Spinnenspiel
         private float _warteS;
         private string _nearMat;
         private float _zoomFov;
+        private bool _nacht;   // MODELL20: Tagesfortschritt auf Nacht (0.95) setzen
         private float _elapsed;
         private Phase _phase = Phase.Warten;
 
-        public void Configure(string pfad, float pitch, float warteS, string nearMat = null, float zoomFov = 0f)
+        public void Configure(string pfad, float pitch, float warteS, string nearMat = null, float zoomFov = 0f, bool nacht = false)
         {
             _pfad = pfad;
             _pitch = pitch;
             _warteS = Mathf.Max(1f, warteS);
             _nearMat = nearMat;
             _zoomFov = zoomFov;
+            _nacht = nacht;
         }
 
         private void Update()
@@ -168,6 +174,18 @@ namespace Spinnenspiel
                 if (gen != null && !gen.IsReady)
                 {
                     return;
+                }
+
+                // MODELL20: Nachtsprung, damit nachtaktige Insekten (Motte) spawnen —
+                // der InsectSpawner gleicht jede Sekunde an den Tagesanteil an.
+                if (_nacht)
+                {
+                    var zyklus = FindFirstObjectByType<DayNightCycle>();
+                    if (zyklus != null)
+                    {
+                        zyklus.SetDayProgress(0.95f);
+                        Debug.Log("[FotoModus] Nachtszene gesetzt (0.95).");
+                    }
                 }
 
                 var cam = UnityEngine.Camera.main;

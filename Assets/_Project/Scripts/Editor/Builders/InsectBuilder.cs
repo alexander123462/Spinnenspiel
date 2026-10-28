@@ -219,53 +219,94 @@ namespace Spinnenspiel.EditorTools
             return root;
         }
 
-        /// <summary>Z7: Motte (Insekten 2) from ArtSource/Insekten/motte.py FBX; bigger + slower than the fly.</summary>
+        /// <summary>
+        /// MODELL20: Motte neu aus Blender (ArtSource/Insekten/motte_geometrie.py +
+        /// motte_textur.py): pelziger Koerper (real 15 mm), gefiederte Fuehler,
+        /// Fluegel mit Schuppenmuster und Fransensaum (Spannweite real 30 mm).
+        /// FBX liegt bereits in Spielskalierung (~4.5x wie die Fliege).
+        /// </summary>
         public static GameObject CreateMoth()
         {
             const string fbxPath = "Assets/_Project/Art/Insekten/Motte.fbx";
             Object[] assets = AssetDatabase.LoadAllAssetsAtPath(fbxPath);
-            List<Mesh> meshes = new List<Mesh>();
-            foreach (Object asset in assets)
-            {
-                if (asset is Mesh)
-                {
-                    meshes.Add((Mesh)asset);
-                }
-            }
-            if (meshes.Count == 0)
-            {
-                Debug.LogError("[Insect] Motte FBX has no mesh: " + fbxPath);
-                return null;
-            }
+            string[] teile = { "Koerper", "Fuehler_L", "Fuehler_R", "Beine", "Wing_L", "Wing_R" };
 
             GameObject root = new GameObject("Motte");
             FlyingInsect insect = root.AddComponent<FlyingInsect>();
             insect.SetFlightParams(0.45f, 1.8f); // slower than the fly (0.8)
 
-            Material mothMaterial = CreateMothMaterial();
-            int index = 0;
-            foreach (Mesh mesh in meshes)
+            Material body = CreateMothBodyMaterial();
+            Material wing = CreateMothWingMaterial();
+            foreach (string name in teile)
             {
-                GameObject part = new GameObject("Motte_" + index++);
+                Mesh mesh = null;
+                foreach (Object asset in assets)
+                {
+                    if (asset is Mesh && asset.name == name)
+                    {
+                        mesh = (Mesh)asset;
+                    }
+                }
+                if (mesh == null)
+                {
+                    Debug.LogError("[Insect] Motte-FBX fehlt Teil: " + name + " in " + fbxPath);
+                    continue;
+                }
+
+                GameObject part = new GameObject(name);
                 part.transform.SetParent(root.transform, false);
                 MeshFilter mf = part.AddComponent<MeshFilter>();
                 MeshRenderer mr = part.AddComponent<MeshRenderer>();
                 mf.sharedMesh = mesh;
-                mr.sharedMaterial = mothMaterial;
+                mr.sharedMaterial = name.StartsWith("Wing") ? wing : body;
             }
-            // Blender-Export: ~0.10 m body length; scale up so it reads bigger than the fly (~0.044 m).
-            root.transform.localScale = Vector3.one * 1.6f;
 
             return root;
         }
 
-        /// <summary>Z7: Dreckig-beige Motte-Body (HDRP Lit) als Asset MAT_MothBody.</summary>
-        private static Material CreateMothMaterial()
+        /// <summary>MODELL20: Pelz-Koerper mit gebackener Albedo als Asset MAT_MothBody.</summary>
+        private static Material CreateMothBodyMaterial()
         {
-            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.55f, 0.45f, 0.32f));
-            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.15f);
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(Color.white);
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.2f);
+            Texture2D albedo = AssetDatabase.LoadAssetAtPath<Texture2D>(
+                "Assets/_Project/Art/Insekten/Motte_body_albedo.png");
+            if (albedo != null)
+            {
+                material.SetTexture("_BaseColorMap", albedo);
+            }
+            else
+            {
+                Debug.LogWarning("[Insect] Motte_body_albedo.png fehlt – MAT_MothBody wird weiss.");
+                material.color = new Color(0.42f, 0.34f, 0.24f);
+            }
             material.enableInstancing = true;
             return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_MothBody.mat");
+        }
+
+        /// <summary>MODELL20: Fluegel mit Schuppen-Albedo als Asset MAT_MothWing.
+        /// DoubleSided (Mirror): die Fluegelflaeche ist eine duenne Platte, deren
+        /// Kanten in Unity sonst einseitig weggeculled werden (Draufsicht leer).</summary>
+        private static Material CreateMothWingMaterial()
+        {
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(Color.white);
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.3f);
+            Texture2D albedo = AssetDatabase.LoadAssetAtPath<Texture2D>(
+                "Assets/_Project/Art/Insekten/Motte_wing_albedo.png");
+            if (albedo != null)
+            {
+                material.SetTexture("_BaseColorMap", albedo);
+            }
+            else
+            {
+                Debug.LogWarning("[Insect] Motte_wing_albedo.png fehlt – MAT_MothWing wird weiss.");
+                material.color = new Color(0.5f, 0.42f, 0.3f);
+            }
+            material.SetFloat("_DoubleSidedEnable", 1f);
+            material.SetFloat("_DoubleSidedNormalMode", 2f); // Mirror
+            UnityEngine.Rendering.HighDefinition.HDMaterial.ValidateMaterial(material);
+            material.enableInstancing = true;
+            return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_MothWing.mat");
         }
 
         private static void CreateEye(Transform parent, string name, Vector3 localPos, Material material)

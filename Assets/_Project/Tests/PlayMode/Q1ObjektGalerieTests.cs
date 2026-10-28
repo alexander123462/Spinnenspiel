@@ -277,7 +277,12 @@ namespace Spinnenspiel.Tests
             yield return LoadWorld(g => gen = g);
 
             var cycle = Object.FindFirstObjectByType<DayNightCycle>();
-            if (cycle != null) cycle.SetDayProgress(0.45f);
+            // MODELL20: Motte ist nachtaktig (InsectSpawner.activeAtNight) — bei
+            // Tageslicht existiert keine aktive Instanz und die Galerie findet 0
+            // Objekte. Fuer den Typ 'Motte' auf Nacht springen (0 = Mitternacht).
+            string galerieTypQ1 = System.Environment.GetEnvironmentVariable("GALERIE_TYP");
+            float progress = (!string.IsNullOrEmpty(galerieTypQ1) && galerieTypQ1.Contains("Motte")) ? 0.95f : 0.45f;
+            if (cycle != null) cycle.SetDayProgress(progress);
             DisableDepthAndMotionBlur();
             AddOverrideVolume();
             yield return null;
