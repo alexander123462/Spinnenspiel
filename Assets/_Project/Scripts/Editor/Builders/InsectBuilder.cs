@@ -78,15 +78,22 @@ namespace Spinnenspiel.EditorTools
         }
 
         /// <summary>
-        /// S2: Muecke (new small fast prey) derived from the fly parts: ~60 % of the fly body,
-        /// helle schlanke Fluegel, flies by day. Faster than the fly (1.6 x) and gives 10 energy.
-        /// No new Blender work – built from primitives like CreateFly.
+        /// MODELL21: Muecke aus dem Blender-Neubau (ArtSource/Insekten/muecke_geometrie.py
+        /// + muecke_textur.py, FBX wie bei Fliege/Motte): segmentierter Thorax+Leib
+        /// ~24.5 mm (63 % der Fliegen-Koerperlaenge 39 mm), 6 lange gegliederte Beine,
+        /// Stechruessel, plumose Antennen, zwei schmale Fluegel mit Schuppenfransen.
+        /// Kinder behalten Blender-Namen - FlyingInsect findet die Fluegel ueber
+        /// transform.Find. Flugparameter wie bisher (1.6x Fliegenspeed, Energie 10).
         /// </summary>
         public static GameObject CreateMosquito()
         {
+            const string fbxPath = "Assets/_Project/Art/Insekten/Muecke.fbx";
             Material body = CreateMosquitoBodyMaterial();
             Material wing = CreateMosquitoWingMaterial();
-            Material eye = CreateEyeMaterial();
+
+            Object[] assets = AssetDatabase.LoadAllAssetsAtPath(fbxPath);
+            string[] teile = { "Koerper", "Kopf", "Schnabel", "Beine",
+                               "Fuehler_L", "Fuehler_R", "Wing_L", "Wing_R" };
 
             GameObject root = new GameObject("Muecke");
             FlyingInsect insect = root.AddComponent<FlyingInsect>();
@@ -94,32 +101,29 @@ namespace Spinnenspiel.EditorTools
             insect.SetFlightParams(1.28f, 2.5f);
             insect.energyValue = 10f;
 
-            // Kapselkoerper: ~60 % der Fliege (fly capsule 0.012/0.018/0.012).
-            GameObject koerper = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            koerper.name = "Koerper";
-            SetNoCollider(koerper);
-            koerper.transform.SetParent(root.transform, false);
-            koerper.transform.localPosition = Vector3.zero;
-            koerper.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            koerper.transform.localScale = new Vector3(0.0072f, 0.0108f, 0.0072f);
-            SetMaterial(koerper, body);
+            foreach (string name in teile)
+            {
+                Mesh mesh = null;
+                foreach (Object asset in assets)
+                {
+                    if (asset is Mesh && asset.name == name)
+                    {
+                        mesh = (Mesh)asset;
+                    }
+                }
+                if (mesh == null)
+                {
+                    Debug.LogError("[Insect] Muecke-FBX fehlt Teil: " + name + " in " + fbxPath);
+                    continue;
+                }
 
-            // Kopf: Kugel bei z=+0.012 (vorne), ~60 % der Fliege.
-            GameObject kopf = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            kopf.name = "Kopf";
-            SetNoCollider(kopf);
-            kopf.transform.SetParent(root.transform, false);
-            kopf.transform.localPosition = new Vector3(0f, 0f, 0.012f);
-            kopf.transform.localScale = Vector3.one * 0.0072f;
-            SetMaterial(kopf, body);
-
-            // Augen: zwei kleine Kaege seitlich am Kopf (scaled to the smaller body).
-            CreateEyeScaled(root.transform, "Auge_L", new Vector3(-0.0036f, 0.0018f, 0.0144f), 0.0042f, eye);
-            CreateEyeScaled(root.transform, "Auge_R", new Vector3(0.0036f, 0.0018f, 0.0144f), 0.0042f, eye);
-
-            // Fluegel: liegende, SCHLANKER Quads (narrower than the fly), helle + translucent.
-            CreateWingSlim(root.transform, "Wing_L", new Vector3(-0.006f, 0.004f, -0.002f), wing);
-            CreateWingSlim(root.transform, "Wing_R", new Vector3(0.006f, 0.004f, -0.002f), wing);
+                GameObject part = new GameObject(name);
+                part.transform.SetParent(root.transform, false);
+                MeshFilter mf = part.AddComponent<MeshFilter>();
+                MeshRenderer mr = part.AddComponent<MeshRenderer>();
+                mf.sharedMesh = mesh;
+                mr.sharedMaterial = name.StartsWith("Wing") ? wing : body;
+            }
 
             return root;
         }
@@ -420,20 +424,47 @@ namespace Spinnenspiel.EditorTools
             return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_BeetleElytra.mat");
         }
 
-        /// <summary>S2: Helle, schmaerkoe Muecke-Body (HDRP Lit) als Asset MAT_MosquitoBody.</summary>
+        /// <summary>MODELL21: Chitin-Koerper mit gebackener Albedo als MAT_MosquitoBody.</summary>
         private static Material CreateMosquitoBodyMaterial()
         {
-            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.55f, 0.56f, 0.6f));
-            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.4f);
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(Color.white);
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.35f);
+            Texture2D albedo = AssetDatabase.LoadAssetAtPath<Texture2D>(
+                "Assets/_Project/Art/Insekten/Muecke_body_albedo.png");
+            if (albedo != null)
+            {
+                material.SetTexture("_BaseColorMap", albedo);
+            }
+            else
+            {
+                Debug.LogWarning("[Insect] Muecke_body_albedo.png fehlt – MAT_MosquitoBody wird grau.");
+                material.color = new Color(0.3f, 0.26f, 0.21f);
+            }
             material.enableInstancing = true;
             return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_MosquitoBody.mat");
         }
 
-        /// <summary>S2: Helle, schlanke Muecke-Fluegel (Unlit transparent) als Asset MAT_MosquitoWing.</summary>
+        /// <summary>MODELL21: Fluegelmembran mit Schuppen-Albedo, DoubleSided (duenne
+        /// Platte, Kanten sonst einseitig weggeculled) als MAT_MosquitoWing.</summary>
         private static Material CreateMosquitoWingMaterial()
         {
-            Material material = Spinnenspiel.Rendering.PipelineMaterials.Unlit(new Color(0.9f, 0.92f, 0.95f, 0.3f));
-            Spinnenspiel.Rendering.PipelineMaterials.SetTransparent(material, true);
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(Color.white);
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.4f);
+            Texture2D albedo = AssetDatabase.LoadAssetAtPath<Texture2D>(
+                "Assets/_Project/Art/Insekten/Muecke_wing_albedo.png");
+            if (albedo != null)
+            {
+                material.SetTexture("_BaseColorMap", albedo);
+            }
+            else
+            {
+                Debug.LogWarning("[Insect] Muecke_wing_albedo.png fehlt – MAT_MosquitoWing wird hell.");
+                material.color = new Color(0.7f, 0.72f, 0.75f);
+            }
+            material.SetFloat("_DoubleSidedEnable", 1f);
+            material.SetFloat("_DoubleSidedNormalMode", 2f); // Mirror
+            UnityEngine.Rendering.HighDefinition.HDMaterial.ValidateMaterial(material);
+            material.enableInstancing = true;
             return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_MosquitoWing.mat");
         }
 

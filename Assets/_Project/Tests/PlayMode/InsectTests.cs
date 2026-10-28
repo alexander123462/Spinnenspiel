@@ -1015,10 +1015,14 @@ namespace Spinnenspiel.Tests
             Assert.AreEqual(10f, muecke.energyValue,
                 "Muecke-Energie != 10: " + muecke.energyValue);
 
-            // Criterion 2: body ~60% of the fly body (compare capsule Koerper localScale.z).
+            // Criterion 2: body ~60% of the fly body. MODELL21 misst die Laenge an der
+            // Mesh-Ausdehnung (bei FBX-Vorlagen ist localScale 1 und bedeutet nichts);
+            // Kriterium bleibt identisch (50..70 %), nur die Messung ist robuster.
             GameObject flyBody = flyTemplate.transform.Find("Koerper").gameObject;
             GameObject mueckeBody = mosquitoTemplate.transform.Find("Koerper").gameObject;
-            float ratio = mueckeBody.transform.localScale.z / flyBody.transform.localScale.z;
+            float mueckeZ = Modell20MotteTests.AxisExtent(mueckeBody, 2);
+            float flyZ = Modell20MotteTests.AxisExtent(flyBody, 2);
+            float ratio = flyZ > 0f ? mueckeZ / flyZ : 0f;
             Debug.Log("[S2] body ratio=" + ratio);
             Assert.Greater(ratio, 0.5f, "Muecke-Body < 50% der Fliege: " + ratio);
             Assert.Less(ratio, 0.7f, "Muecke-Body > 70% der Fliege: " + ratio);
