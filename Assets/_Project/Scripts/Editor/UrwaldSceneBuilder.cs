@@ -1509,6 +1509,47 @@ namespace Spinnenspiel.EditorTools
                 mats.Add(bnMat);
             }
 
+            // MODELL18: Blumen (Vinca-Bluete: 5 windradige Kronblaetter mit
+            // Augenscheibe und Staubblaettern, 3 Stengel mit lanzettlichen
+            // Blaettern; 834 Dreiecke, 0.27 m). Rosa und gelb/orange nutzen
+            // dasselbe Mesh, Farbe kommt aus zwei Albedo-Karten.
+            Mesh blume = LoadBlenderBlume();
+            if (blume != null)
+            {
+                Shader hdrpLit18 = Shader.Find("HDRP/Lit");
+                Material blueteR = GetOrCreateMat("MAT_Bluete_Rosa", hdrpLit18, Color.white);
+                blueteR.SetFloat("_SurfaceType", 0f);
+                blueteR.SetFloat("_AlphaCutoffEnable", 0f);
+                blueteR.SetFloat("_Smoothness", 0.25f);
+                blueteR.SetFloat("_DoubleSidedEnable", 1f);
+                blueteR.SetFloat("_DoubleSidedNormalMode", 2f);
+                // TEXTUR: Albedo/Normal je Zelle im 8x5-Atlas (Stengel 0..2,
+                // Blaetter 3..17, Kronblaetter 18..32, Mitte 33..35).
+                SetPHTexture(blueteR, "Assets/_Project/Art/Plants/Blume/Textures/Blume_Albedo_Rosa.png", true);
+                SetPHTexture(blueteR, "Assets/_Project/Art/Plants/Blume/Textures/Blume_Normal.png", false);
+                blueteR.SetColor("_BaseColor", Color.white);
+                blueteR.enableInstancing = true;
+                HDMaterial.ValidateMaterial(blueteR);
+                EditorUtility.SetDirty(blueteR);
+                meshes.Add(blume);
+                mats.Add(blueteR);
+
+                Material blueteG = GetOrCreateMat("MAT_Bluete_Gelb", hdrpLit18, Color.white);
+                blueteG.SetFloat("_SurfaceType", 0f);
+                blueteG.SetFloat("_AlphaCutoffEnable", 0f);
+                blueteG.SetFloat("_Smoothness", 0.25f);
+                blueteG.SetFloat("_DoubleSidedEnable", 1f);
+                blueteG.SetFloat("_DoubleSidedNormalMode", 2f);
+                SetPHTexture(blueteG, "Assets/_Project/Art/Plants/Blume/Textures/Blume_Albedo_Gelb.png", true);
+                SetPHTexture(blueteG, "Assets/_Project/Art/Plants/Blume/Textures/Blume_Normal.png", false);
+                blueteG.SetColor("_BaseColor", Color.white);
+                blueteG.enableInstancing = true;
+                HDMaterial.ValidateMaterial(blueteG);
+                EditorUtility.SetDirty(blueteG);
+                meshes.Add(blume);
+                mats.Add(blueteG);
+            }
+
             foreach (string id in ids)
             {
                 if (id == "grass_medium_01" && gras1 != null) continue; // MODELL1: schon ersetzt
@@ -1777,6 +1818,54 @@ namespace Spinnenspiel.EditorTools
                 return null;
             }
             Debug.Log("[Urwald] Brennnessel geladen: " + found.name + ", Dreiecke " + bestTris
+                      + ", Groesse " + found.bounds.size.ToString("F3"));
+            return found;
+        }
+
+        /// <summary>MODELL18: prozedurale Blume (Vinca-Typ: 5 windradige
+        /// Kronblaetter mit Augenscheibe und 5 Staubblaettern je Bluetenstand,
+        /// 3 leicht geneigte Stengel mit lanzettlichen Blaettern; 834 Dreiecke,
+        /// 0.27 m, EIN Slot, UV-Atlas 8x5). Laedt das FBX aus Plants/Blume
+        /// (kopiert aus ArtSource falls dort aelter) und liefert das Mesh.</summary>
+        private static Mesh LoadBlenderBlume()
+        {
+            const string artPath = "Assets/_Project/Art/Plants/Blume/Blume.fbx";
+            const string srcPath = "ArtSource/Blume/blume_neu.fbx";
+            if (!System.IO.File.Exists(artPath) && System.IO.File.Exists(srcPath))
+            {
+                AssetUtil.EnsureFolder("Assets/_Project/Art/Plants/Blume");
+                System.IO.File.Copy(srcPath, artPath, true);
+                AssetDatabase.ImportAsset(artPath, ImportAssetOptions.ForceUpdate);
+            }
+            // Read/Write fuer UV-Check im Test (eine CPU-Kopie, ~25 KB).
+            ModelImporter bimp = AssetImporter.GetAtPath(artPath) as ModelImporter;
+            if (bimp != null && !bimp.isReadable)
+            {
+                bimp.isReadable = true;
+                bimp.SaveAndReimport();
+            }
+            if (!System.IO.File.Exists(artPath))
+            {
+                Debug.LogWarning("[Urwald] Blume-FBX fehlt: " + artPath);
+                return null;
+            }
+            Mesh found = null;
+            int bestTris = 0;
+            foreach (UnityEngine.Object obj in AssetDatabase.LoadAllAssetsAtPath(artPath))
+            {
+                if (obj is Mesh mesh && mesh != null)
+                {
+                    int tris = 0;
+                    for (int s = 0; s < mesh.subMeshCount; s++) tris += mesh.GetSubMesh(s).indexCount / 3;
+                    if (tris > bestTris) { bestTris = tris; found = mesh; }
+                }
+            }
+            if (found == null || bestTris == 0)
+            {
+                Debug.LogWarning("[Urwald] Blume ohne Triangles: " + artPath);
+                return null;
+            }
+            Debug.Log("[Urwald] Blume geladen: " + found.name + ", Dreiecke " + bestTris
                       + ", Groesse " + found.bounds.size.ToString("F3"));
             return found;
         }

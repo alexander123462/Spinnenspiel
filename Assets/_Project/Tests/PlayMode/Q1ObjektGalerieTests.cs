@@ -43,6 +43,8 @@ namespace Spinnenspiel.Tests
             new Typ("Unkraut", "MAT_Unkraut"),  // MODELL3: Blender-Rosette ersetzt Scan weed_plant_02
             new Typ("Brennnessel", "MAT_Brennnessel"),  // MODELL5: Blender-Neubau ersetzt Scan nettle_plant
             new Typ("Immergruen", "MAT_Immergruen"),  // MODELL4: Blender-Bodendecker ersetzt Scan periwinkle_plant
+            new Typ("Bluete_Rosa", "MAT_Bluete_Rosa"),  // MODELL18: Blender-Blume, Vinca-Bluete
+            new Typ("Bluete_Gelb", "MAT_Bluete_Gelb"),  // MODELL18: gelbe/orange Variante, gleiches Mesh
             new Typ("Busch1", "MAT_Busch1_Leaf"),  // MODELL8: Blender-Strauch ersetzt Scan shrub_02
             new Typ("Busch2", "MAT_Busch2_Leaf"),  // MODELL9: Blender-Strauch ersetzt Scan shrub_03
             new Typ("Busch3", "MAT_Busch3_Leaf"),  // MODELL10: Blender-Strauch ersetzt Scan shrub_04
