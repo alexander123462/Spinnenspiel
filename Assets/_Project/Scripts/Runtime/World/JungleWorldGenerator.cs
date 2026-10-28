@@ -1629,7 +1629,6 @@ namespace Spinnenspiel
                 GameObject trunk = new GameObject("TrunkCapsule");
                 trunk.transform.SetParent(colNode.transform, false);
                 // Fussabdruck aus den echten Stamm-Vertices der untersten 2 Welt-Meter (Mesh ist lesbar): Mitte und Radius.
-                Vector3 footC = tb.center; float footR = Mathf.Min(tb.extents.x, tb.extents.z);
                 if (!_footprints.TryGetValue(variant, out Vector3 fp))
                 {
                     var vs = new List<Vector3>();
@@ -1647,17 +1646,22 @@ namespace Spinnenspiel
                     else fp = new Vector3(tb.center.x, Mathf.Min(tb.extents.x, tb.extents.z), tb.center.z);
                     _footprints[variant] = fp;
                 }
-                footC = new Vector3(fp.x, tb.center.y, fp.z); footR = fp.y;
-                trunk.transform.localPosition = footC;
-                // Echter Fussabdruck, mindestens aber die Bounds-Huelle bis 2.5 m Welt-Radius (die Gehtests brauchen den Abstand zum Stamm; Aeste gehen nicht ein).
+                float footR = fp.y;
                 float tradius = Mathf.Max(footR, Mathf.Min(Mathf.Min(tb.extents.x, tb.extents.z), 2.5f / Mathf.Max(scale, 0.01f)));
                 tradius = Mathf.Min(tradius, 3.5f / Mathf.Max(scale, 0.01f));
                 float theight = tb.extents.y * 2f;
+                // Pivot an den Stammfuss (statt Holz-Bounds-Mitte): hohe Neubau-Baeume (MODELL24)
+                // schoben die Kapsel ~6 m hoch, dann findet B3/BotPlaytest sie per
+                // Transform-Abstand (6-m-Suche) nicht und faellt auf den TreeCollider-AABB
+                // (Kiste inkl. Krone) zuruck -> Spinne gilt als "im Stamm". Die Weltgeometrie
+                // der Kapsel bleibt identisch: cap.center kompensiert den Pivot-Wechsel.
+                float pivotY = tb.min.y + tradius;
+                trunk.transform.localPosition = new Vector3(fp.x, pivotY, fp.z);
                 CapsuleCollider cap = trunk.AddComponent<CapsuleCollider>();
                 cap.radius = tradius;
                 cap.height = Mathf.Max(theight, tradius * 2f + 0.01f);
                 // Untere Kuppel unter das Gelaende legen: sonst kann die Spinne am Stammfuss (Kapsel nur so hoch wie der nackte Stamm) in die Kuppel laufen.
-                cap.height += tradius; cap.center = new Vector3(0f, -tradius * 0.5f, 0f);
+                cap.height += tradius; cap.center = new Vector3(0f, tb.center.y - tradius * 0.5f - pivotY, 0f);
                 cap.direction = 1; // Y-Axis (Stemachse)
                 UnityEngine.Debug.Log("[R6] TrunkCapsule variant=" + variant + " radius->" + tradius.ToString("F3")
                     + " height->" + theight.ToString("F3") + " convex->true");

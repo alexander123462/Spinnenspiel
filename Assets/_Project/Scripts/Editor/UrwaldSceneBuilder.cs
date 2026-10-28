@@ -1188,7 +1188,8 @@ namespace Spinnenspiel.EditorTools
                 // MODELL23: island_tree_01 ist jetzt der Blender-Neubau (Mesh selbst 12-15 m)
                 // -> Skala ~1. Die 3-5x-Klemme galt nur fuer die kleinen PH-Scans und wuerde
                 // den neuen Baum auf ~40 m aufblasen.
-                if (ids[i] != "jacaranda_tree" && ids[i] != "island_tree_01")
+                // MODELL24: gilt genauso fuer island_tree_02 (Blender-Neubau, Mesh ~13.5 m).
+                if (ids[i] != "jacaranda_tree" && ids[i] != "island_tree_01" && ids[i] != "island_tree_02")
                 {
                     scale = Mathf.Clamp(scale, 3f, 5f);
                 }
