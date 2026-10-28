@@ -126,6 +126,7 @@ while :; do
     echo "-- ROT-Reparatur: $ROTTEST" >> $LOG
   fi
   echo "-- Runde $RUNDE $(date '+%T') offen=$OFFEN -> $PUNKT" >> $LOG
+  HEAD_VOR=$(git --no-optional-locks log -1 --format=%h 2>/dev/null)
 
   cat > Logs/autopilot_auftrag.txt <<AUF
 Arbeitsordner $ROOT, Branch hdrp. Lies zuerst vollstaendig: .hermes.md und AGENTS.md im Projektordner.
@@ -181,6 +182,19 @@ AUF
   echo "-- Runde $RUNDE Ende $(date '+%T') exit=$HEX HEAD=$(git --no-optional-locks log -1 --format=%h 2>/dev/null)" >> $LOG
   if grep -q "^- \[!\] $KUERZEL " Docs/BACKLOG.md 2>/dev/null; then
     melde "Spinnenspiel: Hermes kommt bei Punkt $KUERZEL nicht weiter und hat ihn als blockiert markiert ($(date '+%F %T')). Grund steht in Docs/BACKLOG.md. Die Schleife macht mit dem naechsten Punkt weiter."
+  fi
+  # Leerlauf-Wache (Overseer 2026-10-28): derselbe Punkt zweimal in Folge ohne neuen Commit -> sperren, damit keine Runden verbrannt werden (MODELL15c lief dreimal leer).
+  if [ "$KUERZEL" != "ROT" ] && [ -n "$KUERZEL" ] && [ "$(git --no-optional-locks log -1 --format=%h 2>/dev/null)" = "$HEAD_VOR" ] && grep -q "^- \[ \] $KUERZEL " Docs/BACKLOG.md 2>/dev/null; then
+    LN=$(cat "Logs/leerlauf_$KUERZEL.count" 2>/dev/null || echo 0); LN=$((LN+1)); echo $LN > "Logs/leerlauf_$KUERZEL.count"
+    if [ "$LN" -ge 2 ]; then
+      sed -i "/^- \[ \] $KUERZEL /{s/^- \[ \] /- [!] /;s/*\$/ BLOCKIERT (Schleife 2026-10-28): zwei Runden in Folge ohne Commit. Claude oder Alex pruefen./}" Docs/BACKLOG.md
+      echo "-- Leerlauf-Wache: $KUERZEL gesperrt (2 Runden ohne Commit)" >> $LOG
+      melde "Spinnenspiel: Punkt $KUERZEL zweimal ohne Ergebnis, als blockiert markiert ($(date '+%F %T'))."
+      git --no-optional-locks add Docs/BACKLOG.md >/dev/null 2>&1
+      git --no-optional-locks commit -q -m "Leerlauf-Wache: $KUERZEL gesperrt (2 Runden ohne Commit)" -- Docs/BACKLOG.md >/dev/null 2>&1
+    fi
+  else
+    rm -f "Logs/leerlauf_$KUERZEL.count" 2>/dev/null
   fi
   # Rot-Gate nach der Runde: neue Eintraege in Docs/ROT.md gehoeren Claude, nicht Hermes -> nach Docs/ROT_NEU.md verschieben.
   VERSCHOBEN=""
