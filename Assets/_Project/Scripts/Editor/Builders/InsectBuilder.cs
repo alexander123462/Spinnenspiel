@@ -13,42 +13,66 @@ namespace Spinnenspiel.EditorTools
     {
         private const string MaterialsFolder = AssetUtil.GeneratedRoot + "/Materials";
 
-        /// <summary>Erzeugt die Fliege (Kapselkoerper + Kopf + Augen + Fluegel) mit FlyingInsect.</summary>
+        // MODELL19: MAT_FlyBody/Eye/Wing wurden frueher pro Aufruf geloescht und neu
+        // angelegt. Da CreateMosquito dieselbe Augen-Methode nutzt, zeigte der
+        // Fliegen-Kopf danach auf ein zerstoertes Material (Slot 1 = null im Scene-File).
+        // Cache: jedes Material wird pro Builder-Lauf nur einmal erzeugt.
+        private static Material _flyBodyCache;
+        private static Material _flyWingCache;
+        private static Material _flyEyeCache;
+
+        /// <summary>MODELL19: Fliege aus dem Blender-Neubau (ArtSource/Insekten/
+        /// fliege_geometrie.py, FBX wie bei der Motte). Kinder behalten ihre Blender-
+        /// Namen (Koerper/Kopf/Beine/Wing_L/Wing_R) - FlyingInsect findet die Fluegel
+        /// ueber transform.Find. real 8 mm Koerper, in Spielskalierung ~39 mm.</summary>
         public static GameObject CreateFly()
         {
+            const string fbxPath = "Assets/_Project/Art/Insekten/Fliege.fbx";
             Material body = CreateBodyMaterial();
             Material wing = CreateWingMaterial();
             Material eye = CreateEyeMaterial();
 
+            Object[] assets = AssetDatabase.LoadAllAssetsAtPath(fbxPath);
+            string[] teile = { "Koerper", "Kopf", "Beine", "Wing_L", "Wing_R" };
+
             GameObject root = new GameObject("Fliege");
             root.AddComponent<FlyingInsect>();
 
-            // Kapselkoerper: Längsachse = lokale Z (um X 90° gedreht), ~0.044 m lang.
-            GameObject koerper = GameObject.CreatePrimitive(PrimitiveType.Capsule);
-            koerper.name = "Koerper";
-            SetNoCollider(koerper);
-            koerper.transform.SetParent(root.transform, false);
-            koerper.transform.localPosition = Vector3.zero;
-            koerper.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-            koerper.transform.localScale = new Vector3(0.012f, 0.018f, 0.012f);
-            SetMaterial(koerper, body);
+            foreach (string name in teile)
+            {
+                Mesh mesh = null;
+                foreach (Object asset in assets)
+                {
+                    if (asset is Mesh && asset.name == name)
+                    {
+                        mesh = (Mesh)asset;
+                    }
+                }
+                if (mesh == null)
+                {
+                    Debug.LogError("[Insect] Fliege-FBX fehlt Teil: " + name + " in " + fbxPath);
+                    continue;
+                }
 
-            // Kopf: Kugel bei z=+0.02 (vorne).
-            GameObject kopf = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            kopf.name = "Kopf";
-            SetNoCollider(kopf);
-            kopf.transform.SetParent(root.transform, false);
-            kopf.transform.localPosition = new Vector3(0f, 0f, 0.02f);
-            kopf.transform.localScale = Vector3.one * 0.012f;
-            SetMaterial(kopf, body);
-
-            // Augen: zwei kleine rotbraune Kugeln seitlich am Kopf.
-            CreateEye(root.transform, "Auge_L", new Vector3(-0.006f, 0.003f, 0.024f), eye);
-            CreateEye(root.transform, "Auge_R", new Vector3(0.006f, 0.003f, 0.024f), eye);
-
-            // Fluegel: liegende Quads, schlagen um die lokale Z-Achse (Flugrichtung).
-            CreateWing(root.transform, "Wing_L", new Vector3(-0.009f, 0.006f, -0.004f), wing);
-            CreateWing(root.transform, "Wing_R", new Vector3(0.009f, 0.006f, -0.004f), wing);
+                GameObject part = new GameObject(name);
+                part.transform.SetParent(root.transform, false);
+                MeshFilter mf = part.AddComponent<MeshFilter>();
+                MeshRenderer mr = part.AddComponent<MeshRenderer>();
+                mf.sharedMesh = mesh;
+                if (name == "Kopf" && mesh.subMeshCount >= 2)
+                {
+                    // Slot 0 = Koerper, Slot 1 = Auge (Blender-Slot-Reihenfolge).
+                    mr.sharedMaterials = new Material[] { body, eye };
+                }
+                else if (name.StartsWith("Wing"))
+                {
+                    mr.sharedMaterial = wing;
+                }
+                else
+                {
+                    mr.sharedMaterial = body;
+                }
+            }
 
             return root;
         }
@@ -390,31 +414,49 @@ namespace Spinnenspiel.EditorTools
             }
         }
 
-        /// <summary>Dunkelgrau-metallisch (URP Lit) als Asset MAT_FlyBody.</summary>
+        /// <summary>MODELL19: dunkler Fallfliegen-Koerper mit eingebrannter
+        /// Albedo-Textur (Fliege_albedo.png) als Asset MAT_FlyBody.</summary>
         private static Material CreateBodyMaterial()
         {
-            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.22f, 0.23f, 0.25f));
-            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.7f);
-            material.SetFloat("_Metallic", 0.6f);
+            if (_flyBodyCache != null) return _flyBodyCache;
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(Color.white);
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.35f);
+            material.SetFloat("_Metallic", 0.05f);
+            Texture2D albedo = AssetDatabase.LoadAssetAtPath<Texture2D>(
+                "Assets/_Project/Art/Insekten/Fliege_albedo.png");
+            if (albedo != null)
+            {
+                material.SetTexture("_BaseColorMap", albedo);
+            }
+            else
+            {
+                Debug.LogWarning("[Insect] Fliege_albedo.png fehlt – MAT_FlyBody wird weiss.");
+                material.color = new Color(0.22f, 0.23f, 0.25f);
+            }
             material.enableInstancing = true;
-            return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_FlyBody.mat");
+            _flyBodyCache = AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_FlyBody.mat");
+            return _flyBodyCache;
         }
 
         /// <summary>URP Unlit Transparent, hellgrau, Alpha 0.35 (wie SilkThread) als Asset MAT_FlyWing.</summary>
         private static Material CreateWingMaterial()
         {
+            if (_flyWingCache != null) return _flyWingCache;
             Material material = Spinnenspiel.Rendering.PipelineMaterials.Unlit(new Color(0.85f, 0.87f, 0.9f, 0.35f));
             Spinnenspiel.Rendering.PipelineMaterials.SetTransparent(material, true);
-            return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_FlyWing.mat");
+            _flyWingCache = AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_FlyWing.mat");
+            return _flyWingCache;
         }
 
         /// <summary>Rotbraun (URP Lit) als Asset MAT_FlyEye.</summary>
         private static Material CreateEyeMaterial()
         {
+            if (_flyEyeCache != null) return _flyEyeCache;
             Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.32f, 0.16f, 0.10f));
             Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.8f);
             material.enableInstancing = true;
-            return AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_FlyEye.mat");
+            _flyEyeCache = AssetUtil.ReplaceAsset(material, MaterialsFolder + "/MAT_FlyEye.mat");
+            return _flyEyeCache;
         }
     }
 }
