@@ -1185,7 +1185,10 @@ namespace Spinnenspiel.EditorTools
                 float height = lodMeshes[0].bounds.size.y;
                 float target = ids[i] == "jacaranda_tree" ? 30f : 12f;
                 float scale = target / Mathf.Max(0.01f, height);
-                if (ids[i] != "jacaranda_tree")
+                // MODELL23: island_tree_01 ist jetzt der Blender-Neubau (Mesh selbst 12-15 m)
+                // -> Skala ~1. Die 3-5x-Klemme galt nur fuer die kleinen PH-Scans und wuerde
+                // den neuen Baum auf ~40 m aufblasen.
+                if (ids[i] != "jacaranda_tree" && ids[i] != "island_tree_01")
                 {
                     scale = Mathf.Clamp(scale, 3f, 5f);
                 }
