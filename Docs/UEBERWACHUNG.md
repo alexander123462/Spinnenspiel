@@ -40,3 +40,6 @@ Ursache: kein Spielcode-Fehler; Beweisbild grau wegen Aufnahme-Pipeline (auch Wa
 
 ## 2026-10-28 MODELL17 (Overseer)
 Ursache: Hermes brach ab, weil HDRP-Lit die Vertexfarbe (Moos) nicht zeigt und Blender-PNG-Save schwarz lieferte; Geometrie/Tests waren fertig. Aktion: gezielte Tests geprueft (M17 gruen; Q1/Vegetation/Urwald gruen ausser Z9, E1 lastabhaengig), Hermes-Dateien committet, Moos als MODELL17b neu geplant, E1 in ROT.md.
+
+## 2026-10-28 LICHT1b (Overseer)
+Ursache: Testannahme falsch - Dach-Dichte kann den Std-Faktor nicht auf 1,25 heben, Direktlicht nur ~9 % der Bodenhelligkeit. Aktion: kein Code committet (Urwald_GeneratesWorldFromSeed waere rot), Code gestasht, Punkt als LICHT1c (Look-Entscheidung Alex) neu geplant, Frage in ALEX-FRAGEN.md.
