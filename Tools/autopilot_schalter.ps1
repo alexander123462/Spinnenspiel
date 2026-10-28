@@ -16,7 +16,7 @@ function Warte($port, $sekunden) {
 if (Test-Path $pause) {
   Write-Host ''
   Write-Host 'AUTOPILOT STARTEN' -ForegroundColor Cyan
-  $editor = Get-Process Unity -ErrorAction SilentlyContinue
+  $editor = Get-Process Unity -ErrorAction SilentlyContinue | Where-Object { $_.Path -notmatch 'Unity Hub' }  # Unity Hub (unity.exe serve) ist kein Editor
   if ($editor) {
     Write-Host 'Der Unity-Editor ist offen. Bitte zuerst schliessen, sonst kann der Autopilot nicht testen.' -ForegroundColor Yellow
     Write-Host 'Nichts gestartet.'
