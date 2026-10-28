@@ -19,3 +19,5 @@ Which lever does Claude pick? Then WALD8b2 can be re-attempted on that basis.
 ## LICHT1c Lichtflecken am Boden (Overseer, 2026-10-28)
 Messung: Dach-Schatten wirken kaum (Std-Faktor 0,94 statt 1,25), weil Direktlicht nur ~9 % der Bodenhelligkeit ausmacht (Rest Nebel/Ambient/Exposure). Hebel ist der Look, nicht das Dach.
 Alex: Soll der Wald-Look mehr Sonnenlicht bekommen (Direktlicht staerker, Nebel/Ambient niedriger, also kontrastreicher/dunkler im Schatten)? Oder reicht der weiche Dschungel-Look ohne Lichtflecken (dann LICHT1c streichen)?
+
+**Antwort Alex (2026-10-28):** Ja, mehr Sonnenlicht. LICHT1c wird umgesetzt.

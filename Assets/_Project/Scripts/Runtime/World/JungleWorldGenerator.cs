@@ -1519,6 +1519,8 @@ namespace Spinnenspiel
         }
 
         private readonly Dictionary<int, Vector3> _footprints = new Dictionary<int, Vector3>();
+        // Unsichtbare Wand: typischer Stammradius (Median) im Band 1.5..4 Welt-Meter ueber dem Fuss, ohne Wurzelanlauf/Aeste.
+        private static readonly Dictionary<int, float> _trunkMid = new Dictionary<int, float>();
 
         private Transform CreateTree(Vector3 pos, float rotY, float scale, int variant, Transform parent)
         {
@@ -1646,9 +1648,24 @@ namespace Spinnenspiel
                     else fp = new Vector3(tb.center.x, Mathf.Min(tb.extents.x, tb.extents.z), tb.center.z);
                     _footprints[variant] = fp;
                 }
+                if (!_trunkMid.TryGetValue(variant, out float midR))
+                {
+                    var vs2 = new List<Vector3>();
+                    lod0.GetVertices(vs2);
+                    var idx2 = lod0.GetIndices(woodSub);
+                    float yLo = tb.min.y + 1.5f / Mathf.Max(scale, 0.01f), yHi = tb.min.y + 4f / Mathf.Max(scale, 0.01f);
+                    var ds = new List<float>();
+                    foreach (int ii in idx2) { var vv = vs2[ii]; if (vv.y >= yLo && vv.y <= yHi) ds.Add((new Vector2(vv.x, vv.z) - new Vector2(fp.x, fp.z)).magnitude); }
+                    if (ds.Count > 8) { ds.Sort(); midR = ds[ds.Count / 2]; } else midR = -1f;
+                    _trunkMid[variant] = midR;
+                }
                 float footR = fp.y;
                 float tradius = Mathf.Max(footR, Mathf.Min(Mathf.Min(tb.extents.x, tb.extents.z), 2.5f / Mathf.Max(scale, 0.01f)));
                 tradius = Mathf.Min(tradius, 3.5f / Mathf.Max(scale, 0.01f));
+                // Unsichtbare Wand (Alex 2026-10-28): die alte Formel nahm bei Scan-Baeumen die Halbachse der GANZEN Holz-Submesh (Aeste eingerechnet) -> Kapsel r=2.5 m um einen duennen Stamm.
+                // Die Kapsel folgt jetzt dem echten Stammfuss (Radius der untersten 2 Welt-Meter + 8 %); die alte Groesse bleibt nur fuer die Moos-Huelle (_lastTrunkRadius).
+                float tradiusAlt = tradius;
+                tradius = Mathf.Clamp((midR > 0f ? midR : footR) * 1.1f, 0.25f, tradius);
                 float theight = tb.extents.y * 2f;
                 // Pivot an den Stammfuss (statt Holz-Bounds-Mitte): hohe Neubau-Baeume (MODELL24)
                 // schoben die Kapsel ~6 m hoch, dann findet B3/BotPlaytest sie per
@@ -1663,7 +1680,7 @@ namespace Spinnenspiel
                 // Untere Kuppel unter das Gelaende legen: sonst kann die Spinne am Stammfuss (Kapsel nur so hoch wie der nackte Stamm) in die Kuppel laufen.
                 cap.height += tradius; cap.center = new Vector3(0f, tb.center.y - tradius * 0.5f - pivotY, 0f);
                 cap.direction = 1; // Y-Axis (Stemachse)
-                UnityEngine.Debug.Log("[R6] TrunkCapsule variant=" + variant + " radius->" + tradius.ToString("F3")
+                UnityEngine.Debug.Log("[R6] TrunkCapsule variant=" + variant + " radius->" + tradius.ToString("F3") + " (alt " + tradiusAlt.ToString("F2") + ", footR " + footR.ToString("F2") + ", mitte " + midR.ToString("F2") + ")"
                     + " height->" + theight.ToString("F3") + " convex->true");
                 // WALD7: Moos-Shell-Anker = real planted trunk base (colNode already carries
                 // the planting shift) and the capsule radius.
@@ -1671,7 +1688,7 @@ namespace Spinnenspiel
                 // Fix (Alex 2026-10-21): tradius ist die kleinere Halbachse der GANZEN Holz-Submesh (Aeste eingerechnet, mehrere Meter),
                 // nicht der Stamm am Fuss. Die Huelle bekommt daher nur einen Bruchteil, begrenzt auf 0.35..1.2 m, sonst entstehen
                 // riesige gruene Ringe ("Baender").
-                _lastTrunkRadius = Mathf.Clamp(tradius * 0.12f, 0.35f, 1.2f);
+                _lastTrunkRadius = Mathf.Clamp(tradiusAlt * 0.12f, 0.35f, 1.2f);
             }
 
             var lod = tree.AddComponent<LODGroup>();
