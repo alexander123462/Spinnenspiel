@@ -43,3 +43,6 @@ Ursache: Hermes brach ab, weil HDRP-Lit die Vertexfarbe (Moos) nicht zeigt und B
 
 ## 2026-10-28 LICHT1b (Overseer)
 Ursache: Testannahme falsch - Dach-Dichte kann den Std-Faktor nicht auf 1,25 heben, Direktlicht nur ~9 % der Bodenhelligkeit. Aktion: kein Code committet (Urwald_GeneratesWorldFromSeed waere rot), Code gestasht, Punkt als LICHT1c (Look-Entscheidung Alex) neu geplant, Frage in ALEX-FRAGEN.md.
+
+## 2026-10-28 LICHT1c (Overseer)
+Ursache: kein technischer Fehler - Punkt wartet auf Look-Entscheidung von Alex (ALEX-FRAGEN.md "LICHT1c": mehr Direktlicht/Kontrast vs. weicher Dschungel-Look, dann LICHT1c streichen). Aktion: nichts am Code geaendert, Stash "Hermes LICHT1b" unangetastet, Punkt bleibt [!]; Schleife soll mit STAMM1 weitermachen. Unity lief nicht, keine CI noetig.
