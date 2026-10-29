@@ -174,27 +174,120 @@ namespace Spinnenspiel.EditorTools
             }, true);
         }
 
+        // STAMM1: Furchen pro Texturkachel — Grundfrequenz und das 1.7-fache davon.
+        private const int FurrowBase = 10;
+        private const int FurrowSecond = 17;
+        // STAMM1: feine senkrechte Faserstreifen pro Kachel (durchgehend, endend, verzweigend).
+        // Bewusst feiner als die Furchen: die Faserstreifen sollen die Platten nicht zulaufen.
+        private const int FiberCount = 64;
+        // STAMM1: bei diesem Betrag wird der Sinusruecken abgeschnitten -> breite flache Platte
+        // mit schmaler tiefer Furche statt runder Streifen.
+        private const float PlateClamp = 0.32f;
+
+        /// <summary>
+        /// STAMM1: Rinden-Hoehe der Mammutbaum-Rinde (u = Umfang, v = Hoehe wie in den Trunk-UVs).
+        /// Furchen: Grundfrequenz 10 plus zweite Frequenz 17 (=1.7x); Phase UND Position jeder
+        /// Furche sind per Hash variiert, der Abstand ist also unregelmaessig. Flache Platten statt
+        /// runder Sinusstreifen. Dazu feine Faserstreifen, von denen jedes vierte endet (scharfe
+        /// Kante) und jedes vierte verzweigt. In u und v kachelbar (Normalmap wrappt).
+        /// </summary>
         private static float RedwoodHeight(float u, float v)
         {
-            // lange senkrechte Fasern (u hoch, v niedrig) + tiefe Furchen
-            float fibre = TileNoise(u, v, 2f, 2, 3.3f) * 0.3f + Mathf.PerlinNoise(u * 64f, v * 3f) * 0.7f;
-            float ridge = Mathf.Abs(Mathf.Sin((u * 14f + TileNoise(u, v, 2f, 2, 8f) * 2.5f) * Mathf.PI));
-            return Mathf.Clamp01(fibre * 0.55f + ridge * 0.45f);
+            float warp = TileNoise(u, v, 2f, 2, 8f) * 3.4f;
+            float off = FurrowShift(u, v, FurrowBase);          // Positionssprung pro Furche
+            float x1 = (u * FurrowBase + warp + off) * Mathf.PI;
+            float x2 = (u * FurrowSecond + warp * 1.7f + off * 1.7f) * Mathf.PI;
+            float plates = 0.62f * PlateRidge(x1, FurrowBase) + 0.38f * PlateRidge(x2, FurrowSecond);
+            return Mathf.Clamp01(plates * 0.55f + FiberField(u, v) * 0.26f
+                                    + TileNoise(u, v, 24f, 2, 61f) * 0.015f);
         }
 
-        /// <summary>WALD4: Mammutbaum-Rinde, rotbraun (Farbton ca. 12..25 Grad), senkrechte Fasern, dunkle Furchen.</summary>
+        /// <summary>STAMM1: Positions-Versatz pro Furche (stetig interpoliert, modulo der
+        /// Halbperioden pro Kachel -> kachelbar). Macht den Furchenabstand unregelmaessig.</summary>
+        private static float FurrowShift(float u, float v, int furrows)
+        {
+            float t = u * furrows + TileNoise(u, v, 2f, 2, 8f);
+            int k = Mathf.FloorToInt(t);
+            float f = Mathf.SmoothStep(0f, 1f, t - (float)k);
+            int i0 = ((k % furrows) + furrows) % furrows;
+            int i1 = (i0 + 1) % furrows;
+            float h = Mathf.Lerp(WorldLayout.Hash01(i0, 11, 97), WorldLayout.Hash01(i1, 11, 97), f);
+            return (h - 0.5f) * 0.5f;
+        }
+
+        /// <summary>STAMM1: flache Platte — der Betrag des Sinus ist bei 1 abgeschnitten, dadurch
+        /// breite flache Ruecken und schmale tiefe Furchen. Die Phase springt pro Furche (Hash ueb
+        /// den Furchen-Index), zwischen den Furchen stetig interpoliert; der Index laeuft modulo
+        /// der Halbperioden pro Kachel, damit die u-Naht wieder genau passt.</summary>
+        private static float PlateRidge(float x, int furrows)
+        {
+            float t = x / Mathf.PI;
+            int k = Mathf.FloorToInt(t);
+            float f = Mathf.SmoothStep(0f, 1f, t - (float)k);
+            int i0 = ((k % furrows) + furrows) % furrows;
+            int i1 = (i0 + 1) % furrows;
+            float jitter = (Mathf.Lerp(WorldLayout.Hash01(i0, 7, 29), WorldLayout.Hash01(i1, 7, 29), f) - 0.5f) * 0.8f;
+            return Mathf.Min(1f, Mathf.Abs(Mathf.Sin(x + jitter)) / PlateClamp);
+        }
+
+        /// <summary>STAMM1: feine senkrechte Faserstreifen. Jedes vierte endet (Kurz-Faser), ein
+        /// weiteres Viertel verzweigt oberhalb einer zufaelligen Hoehe in zwei Aeste. Ein Kuvert an
+        /// v=0 und v=1 haelt die Textur kachelbar.</summary>
+        private static float FiberField(float u, float v)
+        {
+            float fu = u * FiberCount;
+            int fi = Mathf.FloorToInt(fu);
+            float d = Mathf.Abs(fu - fi - 0.5f);                  // Abstand zur Streifenachse
+            int kind = ((fi % 4) + 4) % 4;                        // 0 endet, 2 verzweigt
+            float presence = 0f;
+
+            if (kind == 0)                                        // Faser endet in der Kachelmitte
+            {
+                float end = 0.18f + 0.6f * WorldLayout.Hash01(fi, 3, 61);
+                float tip = Mathf.Clamp01((end - v) / 0.012f);    // scharfe Kante am Faserende
+                presence = Mathf.Clamp01((0.30f - d) * 6f) * (0.25f + 0.75f * tip);
+            }
+            else if (kind == 2)                                   // Faser verzweigt
+            {
+                float fork = 0.12f + 0.6f * WorldLayout.Hash01(fi, 5, 73);
+                float spread = Mathf.Clamp01((v - fork) / 0.15f) * 0.2f;
+                presence = (v > fork)
+                    ? Mathf.Max(Mathf.Clamp01((0.24f - d + spread) * 6f), Mathf.Clamp01((0.24f - d - spread) * 6f))
+                    : Mathf.Clamp01((0.30f - d) * 6f);
+                presence *= 1f - 0.55f * Mathf.Clamp01((v - fork) / 0.15f);
+            }
+            else presence = Mathf.Clamp01((0.30f - d) * 6f);
+
+            float env = Mathf.Clamp01(Mathf.Min(v, 1f - v) / 0.05f);   // Nahtschutz in v
+            return presence * env * (0.75f + 0.25f * TileNoise(u, v, 32f, 2, 13f));
+        }
+
+        /// <summary>WALD4/STAMM1: Mammutbaum-Rinde, rotbraun. Der Farbton wird gefuehrt ueber HSV
+        /// (12..21 Grad = Ziel 10..25 Grad) statt ueb RGB-Mischungen, damit er nicht ins Graeuliche
+        /// oder Ins gelbliche driftet. Moosfarbe gibt es ausschliesslich im untersten Meter der Rinde
+        /// (v &lt; RedwoodFactory.BarkMossBandV) — in den Trunk-UVs sitzt dort der Fussbereich.</summary>
         public static Texture2D RedwoodBark()
         {
             return Generate("T_RedwoodBark", 512, (u, v) =>
             {
                 float h = RedwoodHeight(u, v);
                 float patch = TileNoise(u, v, 3f, 3, 21f);
-                Color dark = new Color(0.10f, 0.06f, 0.045f);
-                Color mid = new Color(0.26f, 0.15f, 0.10f);
-                Color light = new Color(0.40f, 0.26f, 0.19f);
+                Color dark = Color.HSVToRGB(12f / 360f, 0.78f, 0.11f);    // Furche, tiefrotbraun
+                Color mid = Color.HSVToRGB(17f / 360f, 0.66f, 0.30f);     // Platte
+                Color light = Color.HSVToRGB(21f / 360f, 0.52f, 0.46f);   // abgeriebene Plattenkante
                 Color c = h < 0.5f ? Color.Lerp(dark, mid, h * 2f) : Color.Lerp(mid, light, (h - 0.5f) * 2f);
-                c = Color.Lerp(c, new Color(0.28f, 0.25f, 0.20f), Mathf.Clamp01((patch - 0.5f) * 3f) * 0.6f); // graue Flecken
-                return Color.Lerp(c, new Color(0.22f, 0.34f, 0.12f), Mathf.Clamp01((TileNoise(u, v, 5f, 3, 50f) - 0.64f) * 4f) * 0.35f); // Moosahnung
+                c = Color.Lerp(c, Color.HSVToRGB(20f / 360f, 0.14f, 0.34f),
+                               Mathf.Clamp01((patch - 0.62f) * 3f) * 0.55f);   // graue Verwitterung
+
+                float band = RedwoodFactory.BarkMossBandV;
+                if (v < band)
+                {
+                    float mask = Mathf.Clamp01((TileNoise(u, v / band, 6f, 3, 50f) - 0.42f) * 3.2f);
+                    float edge = Mathf.Clamp01(Mathf.Min(v, band - v) / (band * 0.25f));  // weiche Raender
+                    c = Color.Lerp(c, Color.HSVToRGB(96f / 360f, 0.62f, 0.34f),
+                                   Mathf.Clamp01(mask * edge * 1.2f));
+                }
+                return c;
             }, false);
         }
 
