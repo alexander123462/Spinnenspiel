@@ -45,9 +45,24 @@ namespace Spinnenspiel
         /// Initialized explicitly so runtime-created components (tests) can hook listeners.</summary>
         public UnityEvent MorningFired;
 
-        /// <summary>J5: Minutes of the cycle that are dark (night core, ramps excluded).</summary>
+        /// <summary>J5: Minutes of the cycle that are dark (night core, ramps excluded).
+        /// LICHT1c4-Wirkung: das ist eine ABSOLUTE Minutenzahl. Der Nachtanteil in der
+        /// Fortschritts-Skala ist nightMinutes/dayLengthMinutes — wer den Zyklus ueber
+        /// dayLengthMinutes "einfriert" (z. B. 10000 min), schrumpft das Nachtfenster auf
+        /// +/-0.0003 Fortschritt und die Daemmerungsrampe auf 4e-6: der Zyklus schnappt beim
+        /// naechsten Frame von Nacht auf vollen Tag (Tag/Nacht-Proben r107-f2: dayFactor 0 ->
+        /// 1, sunLux 250 -> 100000, Himmels-Multiplikator 0.003 -> 1, Nebelfarbe 0.006 -> 0.40
+        /// bei Fortschritt 0.0003 = kurz nach Mitternacht). Fuer Messungen deshalb
+        /// <see cref="SetHoldDayProgressForTests"/> benutzen, nie dayLengthMinutes.</summary>
         [Tooltip("Minutes per cycle that are dark (night core, ramps excluded)")]
         [SerializeField] private float nightMinutes = 6f;
+
+        /// <summary>LICHT1c4: wenn true, schiebt Update() den Tagesfortschritt nicht mehr weiter
+        /// (Licht, Nebel und Himmel werden weiterhin jeden Frame gesetzt). Haelte-Modus fuer
+        /// Messungen und Screenshot-Werkzeuge, damit der Zyklus waehrend langer Aufnahmen nicht
+        /// aus der Nacht laeuft. Aus = normales Spiel.</summary>
+        [Tooltip("Hold the day progress (measurements/screenshots); light and fog keep updating")]
+        [SerializeField] private bool holdDayProgress;
 
         /// <summary>J5: Width in minutes of each dawn/dusk ramp (transition not abrupt).</summary>
         [Tooltip("Width in minutes of each dawn/dusk transition ramp")]
@@ -72,15 +87,20 @@ namespace Spinnenspiel
         [Tooltip("Sun tint during day (from WaldLook)")]
         public Color daySunColor = new Color(1f, 0.93f, 0.82f);
 
-        // T7 Morgennebel: Nebeldensity follows the time of day. The factor multiplies
-        // the baseline fog density (2.0 = twice as dense as noon). Piecewise-linear keys
-        // keep the curve continuous (no jumps; sampled on a fine grid the adjacent values
-        // differ by well under 0.05). Morning plateau 0.05..0.2, evening ramp to 1.4 at 0.75.
-        private static readonly float[] fogKeysT = { 0f, 0.05f, 0.2f, 0.35f, 0.7f, 0.75f, 0.85f, 0.9f, 1f };
-        private static readonly float[] fogKeysV = { 1f, 2f, 2f, 1f, 1f, 1.4f, 1.4f, 1f, 1f };
+        // T7 Morgennebel / LICHT1c2: Nebeldichte folgt dem Tageslauf. Der Faktor multipliziert
+        // die Mittag-Dichte. Stueckweise lineare Keys halten die Kurve stetig (kein Sprung > 0.05
+        // auf feinem Raster). FRUEHER: Plateau nur 0.05..0.2 bei 2.0x — um 0.3 war der Morgennebel
+        // schon fast weg, bei gleichem Sonnenstand (0.3 vs. 0.7) blieb kein messbarer Unterschied
+        // (StDev-Delta 0.90). JETZT: Plateau bis 0.3 bei 3.0x, Anstieg geramppt von 0 bis 0.15
+        // (Der Kurventest misst Stetigkeit: <0.05 Sprung pro 0.002-Schritt — die 0.05-Rampe mit
+        // Sprung 1->3 ergab 0.08 und warf den Test), Ausloesen bis 0.45, Mittag/Nachmittag 1.0,
+        // Abendbuckel 1.4 bei 0.75.
+        private static readonly float[] fogKeysT = { 0f, 0.15f, 0.3f, 0.45f, 0.7f, 0.75f, 0.85f, 0.9f, 1f };
+        private static readonly float[] fogKeysV = { 1f, 3f, 3f, 1f, 1f, 1.4f, 1.4f, 1f, 1f };
 
         /// <summary>T7: Nebelfactor at a day progress (0 = midnight, 0.5 = noon).
-        /// Morning (0.05..0.2) 2.0x denser than noon, evening 1.4x, night ~1.0x.</summary>
+        /// Ramps from midnight to 3.0x noon by 0.15, plateau to 0.3, dissolves by late morning
+        /// (0.45), noon/afternoon 1.0x, evening 1.4x, night ~1.0x.</summary>
         public static float FogFactor(float dayProgress)
         {
             float t = dayProgress - Mathf.Floor(dayProgress);
@@ -105,6 +125,24 @@ namespace Spinnenspiel
         private float fogBaseDensity = -1f; // baseline RenderSettings.fogDensity (visible when volumetric off)
         private bool fogMissingWarned;
 
+        /// <summary>LICHT1c2: Mittag-Dichte (Faktor 1.0 der Nebelkurve) vom Builder gesetzt
+        /// (WaldLook.FogDensity). RenderSettings.fogDensity ist ein Prozess-globaler Wert und
+        /// bleibt nach vorangelaufenen PlayMode-Tests skaliert zurueck — wer ihn beim Start
+        /// abliest, erbt die Kontamination (Voll-Lauf vs. gezielte Auswahl maass dann
+        /// Unterschiedliches). Mit Builder-Wert schreibt der Zyklus jede Frame ABSOLUT
+        /// (Dichte = noonFogDensity x Kurve) und selbstheilend. -1 = Verhalten wie bisher
+        /// (Baseline bei Start aus RenderSettings lesen; Runtime-erzeugte Komponenten).</summary>
+        [Tooltip("Noon (factor 1.0) fog density from the builder; -1 reads RenderSettings at start")]
+        public float noonFogDensity = -1f;
+
+        /// <summary>LICHT1c2: Tag-Nebelfarbe (Huellflaeche, Faktor 1) vom Builder gesetzt
+        /// (WaldLook.FogAlbedo). Der Zyklus dimmt sie nachts pro Frame auf fogNightDimFactor.
+        /// Ohne Builder-Wert wurde RenderSettings.fogColor einmalig abgelesen — nach einem
+        /// Test, der nachts endete, kam dabei die NACHTLICHE (gedimmte) Farbe als Tag-Baseline
+        /// heraus (G6-Himmel Max 214 -> 183 im Voll-Lauf). -1 = altes Verhalten.</summary>
+        [Tooltip("Day fog colour from the builder; -1 reads RenderSettings at start")]
+        public Color dayFogColor = new Color(-1f, -1f, -1f);
+
         /// <summary>FARBE1a: The HDRP PhysicallyBasedSky built by the Builder. The sky renders a
         /// full-bright DAY sky whenever the main light sits above the horizon — and the cycle
         /// parks the "moon" above the horizon at night (J5). Without this link the night frame
@@ -126,7 +164,87 @@ namespace Spinnenspiel
         /// ambient) dominates the frame, so 0.02 lands night at ~20-25 (ratio ~6, matches the
         /// 16000 lx moonlight design where night is ~5-10x darker than day).</summary>
         [Tooltip("Sky brightness multiplier at deep night (0 = pitch black)")]
-        public float skyNightMultiplier = 0.01f;
+        public float skyNightMultiplier = 0.018f; // LICHT1c6 (r109): Builder setzt WaldLook.Wert (0.018, Obergrenze < 0.02); Default nur Konsistenz.
+
+        /// <summary>LICHT1c1: Multiplier fuer die klassische Nebelfarbe (RenderSettings.fogColor)
+        /// bei tiefster Nacht. Die helle Tag-Huellflaeche (FogAlbedo) macht die Ferne auch nachts
+        /// hell (J5-Nacht Mittel 77 > 45-Fenster,mondleuchtende Ferne ueber den Schleier). Der
+        /// Zyklus dimmt die Nebelfarbe mit dem Tagesfaktor: tags 1x, nachts dieser Faktor.
+        /// Vom Builder aus WaldLook.FogNightDimFactor gesetzt.</summary>
+        [Tooltip("Fog colour multiplier at deep night (1 = day veil stays, 0 = black distance)")]
+        public float fogNightDimFactor = 0.08f; // LICHT1c6: Builder setzt WaldLook.Wert (0.08); Default nur Konsistenz.
+
+        /// <summary>LICHT1c1: Heller-Multiplikator des PBS-Himmels bei vollem Tageslicht.
+        /// Der +6-Kontrast (ColorAdjustments, wirkt im HDR-Pfad der Beweisfotos) dimmt die
+        /// Sonnen-Scheibe auf dem G6-Himmel 214 -> 188 (<200-Fenster). Der Himmel wird
+        /// ueber seinen Multiplier kompensiert (nur Himmel+Ambient, nicht die
+        /// Direktlicht-Geometrie) — vom Builder aus WaldLook.DaySkyMultiplier gesetzt.</summary>
+        [Tooltip("Sky brightness multiplier at full day (1 = old behaviour)")]
+        public float daySkyMultiplier = 1f;
+
+        private Color fogBaseColor = new Color(-1f, -1f, -1f); // baseline RenderSettings.fogColor (read once)
+
+        // LICHT1c3: Backlog-Forderung "Nachts duerfen Oeffnungen Mond nicht als Scheibe
+        // durchlassen (Himmelsscheibe ausblenden)". Die Szenen-Sonne steht nachts als
+        // "Mond" UEBER dem Horizont (sonst waere die Nacht pechschwarz) und HDRPs
+        // PhysicallyBasedSky malt dazu die Himmelskoerper-Scheibe aus der Lichtfarbe
+        // (FillCelestialBodyData). Bei ShadingSource Emission ist das eine Leucht-
+        // scheibe mit Radiance = Lux / Raumwinkel — nachts bei 8000 lx immer noch eine
+        // weisse Scheibe (r105-Beweis: Nachtrahmen == Tagesrahmen, Max 253). Der Zyklus
+        // schaltet die Scheibe deshalb am Tag auf Emission (PBS-Sonnenkern fuer G6) und
+        // in der Nacht auf ReflectSunLight (dunkle Scheibe, Mondlicht bleibt als gerichtete
+        // Beleuchtung erhalten).
+        private HDAdditionalLightData hdSun;
+        private bool hdSunFetched;
+
+        /// <summary>LICHT1c3: Applies the celestial body disc mode for the current day
+        /// factor: Emission (bright sun disc) at full day, no sky participation at all from
+        /// dusk onward. No-op if the light has no HDAdditionalLightData.</summary>
+        private void ApplyCelestialDisk()
+        {
+            if (sun == null) return;
+            if (!hdSunFetched)
+            {
+                hdSun = sun.GetComponent<HDAdditionalLightData>();
+                hdSunFetched = true;
+            }
+            if (hdSun == null) return;
+            // LICHT1c3 (r106-f5): ReflectSunLight-Experiment — damals noch MIT
+            // dayLengthMinutes-Drift gemessen (Nacht-Rahmen waren versteckte Tagesrahmen,
+            // "Schaettigung" durch die helle Tag-Nebelfarbe, nicht die Scheibe). LICHT1c6
+            // (Claude 2026-10-29, Entscheidung Nacht-Nebelhelligkeit): der Nachthimmel < 0.02
+            // und Dach-Schatten On bleiben, aber der Mond muss den PBS-Himmel speisen —
+            // ohne jede Himmelsbeteiligung ist die Nacht EXAKT schwarz (r108-f2: Nebelfarbe
+            // 0.0464, alle Proben Raw 0.00E+000), und der Nebel-Schleier skaliert nur die
+            // LICHTMENGE, die ihn speist (0.015 -> 0.08 aenderte am Schwarzbild nichts).
+            // Nachts daher: Himmelsbeteiligung AN, aber Schattungsquelle ReflectSunLight
+            // (dunkle Scheibe statt Leuchtkugel). Der Nachthimmel-Multiplikator (WaldLook
+            // 0.003 < 0.02) begrenzt die Helligkeit.
+            bool day = CurrentDayFactor >= 0.5f;
+            hdSun.interactsWithSky = true;
+            hdSun.celestialBodyShadingSource = day
+                ? HDAdditionalLightData.CelestialBodyShadingSource.Emission
+                : HDAdditionalLightData.CelestialBodyShadingSource.ReflectSunLight;
+        }
+
+        /// <summary>LICHT1c3: Tests-only hook: applies the disc mode for a given day
+        /// fraction (0 = midnight -> Reflection/dark, 0.5 = noon -> Emission/bright).
+        /// Returns false when the light has no HDAdditionalLightData.</summary>
+        public bool SetCelestialDiskForTests(float dayFractionTest)
+        {
+            if (sun == null) return false;
+            if (!hdSunFetched)
+            {
+                hdSun = sun.GetComponent<HDAdditionalLightData>();
+                hdSunFetched = true;
+            }
+            if (hdSun == null) return false;
+            float saved = CurrentDayFactor;
+            CurrentDayFactor = dayFractionTest;
+            ApplyCelestialDisk();
+            CurrentDayFactor = saved;
+            return true;
+        }
 
         /// <summary>J5: dayFactor (0 = deep night, 1 = full day) for a day fraction with explicit
         /// dawn/dusk ramps. Pure function so EditMode tests can pin the ramp shape (and the
@@ -209,11 +327,34 @@ namespace Spinnenspiel
             return true;
         }
 
+        /// <summary>LICHT1c2: zurueck auf Automatik-Histogramm. Der Modus lebt auf dem geteilten
+        /// Profil-Component und bleibt im PlayMode-Prozess auch nach Szenenwechsel Fixed stehen —
+        /// ein Test, der (wie T7) Auto-Exposure voraussetzt, mass sonst mit gedimmtem dayLux
+        /// schwarze Frames (Mittel 0.0), wenn ein frueherer Test (J5) auf Fixed EV kalibriert hat.</summary>
+        public bool SetAutoExposureForTests()
+        {
+            if (exposureVolume == null) return false;
+            exposureVolume.mode.Override(ExposureMode.AutomaticHistogram);
+            return true;
+        }
+
         /// <summary>FARBE1a: The current sky multiplier (1 = full day sky), or -1 when no sky
         /// volume is wired. Plain float so Tests (no HDRP reference) can log the sky source.</summary>
         public float CurrentSkyMultiplier()
         {
             return skyVolume == null ? -1f : skyVolume.multiplier.value;
+        }
+
+        /// <summary>LICHT1c4: Tests-/Foto-Modus — Tagesfortschritt halten (true) oder laufen
+        /// lassen (false). Ersetzt den alten Trick, dayLengthMinutes auf 10000 zu stellen:
+        /// nightMinutes und transitionMinutes sind ABSOLUTE Minuten, der Nachtkern einer
+        /// 10000-Minuten-Tage ist darum nur noch +/-0.0003 Fortschritt breit — der Zyklus
+        /// schnappte mitten in der Nacht auf vollen Tag (r107-f2: dayFactor 0 -> 1 bei
+        /// Fortschritt 0.0003). Bei unveraenderter Tageslaenge bleibt das Nachtfenster breit.
+        /// False beim Zuruecksetzen, damit nichts haengen bleibt.</summary>
+        public void SetHoldDayProgressForTests(bool hold)
+        {
+            holdDayProgress = hold;
         }
 
         /// <summary>FARBE1a: Drives the PhysicallyBasedSky brightness with the day factor.
@@ -225,7 +366,17 @@ namespace Spinnenspiel
         private void ApplySky()
         {
             if (skyVolume == null) return;
+            // LICHT1c2: der Tages-Multiplier (Kompensation fuer den Look) darf NICHT schon bei
+            // kleinem dayF durch den Lerp lecken — J5-Nacht bei dayFactor 0.025 bekam mit
+            // daySkyMultiplier 2.1 ein 1.5x helleren Nachthimmel (Nacht-Mittel 50.7 -> 82.6,
+            // r104-f3/f4). Grundkurve bis dayF 1 auf 1.0; der Tages-Boost setzt erst ab
+            // echter Tagesspitze (dayF > 0.95) ein.
             float m = Mathf.Lerp(skyNightMultiplier, 1f, CurrentDayFactor);
+            float boost = Mathf.InverseLerp(0.95f, 1f, CurrentDayFactor);
+            if (boost > 0f)
+            {
+                m = Mathf.Lerp(m, daySkyMultiplier, boost);
+            }
             skyVolume.multiplier.Override(m);
         }
 
@@ -252,6 +403,7 @@ namespace Spinnenspiel
                 sun.transform.rotation = Quaternion.Euler(elevLight, azLight, 0f);
                 sun.intensity = Mathf.Lerp(moonLux, dayLux, CurrentDayFactor);
                 sun.color = Color.Lerp(daySunColor, moonTint, 1f - CurrentDayFactor);
+                ApplyCelestialDisk(); // LICHT1c3: Himmelscheibe tags Emission, nachts aus.
             }
             ApplySky();
         }
@@ -259,9 +411,15 @@ namespace Spinnenspiel
         private void Update()
         {
             float lengthMinutes = dayLengthMinutes > 0.01f ? dayLengthMinutes : 0.01f;
-            dayFraction += Time.deltaTime / (lengthMinutes * 60f);
-            if (dayFraction >= 1f) dayFraction -= 1f;
-            DayProgress = dayFraction;
+            // LICHT1c4: im Haelte-Modus bleibt der Fortschritt stehen (Messungen, Fotos).
+            // Licht/Nebel/Himmel unten werden trotzdem weitergeschrieben, damit ein vorher
+            // gesetzter Tag/Sprung sofort wirksam bleibt und bleibt.
+            if (!holdDayProgress)
+            {
+                dayFraction += Time.deltaTime / (lengthMinutes * 60f);
+                if (dayFraction >= 1f) dayFraction -= 1f;
+                DayProgress = dayFraction;
+            }
 
             // S5: sunrise at 0.25 — the event fires only on a natural forward crossing
             // (not on wrap-around midnight, not on a Test-Jump via SetDayProgress).
@@ -297,6 +455,7 @@ namespace Spinnenspiel
             sun.intensity = Mathf.Lerp(moonLux, dayLux, dayFactor);
             sun.color = Color.Lerp(
                 daySunColor, moonTint, 1f - dayFactor);
+            ApplyCelestialDisk(); // LICHT1c3: Himmelscheibe tags Emission, nachts aus.
 
             // FARBE1a: the sky brightness must follow the day factor (see ApplySky).
             ApplySky();
@@ -332,14 +491,55 @@ namespace Spinnenspiel
             }
             if (RenderSettings.fog)
             {
-                if (fogBaseDensity <= 0f)
+                // LICHT1c2: Builder-Baseline hat Vorrang; ohne Builder-Wert (runtime-Erzeugung)
+                // bleibt das alte Einmalablesen aus RenderSettings.
+                float baseD = noonFogDensity >= 0f ? noonFogDensity : fogBaseDensity;
+                if (baseD <= 0f && noonFogDensity < 0f)
                 {
-                    fogBaseDensity = RenderSettings.fogDensity;
+                    fogBaseDensity = baseD = RenderSettings.fogDensity;
                 }
-                if (fogBaseDensity > 0f)
+                if (baseD > 0f)
                 {
-                    RenderSettings.fogDensity = fogBaseDensity * factor;
+                    RenderSettings.fogDensity = baseD * factor;
                 }
+            }
+            // LICHT1c1/c3: die Nebelfarbe folgt dem Tagesfaktor (tags 1x, tiefste Nacht
+            // fogNightDimFactor). SetDayProgress ruft ApplyFog VOR der Neuberechnung von
+            // CurrentDayFactor auf — den Faktor hier lokal bestimmen, damit ein Test-Jump
+            // sofort die richtige Farbe setzt.
+            Color baseC = dayFogColor.r >= 0f ? dayFogColor : fogBaseColor;
+            if (baseC.r < 0f)
+            {
+                fogBaseColor = baseC = RenderSettings.fogColor;
+            }
+            float lengthMinutes = dayLengthMinutes > 0.01f ? dayLengthMinutes : 0.01f;
+            float dayF = DayFactorAt(dayFraction, lengthMinutes,
+                Mathf.Max(transitionMinutes, 0.01f), nightMinutes);
+            // LICHT1c1 fix (r103-f7): der rohe Tagesfaktor dimmt schon um 16:30 (Faktor
+            // 0.875) — das nahm G6-Himmel Max exakt 214 -> 190 (Multiplikator auf die
+            // Hüllfläche). Die Tag-Hüllfläche bleibt bis in den Abend bei 1x; gedimmt
+            // wird erst ab Daemmerung (dayF < 0.5) bis tief in die Nacht.
+            float dim = Mathf.Lerp(fogNightDimFactor, 1f,
+                Mathf.InverseLerp(0f, 0.5f, dayF)); // InverseLerp klemmt selbst auf 0..1
+            if (RenderSettings.fog)
+            {
+                RenderSettings.fogColor = new Color(
+                    baseC.r * dim, baseC.g * dim, baseC.b * dim);
+            }
+            // LICHT1c3: der SICHTBARE Schleier in HDRP ist das Fog-Volumen, nicht
+            // RenderSettings.fogColor — das dimmte bisher nur den ungenutzten Wert und die
+            // J5-Nacht blieb bei der hellen Tag-Huellflaeche (Mittel 164.7, r104-f9).
+            // DIM-Test (r105-f3) zeigt: albedo allein reicht nicht — Nachtrahmen-Raw war
+            // identisch zum Tagesrahmen (4.7E-2), denn HDRPs klassischer Nebel
+            // (enableVolumetricFog aus) blendet mit fog.color, und das Profil hatte dort
+            // nirgends einen Override -> Default 0.5 Grau als Dauer-Schleier. Der Zyklus
+            // dimmt jetzt color UND albedo: tags Faktor 1 (Builder-Wert), nachts 0.12x.
+            if (fogVolumeComponent != null && fogVolumeComponent.albedo.overrideState)
+            {
+                fogVolumeComponent.albedo.Override(new Color(
+                    baseC.r * dim, baseC.g * dim, baseC.b * dim));
+                fogVolumeComponent.color.Override(new Color(
+                    baseC.r * dim, baseC.g * dim, baseC.b * dim));
             }
         }
     }

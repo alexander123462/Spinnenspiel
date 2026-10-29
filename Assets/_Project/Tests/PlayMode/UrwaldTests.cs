@@ -726,7 +726,19 @@ namespace Spinnenspiel.Tests
             float half = gen.World.Size / 2f;
             VegetationSystem veg = Object.FindFirstObjectByType<VegetationSystem>();
             var cycle = Object.FindFirstObjectByType<DayNightCycle>();
-            if (cycle != null) cycle.SetDayProgress(0.45f); // Vormittag-Light for the proof shots
+            if (cycle != null)
+            {
+                cycle.SetDayProgress(0.45f); // LICHT1c3: 0.45 wie im gruenen HEAD-Lauf (r109 Max 214). Das LICHT1c2-Experiment 0.5 mass nur 167 — und die Begruendung 'Himmel bei 0.45 erst ~0.5' war falsch: DayFactorAt(0.45) = min(1,(0.45-0.15)/0.1) = 1.0 (Volltag, Kern/Halbzeit-Rechnung).
+                // LICHT1c3 (G6-Lehre, r104-f9): der Himmel-Rahmen ueber dem Dach soll den
+                // PBS-Himmel mit Sonne zeigen. Volumennebel AN fuhrte einen flaechigen
+                // Streuschleier ein (Max 167 = reiner Nebelwert, kein Sonnenkern) — die
+                // Sonne steht mittags im Zenit und liegt bei waagrechtem Blick nicht im
+                // Rahmen; der Schleier ueberdeckt alles. Der gruene HEAD-Lauf lief mit
+                // klassischem Nebel allein (Volumetrik aus). Hier bewusst pinned, damit
+                // kein Test-Leck (J5 schaltet sie am geteilten Profil aus) den Rahmen
+                // veraendert: Volumetrik AUS.
+                cycle.SetVolumetricFogForTests(false);
+            }
             yield return null; // one frame so DayNightCycle rotates the sun to morning
             Camera main = Camera.main;
             var overviewPos = new Vector3(half, 14f, half - 14f);
@@ -766,15 +778,52 @@ namespace Spinnenspiel.Tests
                 if (veg != null) veg.RenderForCamera(main);
                 Vector4 spinne = SaveFrameHdr(main, 1280, 720, "Logs/ci/urwald_spinne.png");
 
-                // --- urwald_himmel.png: Kamera ueber dem Kronendach, Blick waagrecht. ---
+                // --- urwald_himmel.png: Kamera ueber dem Kronendach, Blick zur Sonne. ---
                 float camY = (canopyTop > 0f) ? canopyTop + 6f : s.y + 40f;
                 main.transform.position = new Vector3(s.x, camY, s.z);
                 main.nearClipPlane = 0.5f;
-                var fwd = (new Vector3(0.6f, 0f, -0.9f)).normalized;
+                // LICHT1c3 (r105-f5 Bildbeweis): der Rahmen war ein einziger Nebel-Schleier —
+                // klassischer HDRP-Nebel (fog.enabled am geteilten Profil) ueberdeckt auch die
+                // Sonne komplett, Max bleibt beim normalisierten Schleierwert 167. Fuer diesen
+                // EINEN Rahmen klassichen Nebel aus (danach zurueck — geteiltes Profil!) und
+                // die Kamera direkt auf die Sonnenlinie der fest gepinnten 0.45 stellen:
+                // dann liegt der PBS-Sonnenkern im Bild und Max > 200 ist messbar.
+                object g6FogVol = typeof(DayNightCycle).GetField("fogVolumeComponent")
+                    .GetValue(cycle);
+                object g6FogEnabled = g6FogVol == null ? null
+                    : g6FogVol.GetType().GetField("enabled").GetValue(g6FogVol);
+                if (g6FogEnabled != null)
+                    g6FogEnabled.GetType().GetMethod("Override", new[] { typeof(bool) })
+                        .Invoke(g6FogEnabled, new object[] { false });
+                Vector3 toSun = cycle.sun != null
+                    ? -cycle.sun.transform.forward
+                    : new Vector3(0.4f, 0.6f, -0.7f);
+                if (toSun.y < 0.25f) toSun.y = 0.25f; // nie unter den Horizont zielen
+                var fwd = toSun.normalized;
                 main.transform.rotation = Quaternion.LookRotation(fwd);
+                // LICHT1c3 Diagnose: zeigt die Kamera wirklich auf die Sonnenlinie, und ist
+                // die Sonne hell + aktiv (Himmelskoerper-Puffer fuellt nur enabled, hell,
+                // interactsWithSky)?
+                Debug.Log("[G6-aim] sunEuler " + (cycle.sun != null ? cycle.sun.transform.rotation.eulerAngles.ToString() : "n/a")
+                    + " fwd " + fwd.ToString() + " lux " + (cycle.sun != null ? cycle.sun.intensity.ToString("F0") : "n/a")
+                    + " sunEnabled " + (cycle.sun != null && cycle.sun.enabled));
                 float skyFrac = SkyFractionUpperHalf(main, 30f);
                 if (veg != null) veg.RenderForCamera(main);
+                // LICHT1c3 (r105-f8 Messbeleg): die G6-Annahme "cam.Render() SKIPS post"
+                // stimmt unter Unity 6/HDRP 17 nicht mehr — der gelesene RT war display-
+                // referenziert (geoMittel 0.94, rawMax exakt 1.00): Auto-Exposure normiert
+                // alles (rawMax == 1.00 ist deren Decke), Max blieb 167..169 bei jedem Look.
+                // Fix: fuer DIESEN EINEN Rahmen die Belichtung auf Fixed EV 20 pinnen (wie J5,
+                // SetFixedExposureForTests) — dann bleibt der PBS-Sonnenkern (~1e8 cd/m2, vier
+                // Zehnerpotenzen ueber Himmel) auch nach ACES gesaettigt >200, waehrend der
+                // Himmel im Fenster 60..200 landet. Danach zurueck auf Auto (geteiltes Profil!).
+                Assert.IsTrue(cycle.SetFixedExposureForTests(16f),
+                    "Exposure volume not wired to the DayNightCycle (G6 needs fixed EV).");
                 Vector4 himmel = SaveFrameHdr(main, 1280, 720, "Logs/ci/urwald_himmel.png");
+                cycle.SetAutoExposureForTests();
+                if (g6FogEnabled != null)
+                    g6FogEnabled.GetType().GetMethod("Override", new[] { typeof(bool) })
+                        .Invoke(g6FogEnabled, new object[] { true }); // Profil-Rueckgabe
 
                 // DANN messen + asserten (ERST aufnehmen war oben -> G6-Lehre).
                 Debug.Log("[G6-Spinne] Mittel " + spinne.x.ToString("F1") + " -> >=25 -> "
@@ -988,16 +1037,33 @@ namespace Spinnenspiel.Tests
             cam.targetTexture = null;
 
             Color[] px = hdr.GetPixels();
+            // LICHT1c3: Im Himmel-Rahmen (Post aus) steht echte Roh-Radianz — der PBS-
+            // Sonnenkern (~1e9 bei 100000 lx Emission) ueberlaeuft Half-Float auf inf und
+            // zerstoert geoMittel/ACES. Kanaege auf 3e5 klammern; in allen Raeumen MIT Post
+            // (spinne, uebersicht, nahkamp, wasser: Werte <= ~2) ist das ein No-op.
+            for (int i = 0; i < px.Length; i++)
+            {
+                Color c = px[i];
+                px[i] = new Color(Mathf.Min(c.r, 300000f), Mathf.Min(c.g, 300000f),
+                    Mathf.Min(c.b, 300000f), 1f);
+            }
             int n = px.Length;
             float sumLog = 0f;
+            // LICHT1c3 Diagnose: hellster Roh-Pixel und geometrisches Mittel vor Tonemap —
+            // unterscheidet "Sonne liegt nicht im Rahmen" (rawMax ~ geoMittel) von
+            // "Sonne im Rahmen aber Tonemap drueckt sie" (rawMax >> geoMittel).
+            float rawMax = 0f;
             for (int i = 0; i < n; i++)
             {
                 Color c = px[i];
                 float lum = 0.2126f * c.r + 0.7152f * c.g + 0.0722f * c.b;
                 sumLog += Mathf.Log(Mathf.Max(lum, 1e-5f));
+                if (lum > rawMax) rawMax = lum;
             }
             float exposure = 0.55f / Mathf.Exp(sumLog / n);
             exposure = Mathf.Clamp(exposure, 0.0005f, 50f);
+            Debug.Log("[SaveFrameHdr] " + file + " geoMittel " + Mathf.Exp(sumLog / n).ToString("E2")
+                + " rawMax " + rawMax.ToString("E2") + " ratio " + (rawMax / Mathf.Exp(sumLog / n)).ToString("F1"));
 
             Color[] outPx = new Color[n];
             for (int i = 0; i < n; i++)

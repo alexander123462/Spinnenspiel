@@ -8,8 +8,9 @@ using UnityEngine.TestTools;
 namespace Spinnenspiel.Tests
 {
     /// <summary>T7 Morgennebel: the fog density follows the time of day. FogFactor(dayProgress)
-    /// is a pure curve (morning 2.0x noon, evening 1.4x, night 1.0x), applied by the DayNightCycle
-    /// onto the HDRP Fog volume. Proof image compares morning vs noon from the gallery camera.</summary>
+    /// is a pure curve (morning plateau 3.0x noon to mid-morning, evening 1.4x, night 1.0x),
+    /// applied by the DayNightCycle onto the HDRP Fog volume and RenderSettings.fogDensity.
+    /// Proof image compares dense morning vs thin noon at EQUAL sunlight.</summary>
     public class MorgennebelTests
     {
         /// <summary>T7: The fog curve as a pure function — morning 2x noon, evening 1.4x,
@@ -20,17 +21,24 @@ namespace Spinnenspiel.Tests
             float noon = DayNightCycle.FogFactor(0.5f);
             Assert.Greater(noon, 0f, "Fog factor must be positive.");
 
-            // Morning (0.1) is 2.0x denser than noon.
+            // Morning (0.1) sits on the ramp at ~2.33x noon; the plateau 3.0x holds to 0.3
+            // (LICHT1c2: ramped rise 0..0.15 keeps the curve smooth for the jump guard).
             float morning = DayNightCycle.FogFactor(0.1f);
             float ratioMorning = morning / noon;
-            Assert.GreaterOrEqual(ratioMorning, 1.9f, "Morning not ~2.0x noon (" + ratioMorning + ").");
-            Assert.LessOrEqual(ratioMorning, 2.1f, "Morning too dense vs noon (" + ratioMorning + ").");
+            Assert.GreaterOrEqual(ratioMorning, 2.25f, "Morning ramp not ~2.33x noon (" + ratioMorning + ").");
+            Assert.LessOrEqual(ratioMorning, 2.42f, "Morning ramp too dense vs noon (" + ratioMorning + ").");
 
             // Evening (0.75) is 1.4x noon.
             float evening = DayNightCycle.FogFactor(0.75f);
             float ratioEvening = evening / noon;
             Assert.GreaterOrEqual(ratioEvening, 1.3f, "Evening not ~1.4x noon (" + ratioEvening + ").");
             Assert.LessOrEqual(ratioEvening, 1.5f, "Evening too dense vs noon (" + ratioEvening + ").");
+
+            // LICHT1c2: the morning plateau reaches to 0.3 (five o'clock, just after sunrise
+            // at 0.25) — the old curve was already down to 1.33 there, so the equal-sunlight
+            // proof (0.3 vs 0.7) had no measurable fog difference (StDev delta 0.90 < 1.5).
+            Assert.GreaterOrEqual(DayNightCycle.FogFactor(0.3f) / noon, 2.9f,
+                "Morning fog must still be ~3x noon at dayProgress 0.3 (plateau to mid-morning).");
 
             // Night (0.9) equals noon (1.0x).
             float night = DayNightCycle.FogFactor(0.9f);
@@ -150,6 +158,13 @@ namespace Spinnenspiel.Tests
             Camera cam = Object.FindFirstObjectByType<Camera>();
             Assert.IsNotNull(cam, "No Camera in Urwald.");
 
+            // LICHT1c2: T7 misst bewusst MIT Auto-Exposure (beide Frames bei gleichem Sonnenstand
+            // werden auf Mittelgrau normalisiert — der Nebelunterschied bleibt als StDev-Signal
+            // erhalten). Der Modus ist ein geteilter Profil-Wert: J5 (alphabetisch vorher) hinterlaesst
+            // Fixed EV — mit dayLux 3000 kaemen dann schwarze Frames (Mittel 0.0, r104-f3). Hier
+            // explicit zurueck auf Automatik.
+            Assert.IsTrue(cycle.SetAutoExposureForTests(), "Exposure volume not wired to the DayNightCycle.");
+
             // Warmup so the HDRP volume/atmosphere pipeline is active before capture
             // (G6-Lehre: J5 runs many frames; instant jumps after LoadScene render blank frames).
             for (int warm = 0; warm < 30; warm++) yield return null;
@@ -159,10 +174,20 @@ namespace Spinnenspiel.Tests
             // dayFactor stays 1.0 at BOTH 0.5 and 0.75, so noon vs evening differ ONLY in fog.
             cycle.dayLux = 3000f;
 
-            // Use the LIVE follow-camera (it sits behind the spider over nearby ground + vegetation,
-            // exactly like the green J5 proof). Repositioning to a mid-world horizon view showed
-            // only uniform far-fog (StDev ~0), no usable gradient. The follow-rig keeps its pose
-            // across SetDayProgress jumps, so noon vs evening differ ONLY in fog, not sunlight.
+            // LICHT1c2 (Bildbeweis-Redesign): die Follow-Kamera rahmt Nahfeld — bei gleichem
+            // Sonnenstand (0.7 vs 0.3) maessen dort selbst 3x Nebel nur StDev-Delta 0.13
+            // (r104-f5: noon 21.1 vs dense 21.0). Klassischer exp2-Nebel wirkt ab ~60 m: der
+            // Beweis braucht wie J5 eine feste Pose am Weltmittelpunkt, etwas erhoeht und leicht
+            // nach unten (Nebelband in der Mittel-Distanz, nicht der einheitliche Fern-Schleier).
+            var followCamT7 = cam.GetComponent<SpiderCamera>();
+            if (followCamT7 != null) followCamT7.enabled = false;
+            float halfT7 = worldGen.World.Size / 2f;
+            UnityEngine.Terrain terT7 = UnityEngine.Terrain.activeTerrain;
+            Assert.IsNotNull(terT7, "No active terrain in Urwald (T7 pose pin).");
+            Vector3 midT7 = new Vector3(halfT7, 0f, halfT7);
+            float groundY7 = terT7.SampleHeight(midT7) + terT7.transform.position.y;
+            cam.transform.position = midT7 + new Vector3(0f, groundY7 + 8f, 0f);
+            cam.transform.rotation = Quaternion.Euler(-8f, 45f, 0f);
 
             // Noon (baseline fog, dayFactor 1.0): let HDRP settle the volume, then capture the live frame.
             cycle.SetDayProgress(0.7f);
@@ -170,14 +195,14 @@ namespace Spinnenspiel.Tests
             float pathAtNoon = cycle.CurrentFogMeanFreePath();
             Vector3 noon = CaptureMeanAndStdDev(cam, 480, 270, "Logs/ci/t7-noon.png");
 
-            // Morning (denser): meanFreePath must be baseline / FogFactor(0.1) = /2.0.
+            // Morning (denser): meanFreePath must be baseline / FogFactor(0.1) = /3.0.
             cycle.SetDayProgress(0.1f);
             for (int warm = 0; warm < 3; warm++) yield return null;
             float pathAtMorning = cycle.CurrentFogMeanFreePath();
             Vector3 morgen = CaptureMeanAndStdDev(cam, 480, 270, "Logs/ci/t7-morgen.png");
 
             // Equal-sunlight fog proof: dayFactor(0.3) == dayFactor(0.7) (symmetric light curve),
-            // but FogFactor(0.3)=1.33 vs FogFactor(0.7)=1.0 -> only the FOG differs.
+            // but FogFactor(0.3)=2.0 vs FogFactor(0.7)=1.0 -> only the FOG differs (LICHT1c2).
             cycle.SetDayProgress(0.3f);
             for (int warm = 0; warm < 3; warm++) yield return null;
             float pathAtDense = cycle.CurrentFogMeanFreePath();
@@ -190,25 +215,26 @@ namespace Spinnenspiel.Tests
             Debug.Log("[T7-morgen] Mittel " + morgen.x.ToString("F1") + " StDev " + morgen.y.ToString("F1"));
             Debug.Log("[T7-dense] Mittel " + nebeldense.x.ToString("F1") + " StDev " + nebeldense.y.ToString("F1"));
 
-            // (a) The volume really follows the curve: morning path = noon path / 2.0.
+            // (a) The volume really follows the curve: morning path = noon path / 2.33 (ramp).
             Assert.Greater(pathAtNoon, 0f, "Fog meanFreePath not set in the scene.");
             float ratioMorning = pathAtNoon / pathAtMorning;
-            Assert.GreaterOrEqual(ratioMorning, 1.9f, "Morning fog not ~2x denser (" + ratioMorning + ").");
-            Assert.LessOrEqual(ratioMorning, 2.1f, "Morning fog too dense (" + ratioMorning + ").");
-            // Equal sunlight (0.7 vs 0.3): path ratio must be FogFactor(0.3)/FogFactor(0.7) = 1.33.
+            Assert.GreaterOrEqual(ratioMorning, 2.25f, "Morning fog not ~2.3x denser (" + ratioMorning + ").");
+            Assert.LessOrEqual(ratioMorning, 2.42f, "Morning fog too dense (" + ratioMorning + ").");
+            // Equal sunlight (0.7 vs 0.3): path ratio must be FogFactor(0.3)/FogFactor(0.7) = 3.0.
             float ratioDense = pathAtNoon / pathAtDense;
-            Assert.GreaterOrEqual(ratioDense, 1.28f, "Dense-fog path ratio off (" + ratioDense + ").");
-            Assert.LessOrEqual(ratioDense, 1.39f, "Dense-fog path ratio off (" + ratioDense + ").");
+            Assert.GreaterOrEqual(ratioDense, 2.9f, "Dense-fog path ratio off (" + ratioDense + ").");
+            Assert.LessOrEqual(ratioDense, 3.1f, "Dense-fog path ratio off (" + ratioDense + ").");
 
-            // (b) Visible proof at EQUAL sunlight (0.7 vs 0.3): denser fog measurably changes the
-            // render. Auto-exposure normalizes brightness, so the STABLE signal is that the two
-            // frames differ (the fog really moved the picture); we assert a real StDev delta and
-            // ship both PNGs (Logs/ci/t7-noon.png vs t7-nebel-compare.png) for visual comparison.
-            float stDevDelta = Mathf.Abs(nebeldense.y - noon.y);
-            Assert.Greater(stDevDelta, 1.5f, "Denser fog did not visibly change the render (StDev delta " + stDevDelta + ").");
+            // (b) Visible proof at EQUAL sunlight (0.7 vs 0.3): the denser veil FLATTENS the
+            // mid-distance image — vegetation contrast collapses into the fog colour. The stable
+            // signal is therefore noon StDev MINUS dense StDev (Auto-Exposure normalisiert den
+            // Mittelwert, die Kontrast-Struktur bleibt messbar). PNGs: t7-noon.png vs
+            // t7-nebel-compare.png.
+            float stDevCollapse = noon.y - nebeldense.y;
+            Assert.Greater(stDevCollapse, 1.5f, "Denser fog did not flatten the render (StDev noon " + noon.y + " - dense " + nebeldense.y + " = " + stDevCollapse + ").");
 
-            // The frames must show real content (not blank).
-            Assert.Greater(noon.y, 1f, "Noon frame nearly uniform (blank capture?).");
+            // The noon frame must show real contrast content (not blank/uniform).
+            Assert.Greater(noon.y, 5f, "Noon frame nearly uniform (blank capture?).");
         }
     }
 }

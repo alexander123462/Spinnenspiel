@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Reflection;
 using NUnit.Framework;
 using Spinnenspiel;
 using UnityEngine;
@@ -139,6 +140,13 @@ namespace Spinnenspiel.Tests
             var rt = new RenderTexture(w, h, 0, RenderTextureFormat.ARGBHalf);
             rt.antiAliasing = 4;
             rt.Create();
+            // LICHT1c3: Rahmen vor dem Rendern auf Fehler-Magenta loeschen (RT-Pool kann
+            // alte Rahmen enthalten; bleibt HDRP-Camues still aus, zaehlt der Test Magenta).
+            var clr = new UnityEngine.Rendering.CommandBuffer();
+            clr.SetRenderTarget(rt);
+            clr.ClearRenderTarget(true, true, new Color(1f, 0f, 1f, 1f));
+            UnityEngine.Graphics.ExecuteCommandBuffer(clr);
+            clr.Release();
             cam.targetTexture = rt;
             cam.Render();
             RenderTexture.active = rt;
@@ -153,11 +161,13 @@ namespace Spinnenspiel.Tests
             Color[] outPx = new Color[n];
             double sum = 0.0;
             double rawSum = 0.0;
+            double sr = 0.0, sg = 0.0, sb = 0.0; // LICHT1c3 Diagnose: Kanalmittel (Roh-HDR)
             int maxv = 0;
             long magenta = 0;
             for (int i = 0; i < n; i++)
             {
                 Color c = px[i];
+                sr += Mathf.Max(c.r, 0f); sg += Mathf.Max(c.g, 0f); sb += Mathf.Max(c.b, 0f);
                 rawSum += 0.299 * Mathf.Max(c.r, 0f) + 0.587 * Mathf.Max(c.g, 0f) + 0.114 * Mathf.Max(c.b, 0f);
                 float r = AcesTone(Mathf.Max(c.r * exposure, 0f));
                 float g = AcesTone(Mathf.Max(c.g * exposure, 0f));
@@ -180,7 +190,82 @@ namespace Spinnenspiel.Tests
             Object.DestroyImmediate(ldr);
             Object.DestroyImmediate(rt);
             lastRawLumaMean = (float)(rawSum / n);
+            // LICHT1c3 Diagnose: Roh-Kanalmittel + grobes Perzentil des HDR-Rahmens.
+            System.Array.Sort(px, (a, b) => (0.299f * a.r + 0.587f * a.g + 0.114f * a.b)
+                .CompareTo(0.299f * b.r + 0.587f * b.g + 0.114f * b.b));
+            Debug.Log("[J5-raw] " + file + " RGB " + (sr / n).ToString("E2") + ","
+                + (sg / n).ToString("E2") + "," + (sb / n).ToString("E2")
+                + " p1 " + LumaOf(px[n / 100]).ToString("E2") + " p50 "
+                + LumaOf(px[n / 2]).ToString("E2") + " p99 " + LumaOf(px[n * 99 / 100])
+                .ToString("E2") + " max " + LumaOf(px[n - 1]).ToString("E2"));
             return new Vector3((float)(sum / n), maxv, magenta);
+        }
+
+        // LICHT1c3 Diagnose: Roh-Luma eines HDR-Pixels (vor Belichtung/Tonemap).
+        private static float LumaOf(Color c) => 0.299f * Mathf.Max(c.r, 0f)
+            + 0.587f * Mathf.Max(c.g, 0f) + 0.114f * Mathf.Max(c.b, 0f);
+
+        /// <summary>LICHT1c4 Diagnose: Modus + EV der BELICHTUNG, die im wirksamen
+        /// Volume-Stack ankommt (nicht die, die der Zyklus setzt). Der HDRP-Exposure-Typ
+        /// kommt per Reflection aus dem Zyklus-Feld — die Test-Assembly referenziert HDRP
+        /// nicht. Verglichen wird die Stack-Instanz mit der des Zyklus: unterschiedliche
+        /// Instance-IDs = der Fixed-Pin des Zyklus gewinnt den Stack nicht.</summary>
+        private static string ExposureStackDiag(DayNightCycle cycle)
+        {
+            var vm = UnityEngine.Rendering.VolumeManager.instance;
+            if (vm == null || vm.stack == null) return "exp stack null";
+            System.Type expType = typeof(DayNightCycle).GetField("exposureVolume").FieldType;
+            var comp = vm.stack.GetComponent(expType);
+            object cycExp = typeof(DayNightCycle).GetField("exposureVolume").GetValue(cycle);
+            string cycleId = cycExp != null
+                ? ((UnityEngine.Object)cycExp).GetInstanceID().ToString() : "null";
+            if (comp == null) return "stackExp none cycleExp " + cycleId;
+            return "stackExp inst " + ((UnityEngine.Object)comp).GetInstanceID()
+                + " mode " + OverrideValueOf(comp, "mode")
+                + " fixedEV " + OverrideValueOf(comp, "fixedExposure")
+                + " limMin " + OverrideValueOf(comp, "limitMin")
+                + " limMax " + OverrideValueOf(comp, "limitMax")
+                + " postExp " + OverrideValueOf(comp, "postExposure")
+                + " cycleExp inst " + cycleId;
+        }
+
+        /// <summary>LICHT1c4 Diagnose: Wert eines VolumeParameter-Felds als Text.</summary>
+        private static string OverrideValueOf(object component, string parameterName)
+        {
+            var field = component.GetType().GetField(parameterName);
+            if (field == null) return "?";
+            object param = field.GetValue(component);
+            if (param == null) return "null";
+            object val = param.GetType().GetProperty("value").GetValue(param);
+            return val != null ? val.ToString() : "null";
+        }
+
+        /// <summary>LICHT1c4 Diagnose: alle Volumes der Szene mit Prioritaet — taucht spaeter
+        /// ein zweites Volume auf, das die Belichtung uebernimmt (Wald8c/J5-Override)?</summary>
+        private static string VolumeListDiag()
+        {
+            var vols = Object.FindObjectsByType<UnityEngine.Rendering.Volume>(
+                FindObjectsSortMode.None);
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < vols.Length; i++)
+            {
+                sb.Append(vols[i].name).Append(" p").Append(vols[i].priority.ToString("F0"))
+                  .Append(vols[i].isGlobal ? "g" : "l")
+                  .Append(vols[i].sharedProfile != null ? vols[i].sharedProfile.name : "null")
+                  .Append(' ');
+            }
+            return sb.Length > 0 ? sb.ToString() : "keine Volumes";
+        }
+
+        /// <summary>LICHT1c4 Diagnose: laeuft noch asynchrone Shader-Kompilierung? Schwarze
+        /// Nachtrahmen waeren dann "noch nicht renderbar" statt "Nacht". UnityEditor-API per
+        /// Reflection (Test-Assembly referenziert UnityEditor nicht).</summary>
+        private static string ShaderCompileDiag()
+        {
+            var t = System.Type.GetType("UnityEditor.ShaderUtil, UnityEditor.CoreModule");
+            if (t == null) return "shaderutil n/a";
+            var p = t.GetProperty("isCompiling", BindingFlags.Static | BindingFlags.Public);
+            return p == null ? "isCompiling n/a" : "compiling " + p.GetValue(null);
         }
 
         private static float AcesTone(float x)
@@ -243,6 +328,72 @@ namespace Spinnenspiel.Tests
 
             // No sky volume wired in this bare setup -> sentinel -1 (no crash).
             Assert.AreEqual(-1f, cycle.CurrentSkyMultiplier(), "Unwired sky must report -1.");
+
+            cycle.sun = null;
+            GameObject.DestroyImmediate(go);
+        }
+
+        /// <summary>LICHT1c4 (Ursache der Nacht-Drift, r107-f2): nightMinutes und
+        /// transitionMinutes sind ABSOLUTE Minuten. Wer den Zyklus ueber dayLengthMinutes
+        /// "einfriert" (10000 min wie in J5 vorher), schrumpft den Nachtkern auf
+        /// +/-3e-4 Fortschritt und die Daemmerungsrampe auf 4e-6 — der Zyklus springt mitten
+        /// in der Nacht auf vollen Tag. Der Test pinnt genau diese Falle, damit niemand sie
+        /// erneut einbaut (Messen geht ueber SetHoldDayProgressForTests).</summary>
+        [Test]
+        public void LICHT1c4_DayFactorAt_EingefrorenerTagZerstoertNachtfenster()
+        {
+            // Normaler 20-min-Tag: Mitternacht + 0.5 min ist noch tiefste Nacht.
+            Assert.AreEqual(0f, DayNightCycle.DayFactorAt(0.0004f, 20f, 2f, 6f),
+                "Normaler Tag: kurz nach Mitternacht muss Nacht sein.");
+            // "Eingefrorener" 10000-min-Tag: derselbe Fortschritt liegt ausserhalb des
+            // Nachtkerns (6 min / 10000 min = 6e-4 breit, halbseitig 3e-4) -> taghell.
+            Assert.GreaterOrEqual(DayNightCycle.DayFactorAt(0.0004f, 10000f, 0.04f, 6f), 1f,
+                "Nachtkern bei 10000 min Tageslaenge ist nur +/-0.0003 breit — genau die "
+                + "Drift-Falle aus r107-f2; Messungen dürfen dayLengthMinutes nicht einfrieren.");
+        }
+
+        /// <summary>LICHT1c4: der Halte-Modus haelt den Tagesfortschritt zuverlaessig (Licht
+        /// bleibt Mondlicht), und nach dem Ausschalten laeuft der Zyklus wieder weiter.</summary>
+        [UnityTest]
+        public IEnumerator LICHT1c4_HoldDayProgress_NachtBleibtNacht()
+        {
+            GameObject go = new GameObject("HoldCycleTest");
+            Light testSun = go.AddComponent<Light>();
+            testSun.type = LightType.Directional;
+            DayNightCycle cycle = go.AddComponent<DayNightCycle>();
+            cycle.sun = testSun;
+            cycle.dayLengthMinutes = 0.2f; // wie J5: 12 s pro Tag
+            cycle.transitionMinutes = 0.04f;
+            cycle.dayLux = 100000f;
+            cycle.moonLux = 800f;
+
+            yield return null; // Start() durchlaufen lassen
+            cycle.SetHoldDayProgressForTests(true);
+            cycle.SetDayProgress(0f); // Mitternacht pinnen
+            float pinned = cycle.DayProgress;
+
+            // 2 s real = 0.17 Fortschritt bei 0.2 min/Tag — ohne Halte-Modus laengt das
+            // deutlich ueber den Nachtkern hinaus (und war frueher der Drift-Effekt).
+            float waited = 0f;
+            while (waited < 2f)
+            {
+                yield return null;
+                waited += Time.unscaledDeltaTime;
+            }
+
+            Assert.AreEqual(pinned, cycle.DayProgress, 1e-5f,
+                "Tagesfortschritt laeuft trotz Halte-Modus weiter.");
+            Assert.LessOrEqual(cycle.CurrentDayFactor, 0.05f,
+                "Nacht ist im Halte-Modus auf Tag gekippt (dayFactor " + cycle.CurrentDayFactor + ").");
+            Assert.AreEqual(800f, testSun.intensity, 1f,
+                "Lichtstaerke waehrend des Haltens nicht Mond-Lux.");
+
+            // Halte-Modus aus -> Zyklus laeuft wieder (kein haengenbleibender Zustand).
+            cycle.SetHoldDayProgressForTests(false);
+            float before = cycle.DayProgress;
+            for (int frame = 0; frame < 5; frame++) yield return null;
+            Assert.Greater(cycle.DayProgress, before,
+                "Nach dem Ausschalten muss der Zyklus wieder weiterlaufen.");
 
             cycle.sun = null;
             GameObject.DestroyImmediate(go);
@@ -334,8 +485,50 @@ namespace Spinnenspiel.Tests
             // Fixed-Exposure (EV) umschalten, dann ist der Rahmen reproduzierbar.
             Assert.IsTrue(cycle.SetFixedExposureForTests(fixedHdrvEv),
                 "Exposure volume not wired to the DayNightCycle.");
+            // LICHT1c3 Diagnose (r106-f9): Nacht-Helligkeit invers zum Mond-Lux (250 lx ->
+            // Raw 3,5E-2 > 800 lx -> 1,9E-2) = Auto-Exposure gewinnt den Stack, obwohl der
+            // Zyklus Fixed pinnt. Aufloesung des Volume-Stacks und Zielkomponente loggen.
+            {
+                // VolumeManager.instance kann frue im Test null sein; alle Volume-Komponenten
+                // der Szene plus Zyklus-Zielkomponente direkt loggen.
+                var vols = Object.FindObjectsByType<UnityEngine.Rendering.Volume>(
+                    FindObjectsSortMode.None);
+                foreach (var v in vols)
+                {
+                    Debug.Log("[J5-pin-exposure] scene vol '" + v.name + "' global " + v.isGlobal
+                        + " prio " + v.priority + " profile "
+                        + (v.sharedProfile != null ? v.sharedProfile.name : "null"));
+                }
+                object cycExp = typeof(DayNightCycle).GetField("exposureVolume")
+                    .GetValue(cycle);
+                string cycleInfo = "null";
+                if (cycExp != null)
+                {
+                    object pmc = cycExp.GetType().GetField("mode").GetValue(cycExp);
+                    object cmVal = pmc.GetType().GetProperty("value").GetValue(pmc);
+                    cycleInfo = "inst " + ((UnityEngine.Object)cycExp).GetInstanceID()
+                        + " mode " + cmVal;
+                }
+                Debug.Log("[J5-pin-exposure] cycle.comp " + cycleInfo);
+            }
             Camera cam = Object.FindFirstObjectByType<Camera>();
             Assert.IsNotNull(cam, "No Camera in Urwald.");
+
+            // LICHT1c2 (J5-Kalibrierung): die Follow-Kamera rahmte zum Aufnahmezeitpunkt genau das ein,
+            // was die Spinne gerade tat — im Voll-Lauf mass die Nacht darum 3x heller als in der
+            // gezielten Auswahl (Mittel 90.7 vs. 40.9 bei identischen EV/Himmels-Werten). Die
+            // Messung braucht einen deterministischen Standpunkt (G6-Lehre): feste Pose ueber dem
+            // Terrain am Weltmittelpunkt, fester Blick (Seed 4242 -> identische Vegetation).
+            var followCam = cam.GetComponent<SpiderCamera>();
+            if (followCam != null) followCam.enabled = false;
+            float halfJ5 = worldGen.World.Size / 2f;
+            UnityEngine.Terrain terJ5 = UnityEngine.Terrain.activeTerrain;
+            Assert.IsNotNull(terJ5, "No active terrain in Urwald (J5 pose pin).");
+            Vector3 midJ5 = new Vector3(halfJ5, 0f, halfJ5);
+            float groundYJ5 = terJ5.SampleHeight(midJ5) + terJ5.transform.position.y;
+            cam.transform.position = midJ5 + new Vector3(0f, groundYJ5 + 1.6f, 0f);
+            cam.transform.rotation = Quaternion.Euler(-6f, 45f, 0f);
+            Debug.Log("[J5-pin] pos " + cam.transform.position.ToString("F1") + " ground " + groundYJ5.ToString("F1"));
 
             // Wait until high noon (dayFactor near 1).
             timeout = 40f;
@@ -357,6 +550,12 @@ namespace Spinnenspiel.Tests
             // Schwarzrahmen bei ~0..3E-4. Stabil = Raw > 1E-3 (kein Schwarzrahmen) und zwei
             // Aufnahmen in Folge innerhalb Faktor 2.
             const float calibStartEv = 8f;
+            // LICHT1c3: Kalibrierung + Aufnahme kosten Sekunden; der Zyklus darf dabei nicht
+            // bis zur Daemmerung laufen (r105-f3 dayFactor 0.708). LICHT1c4: NICHT mehr ueber
+            // dayLengthMinutes=10000 einfrieren — das schrumpft den Nachtkern
+            // (nightMinutes/dayLengthMinutes) auf +/-0.0003 Fortschritt und der Zyklus schnappt
+            // mitten in der Nacht auf Tag (r107-f2). Fortschritt halten, Tageslaenge laesst man.
+            cycle.SetHoldDayProgressForTests(true);
             cycle.SetFixedExposureForTests(calibStartEv);
             float calRaw = 0f;
             float prevCalRaw = -1f;
@@ -378,6 +577,11 @@ namespace Spinnenspiel.Tests
             float noonCalMean = 0f;
             for (int pass = 0; pass < 2; pass++)
             {
+                // LICHT1c3: der Zyklus laeuft mit dayLengthMinutes=0.2 (12 s/Tag) weiter —
+                // die Kalibrierung kostet Sekunden, dabei driftete der Tag auf halbe
+                // Daemmerung (r105-f3: [J5-noon-setup] dayFactor 0.708 statt ~0.95).
+                // Vor jeder Messung exakt Mittag pinnen (Mitternacht pinnt der Nachtblock).
+                cycle.SetDayProgress(0.5f);
                 cycle.SetFixedExposureForTests(ev);
                 for (int settle = 0; settle < 3; settle++) yield return null;
                 noonCalMean = SaveFrameFixed(cam, 480, 270, "Logs/ci/j5-noon-calib.png", fixedExposure).x;
@@ -397,6 +601,11 @@ namespace Spinnenspiel.Tests
             yield return WarmUpFixed(cam);
             Vector3 noonStats = SaveFrameFixed(cam, 480, 270, "Logs/ci/j5-noon.png", fixedExposure);
             Debug.Log("[J5-noon] Mittel " + noonStats.x.ToString("F1") + " Max " + noonStats.y.ToString("F0") + " Magenta " + noonStats.z.ToString("F0") + " Raw " + lastRawLumaMean.ToString("E2"));
+            // LICHT1c4: Haelte-Modus aus — der Zyklus laeuft mit 0.2 min/Tag (12 s) weiter und
+            // erreicht die Nacht innerhalb des 40-s-Fensters. Tageslaenge bleibt 0.2: damit
+            // bleibt der Nachtkern in der Fortschritts-Skala breit (min(6, 0.2-2*0.04)=0.12 min
+            // = 60 % des Tags) und kann nicht mehr auf Tag zurueckkippen.
+            cycle.SetHoldDayProgressForTests(false);
 
             // Wait until deep night (dayFactor near 0).
             timeout = 40f;
@@ -406,6 +615,19 @@ namespace Spinnenspiel.Tests
                 yield return null;
             }
             Assert.GreaterOrEqual(timeout, 0f, "Night never reached.");
+
+            // LICHT1c2: die NachtMessung war nichtdeterministisch — Update() schiebt den Zyklus
+            // pro Frame weiter, die Aufnahme landete je nach Lauf an einer anderen Nachtposition
+            // (Mondhoehe + sunLux = Lerp(moonLux, dayLux, dayF) streute: Raw 7.2E-3 vs 1.5E-2,
+            // Mittel 44.9 vs 80.4 bei identischen Einstellungen). Exakt Mitternacht pinnen:
+            // dayFactor 0, Mond im Zenit (Hoehe = -elev spiegelt 90 Grad), alle Werte fix.
+            // LICHT1c4 (r107-f2): das fruehere "Einfrieren" ueber dayLengthMinutes=10000 war die
+            // Ursache der Nacht-Drift — bei 10000 min ist der Nachtkern nur noch +/-0.0003
+            // Fortschritt breit, und nach ~3 min Spielzeit kippte der Zyklus auf vollen Tag
+            // (dayFactor 0 -> 1, sunLux 250 -> 100000, Himmel 0.003 -> 1). Jetzt: Fortschritt
+            // halten (hold), Tageslaenge auf 0.2 min lassen -> breites Nachtfenster.
+            cycle.SetHoldDayProgressForTests(true);
+            cycle.SetDayProgress(0f);
 
             int fliesAtNight = DayInsectCount();
             int mothsAtNight = NightInsectCount();
@@ -418,10 +640,134 @@ namespace Spinnenspiel.Tests
                 + " sunLux " + (cycle.sun != null ? cycle.sun.intensity.ToString("F0") : "n/a")
                 + " skyMultiplier " + cycle.CurrentSkyMultiplier().ToString("E2")
                 + " ambientMode " + UnityEngine.RenderSettings.ambientMode);
+            // LICHT1c3 Diagnose (r106-f6): Nacht-Rahmen reagierte auf GAR keine Licht-/
+            // Himmels-Aenderung (Mittel bitgleich 132.98 bei 800 vs 8000 lx, mit/ohne
+            // interactsWithSky). Vollstaendigen Lichtzustand direkt vor der Messung loggen.
+            Debug.Log("[J5-night-state] fog " + RenderSettings.fog + " fogColor "
+                + RenderSettings.fogColor.ToString("F4") + " fogDensity "
+                + RenderSettings.fogDensity.ToString("E2") + " sunInt "
+                + (cycle.sun != null ? cycle.sun.intensity.ToString("F0") : "n/a") + " sunOn "
+                + (cycle.sun != null && cycle.sun.enabled) + " sunCol "
+                + (cycle.sun != null ? cycle.sun.color.ToString("F2") : "n/a")
+                + " ambInt " + RenderSettings.ambientIntensity + " ambSky "
+                + RenderSettings.ambientSkyColor.ToString("F2") + " ambEq "
+                + RenderSettings.ambientEquatorColor.ToString("F2") + " ambGnd "
+                + RenderSettings.ambientGroundColor.ToString("F2"));
+            object hdSunDbg = cycle.sun != null
+                ? cycle.sun.GetComponent("HDAdditionalLightData") : null;
+            if (hdSunDbg != null)
+            {
+                System.Type hdt = hdSunDbg.GetType();
+                Debug.Log("[J5-night-state] skyPart " + hdt.GetProperty("interactsWithSky")
+                    .GetValue(hdSunDbg) + " shadSrc " + hdt.GetField("celestialBodyShadingSource")
+                    .GetValue(hdSunDbg) + " luxUnit " + cycle.sun.lightUnit);
+            }
+            // LICHT1c3 Diagnose (r106-f15): Nacht-Rahmen weiterhin BITGLEICH 132.98 trotz
+            // Magenta-Clear, Priority 100 und Fixed-Pin. Beweisprobe: Ziel-RT auf Magenta
+            // clearn OHNE cam.Render(), dann exakt so ablesen wie SaveFrameFixed. Liefert
+            // der Read-Pfad einen Wald statt Magenta, liest ReadPixels am RT vorbei.
+            {
+                var probeRt = new RenderTexture(64, 36, 0, RenderTextureFormat.ARGBHalf);
+                probeRt.Create();
+                var pc = new UnityEngine.Rendering.CommandBuffer();
+                pc.SetRenderTarget(probeRt);
+                pc.ClearRenderTarget(true, true, new Color(1f, 0f, 1f, 1f));
+                UnityEngine.Graphics.ExecuteCommandBuffer(pc);
+                pc.Release();
+                RenderTexture.active = probeRt;
+                var ptex = new Texture2D(64, 36, TextureFormat.RGBAHalf, false);
+                ptex.ReadPixels(new Rect(0, 0, 64, 36), 0, 0);
+                ptex.Apply(false);
+                RenderTexture.active = null;
+                Color[] ppx = ptex.GetPixels();
+                double pr = 0, pg = 0, pb = 0;
+                foreach (Color c in ppx) { pr += c.r; pg += c.g; pb += c.b; }
+                int n2 = ppx.Length;
+                Debug.Log("[J5-readback-probe] RGB " + (pr / n2).ToString("F2") + ","
+                    + (pg / n2).ToString("F2") + "," + (pb / n2).ToString("F2")
+                    + " (1,0,1 = ReadPixels liest RT korrekt; Waldwerte = Read-Pfad falsch)");
+                Object.DestroyImmediate(ptex);
+                Object.DestroyImmediate(probeRt);
+            }
             // FARBE1: WarmUp gegen Blank-Rahmen (KLEE1b-Lehre), bevor gemessen wird.
-            yield return WarmUpFixed(cam);
+            // LICHT1c3 (r106-f16): die ersten 11 Nacht-Proben waren EXAKT schwarz
+            // (Mitternacht, Sonne unter Horizont — korrekt!), ab Probe 12 wieder taghell.
+            // LICHT1c4: Zustand pro Probe VOLLSTAENDIG loggen (wirksame Belichtung aus dem
+            // Volume-Stack, Lichtintensitaeten, dayFactor, Volumes, Shader-Kompilierung) und
+            // nach der ersten hellen Probe WEITER messen — erst der Vergleich der Zeilen
+            // zeigt, ob der Zyklus driftet, ein Volume die Belichtung uebernimmt oder HDRP
+            // vorher schlicht noch nicht rendert.
+            // Ergebnis r107-f3: Drift ist weg — alle 24 Proben melden progress 0.0000,
+            // dayFactor 0.000, sunInt konstant 16000 (vorher: Probe 12 plotzlich taghell).
+            // Zweite Ursache (r107-f5 gemessen, NICHT behoben): die Nacht ist bei jeder
+            // Lichtmenge schwarz — Mond 16000 lx, 100000 lx und Himmels-Multiplikator bis 0.1
+            // ergeben Raw 0.00E+000; erst mit Himmelsbeteiligung der Sonne (interactsWithSky
+            // true) misst man 5.7E-008. Das Dach (JungleWorldGenerator BuildCanopy, Schatten
+            // An — LICHT1c5) blockiert das Direktlicht voll, der Tagesrahmen lebt vom
+            // Nebelschleier (Nebelfarbe 0.4/0.58), der nachts auf FogNightDimFactor 0.015
+            // gedimmt ist (Licht1cTests fordert genau diesen Wert), und J5 verlangt ausserdem
+            // Nachthimmel < 0.02. Mit diesen drei festgelegten Werten ist das J5-Fenster
+            // 10..45 bei fester EV nicht erreichbar — Entscheidung nach LICHT1c5 noetig.
+            int brightStreak = 0;
+            for (int probe = 0; probe < 24; probe++)
+            {
+                Vector3 p = SaveFrameFixed(cam, 64, 48, "Logs/ci/j5_warmup_probe.png", 1f);
+                Debug.Log("[J5-night-probe " + probe + "] Raw " + lastRawLumaMean.ToString("E2")
+                    + " dayFactor " + cycle.CurrentDayFactor.ToString("F3")
+                    + " progress " + cycle.DayProgress.ToString("F4")
+                    + " sunInt " + (cycle.sun != null ? cycle.sun.intensity.ToString("F0") : "n/a")
+                    + " sunElev " + (cycle.sun != null ? cycle.sun.transform.eulerAngles.x.ToString("F1") : "n/a")
+                    + " enabled " + cycle.enabled + " len " + cycle.dayLengthMinutes.ToString("F1")
+                    + " | " + ExposureStackDiag(cycle)
+                    + " | skyMul " + cycle.CurrentSkyMultiplier().ToString("E2")
+                    + " ambInt " + RenderSettings.ambientIntensity.ToString("F3")
+                    + " ambSky " + RenderSettings.ambientSkyColor.ToString("F3")
+                    + " fogDens " + RenderSettings.fogDensity.ToString("E2")
+                    + " fogCol " + RenderSettings.fogColor.ToString("F4")
+                    + " | " + ShaderCompileDiag()
+                    + " | vols " + VolumeListDiag());
+                brightStreak = lastRawLumaMean > 1e-3f ? brightStreak + 1 : 0;
+                // LICHT1c6: Schwelle 3 -> 8. Die Nacht ist jetzt berechtigt hell
+                // (Mond-Atmosphaere speist den Schleier, r108-f3 Raw ~1.2E-3 > 1e-3) —
+                // das alte Break endete nach Probe 2 und liess Probe 12..30 (Backlog-
+                // Kriterium "gleich dunkel wie 1..11") ungeprüft. Bei 8 Proben in Folge
+                // ist ein echter Shader-Kompilier-Kipp erkennbar, legitime Nacht-Helligkeit
+                // durchlaeuft die volle Runde (Zyklus haelt progress 0.0000, r107-f6).
+                if (brightStreak >= 8)
+                {
+                    Debug.Log("[J5] Night-WarmUp endhaeltig hell nach " + probe + " Proben");
+                    break;
+                }
+                yield return new UnityEngine.WaitForSecondsRealtime(1.5f);
+            }
             Vector3 nightStats = SaveFrameFixed(cam, 480, 270, "Logs/ci/j5-night.png", fixedExposure);
+            cycle.SetHoldDayProgressForTests(false); // LICHT1c6: Zyklus nicht haengen lassen.
             Debug.Log("[J5-night] Mittel " + nightStats.x.ToString("F1") + " Max " + nightStats.y.ToString("F0") + " Magenta " + nightStats.z.ToString("F0") + " Raw " + lastRawLumaMean.ToString("E2"));
+            // LICHT1c6 Attributions-Probe (einmalig, kein Assert): der klassische Nachtrahmen
+            // reagierte NICHT auf Nebelfarbe (r108 f3 dim 0.08 vs. f4 dim 0.10: Raw bitgleich
+            // 1.2E-3) und auch nicht auf den Himmel-Multiplikator (0.003 vs 0.010). Der helle
+            // Horizont-Streifen ist mondbeleuchtete Geometrie durch die Dach-Oeffnungen.
+            // Diese Probe trennt die Lichtquellen: Rahmen 1 = Volumennebel AN (Spiel-Modus,
+            // HDRP-VolumetricFog-Streuung), Rahmen 2 = klassischer Nebel ganz AUS. Danach wird
+            // der Ausgangszustand (Volumen aus, RenderSettings.fog aus) wiederhergestellt.
+            {
+                cycle.SetHoldDayProgressForTests(true);
+                bool fogWasOn = RenderSettings.fog;
+                RenderSettings.fog = true; // Zyklus schreibt Farbe/Dichte ab jetzt wieder absolut.
+                cycle.SetVolumetricFogForTests(true);
+                for (int settle = 0; settle < 6; settle++) yield return null; // Shader-Variante + Zyklus-Write.
+                Vector3 volStats = SaveFrameFixed(cam, 480, 270, "Logs/ci/j5-night-vol.png", fixedExposure);
+                Debug.Log("[J5-night-vol] (Volumennebel AN) Mittel " + volStats.x.ToString("F1")
+                    + " Max " + volStats.y.ToString("F0") + " Raw " + lastRawLumaMean.ToString("E2"));
+                cycle.SetVolumetricFogForTests(false);
+                RenderSettings.fog = false; // klassischer Nebel aus: pur geometry.
+                for (int settle = 0; settle < 3; settle++) yield return null;
+                Vector3 noFogStats = SaveFrameFixed(cam, 480, 270, "Logs/ci/j5-night-nofog.png", fixedExposure);
+                Debug.Log("[J5-night-nofog] (Nebel AUS) Mittel " + noFogStats.x.ToString("F1")
+                    + " Max " + noFogStats.y.ToString("F0") + " Raw " + lastRawLumaMean.ToString("E2"));
+                RenderSettings.fog = fogWasOn;
+                cycle.SetHoldDayProgressForTests(false);
+            }
 
             // Backlog criteria: day Mittel 60..200, night 10..45, both Magenta 0.
             Assert.GreaterOrEqual(noonStats.x, 60f, "Day Mittel < 60 (fixed exposure).");

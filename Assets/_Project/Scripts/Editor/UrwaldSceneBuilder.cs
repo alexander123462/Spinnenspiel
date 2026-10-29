@@ -189,6 +189,10 @@ namespace Spinnenspiel.EditorTools
             gen.redwoodsOn = WaldLook.RedwoodsOn;
             gen.oldTreeShare = WaldLook.OldTreeShare;
             gen.canopyOn = WaldLook.CanopyOn;
+            // LICHT1c3: Dach-Schatten + Oeffnungen (18 m Raster / 9 m Radius) aus WaldLook.
+            gen.canopyShadowOn = WaldLook.CanopyShadowOn;
+            gen.canopyGapStep = WaldLook.CanopyGapStep;
+            gen.canopyGapRadius = WaldLook.CanopyGapRadius;
 
             new GameObject("Wind").AddComponent<WindController>();
             // Weather: deterministic dry/rain cycle driving the audio crossfade.
@@ -201,6 +205,24 @@ namespace Spinnenspiel.EditorTools
             dayCycle.daySunColor = WaldLook.SunColor;
             // FARBE1: night brightness from WaldLook (J5 night Mittel was 5 < 10).
             dayCycle.moonLux = WaldLook.MoonIntensityLux;
+            // LICHT1c: day brightness from WaldLook too (was: DayNightCycle default 100000,
+            // WaldLook.SunIntensityLux was dead code). Now 110000 lx -> direct share up.
+            dayCycle.dayLux = WaldLook.SunIntensityLux;
+            // LICHT1c: night sky dimming from WaldLook (was hardcoded 0.01 on the component).
+            dayCycle.skyNightMultiplier = WaldLook.SkyNightMultiplier;
+            // LICHT1c1: the classic fog COLOUR follows the day factor (deep night dims to
+            // WaldLook.FogNightDimFactor — the bright day veil lit the distance at night,
+            // J5 night Mittel 77 > 45 window).
+            dayCycle.fogNightDimFactor = WaldLook.FogNightDimFactor;
+            // LICHT1c1: daytime sky multiplier (the +6 contrast dims the sun disc in the
+            // HDR proof path, G6 himmel Max 214 -> 188; 1.35 brings it back above 200).
+            dayCycle.daySkyMultiplier = WaldLook.DaySkyMultiplier;
+            // LICHT1c2: die Nebel-Baselines kommen als feste Werte vom Builder (nicht mehr
+            // aus RenderSettings abgelesen — das geerbte Prozess-Global machte den Voll-Lauf
+            // anders als die gezielte Auswahl: vorangelaufene Tests hinterlassen nachts
+            // gedimmte Farbe / skalierte Dichte). Der Zyklus schreibt damit jede Frame absolut.
+            dayCycle.noonFogDensity = WaldLook.FogDensity;
+            dayCycle.dayFogColor = WaldLook.FogAlbedo;
             // T7 Morgennebel: the cycle drives the fog volume built by WorldLightingBuilder.
             dayCycle.fogVolumeComponent = WorldLightingBuilder.LastBuiltFog;
             // FARBE1a: the cycle drives the sky brightness (day factor) and the tests pin the
