@@ -49,3 +49,6 @@ Ursache: kein technischer Fehler - Punkt wartet auf Look-Entscheidung von Alex (
 
 ## 2026-10-28 LICHT1c zweite Runde (Overseer)
 Ursache: Alex-Entscheidung liegt vor (mehr Sonnenlicht). Look-Code gruen im eigenen Test, aber drei Altteste rot: J5 (Dach-Oeffnungen aus LICHT1b lassen Mond durch), T7 (Vorbedingung bei duennem Nebel nicht erfuellbar), G6-Himmel (170 statt >200). Zu gross und Test-Neukalibrierung noetig (>60 Zeilen). Aktion: alles in Stash 'Hermes LICHT1c' gesichert, Punkt in LICHT1c1 (Look ohne Dach-Oeffnungen), LICHT1c2 (T7), LICHT1c3 (Dach-Schatten + Foto) zerlegt. Unity-Editor lief nicht (nur Hub), keine CI gefahren.
+
+## 2026-10-29 LICHT1c3 (Overseer)
+Ursache: ungeloest, Test-Drift: Nacht ist 11 Proben schwarz, danach taghell ohne Licht-Aenderung (Verdacht Auto-Exposure/zweites Volume). Unity.exe lief (PID 5756) -> keine CI, kein Code-Commit. Aktion: LICHT1c3 zerlegt in LICHT1c4 (Diagnose J5-Drift) und LICHT1c5 (Dach-Schatten+Foto); Hermes-Code bleibt im Arbeitsbaum, in LICHT1c4 namentlich gelistet.

@@ -350,3 +350,5 @@ LICHT1c (als [!] markiert, kein Code geaendert): Punkt setzt die Entscheidung vo
 LICHT1c [!] nach 3 Versuchen: Look umgesetzt (Nebel duenner/dunkler, Kontrast +6, Schatten 0.92, Sonne aus WaldLook; eigener Test gruen), aber J5-Nacht 86-109 (>45, Mond scheint durch LICHT1b-Dachluecken), T7-StDev-Delta 0.9 (>1.5, bei duennem Nebel strukturell nicht erreichbar), G6-Himmel Max 170 (>200). Nicht committet; Dateien im Arbeitsbaum, Details im BACKLOG-Eintrag.
 
 LICHT1c Overseer: kein Commit moeglich (J5-Nacht 86-109 durch LICHT1b-Dach-Oeffnungen, T7-Delta 0.9, G6-Himmel 170). Zerlegt in LICHT1c1 (Look ohne Dach-Oeffnungen), LICHT1c2 (T7 anpassen), LICHT1c3 (Dach-Schatten + Foto); Code im Stash 'Hermes LICHT1c'.
+
+LICHT1c3 Overseer: nicht committet (Unity-Editor offen, J5-Nacht-Drift ungeklaert). Zerlegt in LICHT1c4 (Diagnose) und LICHT1c5 (Dach-Schatten+Foto).
