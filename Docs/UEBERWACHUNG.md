@@ -52,3 +52,6 @@ Ursache: Alex-Entscheidung liegt vor (mehr Sonnenlicht). Look-Code gruen im eige
 
 ## 2026-10-29 LICHT1c3 (Overseer)
 Ursache: ungeloest, Test-Drift: Nacht ist 11 Proben schwarz, danach taghell ohne Licht-Aenderung (Verdacht Auto-Exposure/zweites Volume). Unity.exe lief (PID 5756) -> keine CI, kein Code-Commit. Aktion: LICHT1c3 zerlegt in LICHT1c4 (Diagnose J5-Drift) und LICHT1c5 (Dach-Schatten+Foto); Hermes-Code bleibt im Arbeitsbaum, in LICHT1c4 namentlich gelistet.
+
+## 2026-10-29 LICHT1c4 (Overseer)
+Ursache 1 (dayLengthMinutes=10000 kippt Nachtkern) von Hermes belegt/behoben; Ursache 2: Nacht schwarz, weil drei Werte kollidieren (Nacht-Nebeldimmung 0.015 vs. J5-Fenster vs. Dach-Schatten). Unity.exe lief (PID 5756) -> keine CI, kein Code-Commit. Entscheidung: Nacht-Nebeldimmung anheben + Licht1cTests-Annahme anpassen. Neuer Punkt LICHT1c6; Code bleibt im Arbeitsbaum.
