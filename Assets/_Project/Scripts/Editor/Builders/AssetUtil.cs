@@ -60,20 +60,9 @@ namespace Spinnenspiel.EditorTools
 
         public static Material CreateLitMaterial(string path, Color color, float smoothness, Texture2D baseMap = null, Texture2D normalMap = null)
         {
-            Material material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            material.SetColor("_BaseColor", color);
-            material.SetFloat("_Smoothness", smoothness);
-            if (baseMap != null)
-            {
-                material.SetTexture("_BaseMap", baseMap);
-            }
-
-            if (normalMap != null)
-            {
-                material.SetTexture("_BumpMap", normalMap);
-                material.EnableKeyword("_NORMALMAP");
-            }
-
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(color, baseMap);
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, smoothness);
+            Spinnenspiel.Rendering.PipelineMaterials.SetNormalMap(material, normalMap);
             material.enableInstancing = true;
             return ReplaceAsset(material, path);
         }

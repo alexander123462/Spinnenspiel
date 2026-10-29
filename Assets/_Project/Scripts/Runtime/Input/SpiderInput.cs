@@ -17,6 +17,8 @@ namespace Spinnenspiel
         private InputAction _zoomAction;
         private InputAction _silkAction;
         private InputAction _releaseAction;
+        private InputAction _jumpAction;
+        private InputAction _repairAction;
 
         /// <summary>Aktuelle Bewegungsrichtung (x = rechts, y = vor), typischerweise -1..1.</summary>
         public Vector2 Move => _moveAction != null ? _moveAction.ReadValue<Vector2>() : Vector2.zero;
@@ -33,7 +35,13 @@ namespace Spinnenspiel
         /// <summary>True, in dem Frame in dem die Loslassen-Taste gedrückt wurde (Faden verlassen).</summary>
         public bool ReleasePressed => _releaseAction != null && _releaseAction.WasPressedThisFrame();
 
-        /// <summary>Zoom-Eingabe (Mausrad, positiv = heranzoomen), normiert auf ca. -1..1 pro Rastung.</summary>
+        /// <summary>True, in dem Frame in dem die Leertaste/Jump gedrückt wurde (Sprung; im Netz ignored).</summary>
+        public bool JumpPressed => _jumpAction != null && _jumpAction.WasPressedThisFrame();
+
+        /// <summary>S6: True in the frame the repair key was pressed (R / D-Pad up).</summary>
+        public bool RepairPressed => _repairAction != null && _repairAction.WasPressedThisFrame();
+
+        /// <summary>Zoom-Eingabe (Mausrad, positiv = herzoomen), normiert auf ca. -1..1 pro Rastung.</summary>
         public float Zoom
         {
             get
@@ -70,6 +78,7 @@ namespace Spinnenspiel
             _zoomAction = null;
             _silkAction = null;
             _releaseAction = null;
+            _jumpAction = null;
         }
 
         private void Update()
@@ -117,16 +126,38 @@ namespace Spinnenspiel
             _releaseAction.AddBinding("<Keyboard>/space");
             _releaseAction.AddBinding("<Gamepad>/buttonSouth");
 
+            // Jump: Sprung (Leertaste / A). Im Netz ignoriert — dort bleibt Leertaste "fallen lassen".
+            _jumpAction = new InputAction("Jump", InputActionType.Button);
+            _jumpAction.AddBinding("<Keyboard>/space");
+            _jumpAction.AddBinding("<Gamepad>/buttonSouth");
+
+            // S6: Repair at the web (R / D-Pad up).
+            _repairAction = new InputAction("Repair", InputActionType.Button);
+            _repairAction.AddBinding("<Keyboard>/r");
+            _repairAction.AddBinding("<Gamepad>/dpadUp");
+
             _moveAction.Enable();
             _lookAction.Enable();
             _sprintAction.Enable();
             _zoomAction.Enable();
             _silkAction.Enable();
             _releaseAction.Enable();
+            _jumpAction.Enable();
+            _repairAction.Enable();
         }
 
         private void DisableActions()
         {
+            if (_repairAction != null)
+            {
+                _repairAction.Disable();
+            }
+
+            if (_jumpAction != null)
+            {
+                _jumpAction.Disable();
+            }
+
             if (_moveAction != null)
             {
                 _moveAction.Disable();

@@ -27,6 +27,13 @@ namespace Spinnenspiel
         /// <summary>Linienbreite (m).</summary>
         [SerializeField] private float width = 0.0012f;
 
+        /// <summary>
+        /// Dragline beim normalen Laufen sichtbar zeichnen. Standard: false – beim Gehen
+        /// soll kein Faden hinter der Spinne herziehen (er springt bei jedem neuen Anker).
+        /// Die Linie wird nur sichtbar, wenn die Spinne NICHT haftet (fällt oder hängt am Seil).
+        /// </summary>
+        [SerializeField] private bool showWhileWalking = false;
+
         /// <summary>Position des letzten Ankers (Welt).</summary>
         public Vector3 LastAnchor { get; private set; }
 
@@ -96,6 +103,8 @@ namespace Spinnenspiel
             }
 
             // Beim Laufen: neuen Anker + Haftscheibe, sobald der Abstand überschritten ist.
+            // Die Anker werden weiterhin gesetzt (für das Auffangen beim Fallen), aber die
+            // Linie ist beim Gehen unsichtbar, um den springenden Faden zu vermeiden.
             if (movement.IsAttached &&
                 (transform.position - LastAnchor).sqrMagnitude > anchorSpacing * anchorSpacing)
             {
@@ -104,7 +113,9 @@ namespace Spinnenspiel
 
             if (Line != null)
             {
-                Line.enabled = true;
+                // Sichtbar nur, wenn die Spinne NICHT haftet (fällt oder hängt am Seil)
+                // oder explizit showWhileWalking gesetzt ist.
+                Line.enabled = showWhileWalking || (!movement.IsAttached || movement.IsOnRope);
                 Line.SetPosition(0, LastAnchor);
                 Vector3 end = silk != null && silk.spinnerets != null ? silk.spinnerets.position : transform.position;
                 Line.SetPosition(1, end);
@@ -163,15 +174,8 @@ namespace Spinnenspiel
             {
                 if (draglineMaterial == null)
                 {
-                    var mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-                    mat.color = new Color(1f, 1f, 1f, alpha);
-                    // URP: Surface Type Transparent + Blend-Einstellungen
-                    mat.SetFloat("_Surface", 1f);
-                    mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-                    mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);        // 5
-                    mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha); // 10
-                    mat.SetInt("_ZWrite", 0);
-                    mat.renderQueue = 3000;
+                    var mat = Spinnenspiel.Rendering.PipelineMaterials.Unlit(new Color(1f, 1f, 1f, alpha));
+                    Spinnenspiel.Rendering.PipelineMaterials.SetTransparent(mat, true);
                     draglineMaterial = mat;
                 }
 

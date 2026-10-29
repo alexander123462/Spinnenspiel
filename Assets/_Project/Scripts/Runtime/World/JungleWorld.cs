@@ -21,6 +21,14 @@ namespace Spinnenspiel
         private const float SwampBand = 0.14f;           // Rampen-Breite der Sumpf-Schwelle
         private const float ClearBand = 0.13f;           // Rampen-Breite der Lichtungs-Schwelle
 
+        // W1: Bachlauf – ein Meander-Polyline per Seed, die eem Terrain einkallet
+        public const float CreekCore = 2.2f;             // Halbwatie der Bach-Grundkoerper (m)
+        private const float CreekRamp = 1.6f;            // Rampen-Breite zum Ufer (m)
+        private const float CreekBedDepth = 0.35f;       // Bachgrund unter WaterLevel (m)
+
+        // E1: Sumpfflaechen are shallow, flat water — max depth below the waterline.
+        public const float MaxSwampDepth = 0.15f;
+
         public int Seed { get; }
         public float Size { get; }
 
@@ -28,6 +36,10 @@ namespace Spinnenspiel
         private readonly float _offSwampX, _offSwampZ;
         private readonly float _offIslandX, _offIslandZ;
         private readonly float _offClearX, _offClearZ;
+
+        // W1: Bachlauf as Meander-Polyline across the world (built in ctor from the seed)
+        private readonly Vector2[] _creekPts;
+        public Vector2[] CreekPath { get => _creekPts; }
 
         // Per-Seed kalibrierte Schwellwerte (Konstruktor), damit jede Welt
         // garantierte Sümpfe und Lichtungen hat.
@@ -49,6 +61,9 @@ namespace Spinnenspiel
             _offIslandZ = (float)rnd.NextDouble() * 1000f;
             _offClearX = (float)rnd.NextDouble() * 1000f;
             _offClearZ = (float)rnd.NextDouble() * 1000f;
+
+            // W1: Bachlauef-Polyline per Seed (Meander across the world, x = 0..Size)
+            _creekPts = BuildCreek(rnd);
 
             // Kalibrierung: Schwellwerte per Binärsuche so setzen, dass die Welt
             // (auf dem 96x96-Raster) genau ~15 % Unterwasser und ~12 % Lichtung hat.
@@ -96,13 +111,27 @@ namespace Spinnenspiel
             float distEdge = half - Mathf.Max(Mathf.Abs(x), Mathf.Abs(z));
             float edgeT = 1f - Mathf.Clamp01(distEdge / EdgeWidth);
             h += edgeT * edgeT * EdgeRise;
-            return h;
+
+            // W1: Bachlauef einkallet – aber NOT within the outer 6 m border band,
+            // so the rim rise (and tree/liana anchors there) stay stable. Use TRUE
+            // distance to the world border (world spans x,z in [0,Size]).
+            float distBorder = Mathf.Min(Mathf.Min(x, z), Mathf.Min(Size - x, Size - z));
+            if (distBorder > EdgeWidth)
+                h = CreekModulate(h, CreekDist(x, z));
+
+            // E1: shallow flat water — the bed of every flooded area (Sumpf and
+            // Bach) never goes deeper than MaxSwampDepth under the waterline.
+            return Mathf.Max(h, WaterLevel - MaxSwampDepth);
         }
 
         /// <summary>Sumpffaktor 0..1 (eigenes Perlin, ~1/30 m, weiche Schwelle).</summary>
         public float SwampFactor(float x, float z)
         {
-            return SwampFactorAt(x, z, _swampT);
+            // W1: ein Bachlauef ist Feuchtland too -> near the creek the ground is
+            // intentionally below WaterLevel, so it must count as swamp/wetland and
+            // not as a "dry point that is unexpectedly wet".
+            float creekWet = 1f - Mathf.Clamp01((CreekDist(x, z) - CreekCore) / CreekRamp);
+            return Mathf.Max(SwampFactorAt(x, z, _swampT), creekWet);
         }
 
         private float SwampFactorAt(float x, float z, float swampT)
@@ -191,6 +220,7 @@ namespace Spinnenspiel
         private bool SpawnOk(float x, float z)
         {
             if (IsClearing(x, z)) return false;
+            if (CreekDist(x, z) < CreekCore + 0.8f) return false; // no spawn in/on the creek
 
             float h = Height(x, z);
             if (h < WaterLevel + 0.4f) return false;
@@ -201,6 +231,61 @@ namespace Spinnenspiel
                 Mathf.Abs(h - Height(x, z + 1f)),
                 Mathf.Abs(h - Height(x, z - 1f)));
             return maxD < 0.3f;
+        }
+
+        // ---------- W1: Bachlauef ----------
+
+        /// <summary>
+        /// Meander-Polyline per Seed: ~8 Waypoints across the world (x = 0..Size),
+        /// z jittered. Deterministic from the System.Random stream of the Seed.
+        /// </summary>
+        private Vector2[] BuildCreek(System.Random rnd)
+        {
+            const int pts = 9;
+            var path = new Vector2[pts];
+            float z = Size * (0.3f + 0.4f * (float)rnd.NextDouble()); // Start-z zufaellig in the middle band
+            for (int i = 0; i < pts; i++)
+            {
+                float x = Size * i / (pts - 1);
+                if (i > 0 && i < pts - 1)
+                    z += (float)rnd.NextDouble() * 2f - 1f;            // slight drift (m)
+                z = Mathf.Clamp(z, Size * 0.15f, Size * 0.85f);        // stay inside the world
+                path[i] = new Vector2(x, z);
+            }
+            return path;
+        }
+
+        /// <summary>Distance from (x,z) to the creek polyline (m).</summary>
+        private float CreekDist(float x, float z)
+        {
+            float best = 1e9f;
+            for (int i = 0; i + 1 < _creekPts.Length; i++)
+            {
+                Vector2 a = _creekPts[i], b = _creekPts[i + 1];
+                Vector2 ab = b - a;
+                float lenSq = ab.x * ab.x + ab.y * ab.y;
+                float t = lenSq > 1e-6f ? ((x - a.x) * ab.x + (z - a.y) * ab.y) / lenSq : 0f;
+                t = Mathf.Clamp01(t);
+                float dx = x - (a.x + ab.x * t), dz = z - (a.y + ab.y * t);
+                best = Mathf.Min(best, Mathf.Sqrt(dx * dx + dz * dz));
+            }
+            return best;
+        }
+
+        /// <summary>True within the creek bed (core half-width).</summary>
+        public bool IsInCreek(float x, float z)
+        {
+            return CreekDist(x, z) <= CreekCore;
+        }
+
+        /// <summary>Carve the creek bed into a height: core below WaterLevel, ramp to the bank.</summary>
+        private static float CreekModulate(float h, float dist)
+        {
+            if (dist > CreekCore + CreekRamp) return h;
+            float bed = JungleWorld.WaterLevel - CreekBedDepth;
+            if (dist <= CreekCore) return Mathf.Min(h, bed);
+            float t = (dist - CreekCore) / CreekRamp; // 0 at core -> 1 at bank
+            return Mathf.Lerp(Mathf.Min(h, bed), h, t);
         }
 
         // ---------- Kalibrierung (einmalig im Konstruktor, deterministisch) ----------

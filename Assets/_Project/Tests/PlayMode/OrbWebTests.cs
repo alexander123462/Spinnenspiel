@@ -379,22 +379,31 @@ namespace Spinnenspiel.Tests
 
             Assert.IsFalse(builder.IsBuilding, "Netzbau nach 15 s noch nicht fertig");
             Assert.AreEqual(OrbWeb.WebStage.Done, builder.CurrentStage, "CurrentStage != Done");
-            // Nach Done 0.5 s warten, damit die Beine absetzen.
-            yield return new WaitForSeconds(0.5f);
 
             Assert.IsTrue(fourOnThreadDuringCapture,
                 "Während CaptureSpiral waren nie mindestens 4 Beine auf einem Faden.");
 
+            // Nach Done: abgeinen bis alle geerdeten Beine greiftn einen Faden (max 3 s).
             int grounded = 0;
             int onThread = 0;
-            for (int i = 0; i < legs.Length; i++)
+            float settle = 0f;
+            while (settle < 3f)
             {
-                SpiderLeg leg = legs[i];
-                if (!leg.IsGrounded)
-                    continue;
-                grounded++;
-                if (web.TryClosestPoint(leg.FootPosition, 0.01f, out _))
-                    onThread++;
+                grounded = 0;
+                onThread = 0;
+                for (int i = 0; i < legs.Length; i++)
+                {
+                    SpiderLeg leg = legs[i];
+                    if (!leg.IsGrounded)
+                        continue;
+                    grounded++;
+                    if (web.TryClosestPoint(leg.FootPosition, 0.01f, out _))
+                        onThread++;
+                }
+                if (grounded >= 6 && grounded == onThread)
+                    break;
+                settle += Time.deltaTime;
+                yield return null;
             }
             Assert.GreaterOrEqual(grounded, 6,
                 "Nur " + grounded + " von 8 Beinen geerdet.");
@@ -518,6 +527,89 @@ namespace Spinnenspiel.Tests
                 "Nur " + grounded + " von 8 Beinen geerdet.");
             Assert.AreEqual(grounded, onThread,
                 "Nicht alle geerdeten Beine greifen einen Faden: " + onThread + "/" + grounded);
+
+            Object.DestroyImmediate(web.gameObject);
+        }
+
+        /// <summary>
+        /// Netz (K3): Spinne läuft im Netz auf den Fäden und bleibt in der Netzebene;
+        /// nach LetGo fällt sie am Sicherheitsfaden.
+        /// </summary>
+        [UnityTest]
+        public IEnumerator Web_WalkInWeb_StaysOnWeb()
+        {
+            SceneManager.LoadScene("Klettertest");
+            yield return null;
+            yield return new WaitForSeconds(0.5f);
+
+            GameObject spider = GameObject.Find("Spider");
+            Assert.IsNotNull(spider, "Spider nicht gefunden");
+            SpiderMovement movement = spider.GetComponent<SpiderMovement>();
+            Assert.IsNotNull(movement, "SpiderMovement fehlt");
+            SpiderWebBuilder builder = spider.GetComponent<SpiderWebBuilder>();
+            Assert.IsNotNull(builder, "SpiderWebBuilder fehlt");
+            WebBuildDemo demo = Object.FindFirstObjectByType<WebBuildDemo>();
+            Assert.IsNotNull(demo, "WebBuildDemo fehlt");
+
+            OrbWeb web = demo.CreateWeb();
+            Assert.IsNotNull(web, "CreateWeb lieferte null");
+
+            // Spinne vor das Netz (Ebenen-Seite -Z), dann direkt in die Nabe setzen.
+            movement.SetScripted(true);
+            movement.Teleport(new Vector3(5.4f, 0.6f, 1.9f), Quaternion.LookRotation(Vector3.up, Vector3.back));
+            builder.SitAtHub(web);
+
+            // Beine absetzen lassen.
+            yield return new WaitForSeconds(0.5f);
+
+            // Im Netz laufen: Bewegungseingabe simulieren (wie SpiderWebBuilder.Update).
+            movement.SetScripted(false);
+            movement.AttachToWeb(web);
+
+            // Vorwärts 1.5 s.
+            movement.SetExternalMoveLocal(new Vector2(0f, 1f));
+            yield return new WaitForSeconds(1.5f);
+
+            // Dann rechts 1.5 s.
+            movement.SetExternalMoveLocal(new Vector2(1f, 0f));
+            yield return new WaitForSeconds(1.5f);
+
+            // Assertions: Spinne ist im Netz gelaufen und bleibt in der Netzebene.
+            Assert.AreEqual(web, movement.CurrentWeb, "CurrentWeb ist nicht das Netz");
+
+            float distToHub = Vector3.Distance(spider.transform.position, web.Layout.Hub);
+            Assert.Greater(distToHub, 0.1f,
+                "Spinne hat sich nicht bewegt (Abstand zur Nabe: " + distToHub.ToString("F3", CultureInfo.InvariantCulture) + " m, erwartet > 0.1 m).");
+
+            float distToPlane = Mathf.Abs(Vector3.Dot(spider.transform.position - web.Layout.Hub, web.PlaneNormal));
+            Assert.Less(distToPlane, 0.06f,
+                "Spinne ist nicht in der Netzebene (Abstand: " + distToPlane.ToString("F3", CultureInfo.InvariantCulture) + " m, erwartet < 0.06 m).");
+
+            Assert.IsTrue(web.TryClosestPoint(spider.transform.position, 0.15f, out _),
+                "Spinne ist nicht im Netz (kein Faden innerhalb von 0.15 m).");
+
+            SpiderLeg[] legs = spider.GetComponentsInChildren<SpiderLeg>();
+            Assert.AreEqual(8, legs.Length, "Erwartet 8 Beine, gefunden: " + legs.Length);
+            int grounded = 0;
+            for (int i = 0; i < legs.Length; i++)
+            {
+                if (legs[i].IsGrounded)
+                    grounded++;
+            }
+            Assert.GreaterOrEqual(grounded, 5,
+                "Nur " + grounded + " von 8 Beinen geerdet (erwartet >= 5).");
+
+            // Zweiter Teil: Loslassen -> Spinne fällt am Sicherheitsfaden.
+            float yBefore = spider.transform.position.y;
+            movement.SetExternalMoveLocal(null);
+            movement.LetGo();
+            yield return new WaitForSeconds(1f);
+
+            Assert.IsNull(movement.CurrentWeb, "CurrentWeb ist nach LetGo nicht null");
+            float yAfter = spider.transform.position.y;
+            Assert.Less(yAfter, yBefore,
+                "y-Position ist nicht gesunken (vor: " + yBefore.ToString("F3", CultureInfo.InvariantCulture) +
+                " m, nach: " + yAfter.ToString("F3", CultureInfo.InvariantCulture) + " m).");
 
             Object.DestroyImmediate(web.gameObject);
         }

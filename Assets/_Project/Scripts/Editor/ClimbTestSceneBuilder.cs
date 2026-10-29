@@ -81,6 +81,36 @@ namespace Spinnenspiel.EditorTools
             vorlage.SetActive(false);
             insektenSpawner.template = vorlage;
 
+            // S2: Muecke-Vorlage → der Tag-Spawner mischt Fliegen und Muecken.
+            GameObject mueckeVorlage = InsectBuilder.CreateMosquito();
+            if (mueckeVorlage != null)
+            {
+                mueckeVorlage.name = "Vorlage_Muecke";
+                mueckeVorlage.transform.SetParent(insekten.transform, false);
+                mueckeVorlage.SetActive(false);
+                insektenSpawner.mosquitoTemplate = mueckeVorlage;
+            }
+
+            // T1: Kaefer-Vorlage → der Tag-Spawner mischt rare Kaefer in (10 %).
+            GameObject kaeferVorlage = InsectBuilder.CreateBeetle();
+            if (kaeferVorlage != null)
+            {
+                kaeferVorlage.name = "Vorlage_Kaefer";
+                kaeferVorlage.transform.SetParent(insekten.transform, false);
+                kaeferVorlage.SetActive(false);
+                insektenSpawner.beetleTemplate = kaeferVorlage;
+            }
+
+            // T2: Libelle-Vorlage → der Tag-Spawner mischt sehr rare Libelles in (3 %).
+            GameObject libelleVorlage = InsectBuilder.CreateLibelle();
+            if (libelleVorlage != null)
+            {
+                libelleVorlage.name = "Vorlage_Libelle";
+                libelleVorlage.transform.SetParent(insekten.transform, false);
+                libelleVorlage.SetActive(false);
+                insektenSpawner.libelleTemplate = libelleVorlage;
+            }
+
             EnsureScenesFolder();
             EditorSceneManager.SaveScene(EditorSceneManager.GetActiveScene(), ScenePath);
             // Vorhandene Build-Szenen behalten, Klettertest nur ergaenzen.

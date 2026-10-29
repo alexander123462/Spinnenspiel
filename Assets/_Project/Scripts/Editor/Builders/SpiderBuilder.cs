@@ -1,5 +1,8 @@
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Events;
+using UnityEngine.Rendering.HighDefinition;
 
 namespace Spinnenspiel.EditorTools
 {
@@ -38,20 +41,38 @@ namespace Spinnenspiel.EditorTools
             string folder = AssetUtil.GeneratedRoot + "/Materials";
             Material abdomenMat = AssetUtil.CreateLitMaterial(folder + "/MAT_SpiderAbdomen.mat", Color.white, 0.42f, TextureFactory.SpiderAbdomen());
             Material thoraxMat = AssetUtil.CreateLitMaterial(folder + "/MAT_SpiderThorax.mat", new Color(0.16f, 0.11f, 0.075f), 0.5f);
-            Material legMat = AssetUtil.CreateLitMaterial(folder + "/MAT_SpiderLeg.mat", Color.white, 0.35f, TextureFactory.SpiderLegBands());
+            Material legMat = CreateScanMaterial("MAT_SpiderLegScan",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Leg_Albedo.png",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Leg_Mask.png",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Leg_Normal.png", false);
             Material eyeMat = AssetUtil.CreateLitMaterial(folder + "/MAT_SpiderEye.mat", new Color(0.02f, 0.02f, 0.025f), 0.95f);
+            Material abdomenScanMat = CreateScanMaterial("MAT_SpiderAbdomenScan",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Abdomen_Albedo.png",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Abdomen_Mask.png",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Abdomen_Normal.png", true);
+            Material carapaceMat = CreateScanMaterial("MAT_SpiderCarapace",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Cephalothorax_Albedo.png",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Cephalothorax_Mask.png",
+                "Assets/_Project/Art/Spider/Textures/Spinne_Cephalothorax_Normal.png", true);
 
             AddPart(body.transform, "Abdomen", new Vector3(0f, 0.008f, -0.052f), new Vector3(0.085f, 0.068f, 0.11f), abdomenMat);
+            ApplyScanMesh(body.transform.Find("Abdomen"), "Assets/_Project/Art/Spider/Spinne_Abdomen.fbx", abdomenScanMat);
             AddPart(body.transform, "Pedicel", new Vector3(0f, 0.002f, -0.006f), new Vector3(0.022f, 0.02f, 0.03f), thoraxMat);
             AddPart(body.transform, "Cephalothorax", new Vector3(0f, 0f, 0.025f), new Vector3(0.058f, 0.04f, 0.065f), thoraxMat);
+            ApplyScanMesh(body.transform.Find("Cephalothorax"), "Assets/_Project/Art/Spider/Spinne_Cephalothorax.fbx", carapaceMat);
 
             // Augen: zwei große vordere Mittelaugen, zwei kleinere darüber, zwei seitliche.
-            AddPart(body.transform, "Eye_AL", new Vector3(-0.007f, 0.011f, 0.055f), Vector3.one * 0.009f, eyeMat);
-            AddPart(body.transform, "Eye_AR", new Vector3(0.007f, 0.011f, 0.055f), Vector3.one * 0.009f, eyeMat);
-            AddPart(body.transform, "Eye_PL", new Vector3(-0.009f, 0.018f, 0.046f), Vector3.one * 0.0065f, eyeMat);
-            AddPart(body.transform, "Eye_PR", new Vector3(0.009f, 0.018f, 0.046f), Vector3.one * 0.0065f, eyeMat);
-            AddPart(body.transform, "Eye_LL", new Vector3(-0.016f, 0.012f, 0.047f), Vector3.one * 0.005f, eyeMat);
-            AddPart(body.transform, "Eye_LR", new Vector3(0.016f, 0.012f, 0.047f), Vector3.one * 0.005f, eyeMat);
+            // 2026-10-11 Augenfix: alte Z=0.046..0.055 put the WHOLE eye sphere up to 6.5 mm
+            // OUTSIDE the carapace (head surface along eye ray is only ~0.022-0.025 from head
+            // center). New centers sit 0.35*r inside the scan-mesh surface (raycast against
+            // Spinne_Cephalothorax.fbx, see Logs/ci/eye_calc.py) -> eye dome embedded, only
+            // ~0.65*r of the sphere visible. Values symmetrised L/R.
+            AddPart(body.transform, "Eye_AL", new Vector3(-0.0052f, 0.0088f, 0.0475f), Vector3.one * 0.009f, eyeMat);
+            AddPart(body.transform, "Eye_AR", new Vector3(0.0052f, 0.0088f, 0.0475f), Vector3.one * 0.009f, eyeMat);
+            AddPart(body.transform, "Eye_PL", new Vector3(-0.0070f, 0.0145f, 0.0415f), Vector3.one * 0.0065f, eyeMat);
+            AddPart(body.transform, "Eye_PR", new Vector3(0.0070f, 0.0145f, 0.0415f), Vector3.one * 0.0065f, eyeMat);
+            AddPart(body.transform, "Eye_LL", new Vector3(-0.0132f, 0.0103f, 0.0432f), Vector3.one * 0.005f, eyeMat);
+            AddPart(body.transform, "Eye_LR", new Vector3(0.0132f, 0.0103f, 0.0432f), Vector3.one * 0.005f, eyeMat);
 
             // Kieferklauen (Cheliceren) und Taster (Pedipalpen)
             AddPart(body.transform, "Chelicera_L", new Vector3(-0.006f, -0.006f, 0.058f), new Vector3(0.009f, 0.014f, 0.009f), thoraxMat);
@@ -87,14 +108,63 @@ namespace Spinnenspiel.EditorTools
             root.AddComponent<SpiderWebBuilder>();
             root.AddComponent<SpiderWebPlacer>();
 
+            // J4: Vogel-Predator — greift laenge Zeit im Freien unter offenem Himmel.
+            BirdThreat birdThreat = root.AddComponent<Spinnenspiel.BirdThreat>();
+
+            // T5: Alarm-Ruf at the pre-warning (2 descending tones, volume from GameSettings).
+            root.AddComponent<Spinnenspiel.BirdAlarmCall>();
+
+            // T6: Dynamic danger music — calm bed, intensity rises to 0.8 during danger.
+            root.AddComponent<Spinnenspiel.DangerMusic>();
+
             // Hunger (t73a1): steigt langsam, sinkt beim Fressen.
             root.AddComponent<SpiderHunger>();
+
+            // J2a: Energie 0..100 als reine Logik (SpiderEnergyModel), denner MonoBehaviour.
+            root.AddComponent<SpiderEnergy>();
 
             // Beute 2 (t73a3): zur Beute laufen, einwickeln, zurücktragen, fressen.
             root.AddComponent<SpiderPredation>();
 
+            // S3 Fang-Rueckmeldung: Zupfton + Kamera-Wackeln on AnyCaught (only at own web).
+            root.AddComponent<FangFeedback>();
+
+            // S4 Fress-Rueckmeldung: bar flash + Crunch + "+25" on PreyEaten.
+            root.AddComponent<FeedFeedback>();
+
+            // K5 Wachstum: je 10 gefressene Insekten +8 %, Max 150 % (Abo: PreyEaten).
+            root.AddComponent<SpiderGrowth>();
+
             // Steuerungshilfe (t82): Box oben rechts, F1 schaltet um.
             root.AddComponent<ControlsHelp>();
+
+            // K3: Beute-Hinweis (Pfeilchen + Entfernunget to naechsten caught insect).
+            root.AddComponent<PreyHint>();
+
+            // Speichersystem (Z5): Position/Hunger/Netze as JSON bei Quit, laden beim Start.
+            // Before GameMenu: its Start() must register the hooks before StartGame fires.
+            root.AddComponent<SaveGame>();
+
+            // K6 Statistik beim Tod: Ueberlebenszeit/Fressen/Netzes + Hoechstwert (J6-File).
+            root.AddComponent<DeathStats>();
+
+            // S5 Tagesbilanz: at night->morning a short window shows the day that just ended.
+            root.AddComponent<Spinnenspiel.DayBalance>();
+
+            // S8 Tagesziele: three small goals per day (Seed + Tagnummer), reward once each.
+            root.AddComponent<Spinnenspiel.DailyGoals>();
+
+            // Menu (B8): Startscreen, Esc-Pause, Sensitivity in PlayerPrefs.
+            root.AddComponent<GameMenu>();
+
+            // S9 Einstieg: one-time hints at first start (WASD/Jump/Silk/Net/Collect),
+            // each shown when its situation happens and gone after first use; bitmask
+            // persisted in GameSettings. Must come BEFORE GameSettings (its Awake loads
+            // the settings before this Start reads them).
+            root.AddComponent<FirstStepsHint>();
+
+            // K7 Einstellungen merken: Lautstaerke/Empfindlichkeit/Sichtweite in own versioned file.
+            root.AddComponent<GameSettings>();
 
             return root;
         }
@@ -117,9 +187,8 @@ namespace Spinnenspiel.EditorTools
                 AssetDatabase.CreateFolder(parent, "Materials");
             }
 
-            mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            mat.SetColor("_BaseColor", new Color(0.18f, 0.12f, 0.08f));
-            mat.SetFloat("_Smoothness", 0.35f);
+            mat = Spinnenspiel.Rendering.PipelineMaterials.Lit(new Color(0.18f, 0.12f, 0.08f));
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(mat, 0.35f);
             AssetDatabase.CreateAsset(mat, BodyMaterialPath);
             return mat;
         }
@@ -146,6 +215,86 @@ namespace Spinnenspiel.EditorTools
             go.transform.localScale = localScale;
             Object.DestroyImmediate(go.GetComponent<Collider>());
             go.GetComponent<MeshRenderer>().sharedMaterial = mat;
+        }
+
+        /// <summary>
+        /// Erzeugt ein HDRP/Lit-Material aus Albedo/Mask/Normal-Textur.
+        /// Opak, Smoothness 0.42. doubleSided=true for the body (Härchen need backfaces).
+        /// </summary>
+        private static Material CreateScanMaterial(string name, string albedo, string mask, string normal, bool doubleSided)
+        {
+            string path = AssetUtil.GeneratedRoot + "/Materials/" + name + ".mat";
+            AssetUtil.EnsureFolder(AssetUtil.GeneratedRoot + "/Materials");
+
+            Material existing = AssetDatabase.LoadAssetAtPath<Material>(path);
+            Shader hdrpLit = Shader.Find("HDRP/Lit");
+            if (hdrpLit == null)
+                throw new System.InvalidOperationException("[Spider] Shader nicht gefunden: HDRP/Lit");
+
+            Material mat = existing ?? new Material(hdrpLit) { name = name };
+            Texture2D albedoTex = AssetDatabase.LoadAssetAtPath<Texture2D>(albedo);
+            if (albedoTex == null)
+                Debug.LogError("[Spider] Textur fehlt: " + albedo);
+            mat.SetTexture("_BaseColorMap", albedoTex);
+            Texture2D maskTex = AssetDatabase.LoadAssetAtPath<Texture2D>(mask);
+            if (maskTex == null)
+                Debug.LogError("[Spider] Textur fehlt: " + mask);
+            mat.SetTexture("_MaskMap", maskTex);
+            Texture2D normalTex = AssetDatabase.LoadAssetAtPath<Texture2D>(normal);
+            if (normalTex == null)
+                Debug.LogError("[Spider] Textur fehlt: " + normal);
+            mat.SetTexture("_NormalMap", normalTex);
+            mat.SetFloat("_SurfaceType", 0f);          // Opak
+            mat.SetFloat("_AlphaCutoffEnable", 0f);    // Kein Cutout
+            mat.SetFloat("_DoubleSidedEnable", doubleSided ? 1f : 0f);
+            mat.SetFloat("_Smoothness", 0.42f);
+            // T8 Lesbarkeit: Grundhelligkeit +20 % (HDRP/Lit hat kein Rim-Shader-Parameter,
+            // darum ein schwacher warm Specular-Ton als Rim-Effect an den Randschicht).
+            mat.SetColor("_BaseColor", new Color(1.2f, 1.2f, 1.2f, 1f));
+            mat.SetColor("_SpecularColor", new Color(1.0f, 0.95f, 0.86f, 1f));
+
+            HDMaterial.ValidateMaterial(mat);
+            EditorUtility.SetDirty(mat);
+
+            if (existing == null)
+                AssetDatabase.CreateAsset(mat, path);
+            else
+                AssetDatabase.SaveAssets();
+
+            return mat;
+        }
+
+        // Blender-Export (-Y vorne) landet in Unity mit +Z vorne, keine Drehung nötig (per Screenshot geprüft, S2c).
+        private static void ApplyScanMesh(Transform part, string fbxPath, Material mat)
+        {
+            if (part == null)
+            {
+                Debug.LogWarning("[Spider] ApplyScanMesh: Part-Transform ist null");
+                return;
+            }
+
+            if (string.IsNullOrEmpty(fbxPath) || AssetDatabase.LoadAssetAtPath<Object>(fbxPath) == null)
+            {
+                Debug.LogWarning("[Spider] FBX nicht gefunden: " + fbxPath + " – Kugel bleibt");
+                return;
+            }
+
+            var assets = AssetDatabase.LoadAllAssetsAtPath(fbxPath);
+            Mesh mesh = assets.OfType<Mesh>().FirstOrDefault();
+            if (mesh == null)
+            {
+                Debug.LogWarning("[Spider] Kein Mesh in: " + fbxPath + " – Kugel bleibt");
+                return;
+            }
+
+            // Mesh und Material zuweisen
+            MeshFilter mf = part.GetComponent<MeshFilter>();
+            if (mf == null) mf = part.gameObject.AddComponent<MeshFilter>();
+            mf.sharedMesh = mesh;
+
+            MeshRenderer mr = part.GetComponent<MeshRenderer>();
+            if (mr == null) mr = part.gameObject.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = mat;
         }
     }
 }

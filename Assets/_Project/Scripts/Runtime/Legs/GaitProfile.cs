@@ -44,7 +44,10 @@ namespace Spinnenspiel
         {
             name = "Walk",
             slowStepDuration = 0.2f,
-            fastStepDuration = 0.09f,
+            // Kuerzere Tritte bei Referenzgeschwindigkeit (0.09 -> 0.07): beim Sprint
+            // steht der Fuss kuerzer, der Koerper ueberholt ihn weniger weit
+            // (vorneZmin 0.063 < 0.07 im vollen CI).
+            fastStepDuration = 0.07f,
             referenceSpeed = 1.2f,
             minStepDistance = 0.03f,
             strideFactor = 0.8f,

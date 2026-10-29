@@ -1,0 +1,75 @@
+# -*- coding: utf-8 -*-
+"""Fragt die lokale KI (Strata IQ3_S, Port 8084, Vision-Encoder auf der CPU) zu einem Bild.
+
+Aufruf:  python Tools/bild_fragen.py <bild.png> "<frage>"
+Startet KEINEN Server mehr (Overseer 2026-10-25: ein zweiter Strata-Start belegte weitere 46 GiB RAM und liess den PC haengen).
+Gibt nur die Antwort des Modells auf stdout aus. Rueckgabe 0 = ok.
+"""
+import base64, json, os, subprocess, sys, time, urllib.error, urllib.request
+
+PORT = 8084
+BASE = "http://127.0.0.1:%d/v1" % PORT
+MODELL = "qwen3.8-flash-next-iq3_s"
+STANDARDFRAGE = "Beschreibe sachlich, was auf dem Bild zu sehen ist. Nenne Auffaelligkeiten wie fehlende Teile, Luecken, schwarze Flaechen oder Fehler."
+
+
+def laeuft():
+    try:
+        urllib.request.urlopen(BASE + "/models", timeout=3).read()
+        return True
+    except Exception:
+        return False
+
+
+def starten():
+    # Kein eigener Serverstart: Schleife/Schalter verwalten Strata (Port 8084). Ein zweiter Server braucht erneut ~46 GiB RAM.
+    sys.stderr.write("[bild_fragen] Strata (Port %d) antwortet nicht; es wird KEIN zweiter Server gestartet. Spaeter erneut versuchen.\n" % PORT)
+    return False
+
+
+def fragen(bild, frage):
+    mime = "image/jpeg" if bild.lower().endswith((".jpg", ".jpeg")) else "image/png"
+    with open(bild, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode("ascii")
+    payload = {
+        "model": MODELL,
+        "temperature": 0.2,
+        "max_tokens": 1200,
+        "messages": [{"role": "user", "content": [
+            {"type": "text", "text": frage},
+            {"type": "image_url", "image_url": {"url": "data:%s;base64,%s" % (mime, b64)}},
+        ]}],
+    }
+    req = urllib.request.Request(BASE + "/chat/completions",
+                                 data=json.dumps(payload).encode("utf-8"),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=300) as r:
+        d = json.loads(r.read().decode("utf-8"))
+    m = d["choices"][0]["message"]
+    # Manche Modelle fuellen das Denkfeld, wenn content durchs Token-Limit leer bleibt.
+    text = (m.get("content") or m.get("reasoning_content") or "").strip()
+    return text
+
+
+def main():
+    if len(sys.argv) < 2:
+        sys.stderr.write("Aufruf: python Tools/bild_fragen.py <bild> \"<frage>\"\n")
+        return 1
+    bild = sys.argv[1]
+    frage = sys.argv[2] if len(sys.argv) > 2 else STANDARDFRAGE
+    if not os.path.isfile(bild):
+        sys.stderr.write("FEHLER: Bild nicht gefunden: %s\n" % bild)
+        return 1
+    if not laeuft() and not starten():
+        sys.stderr.write("FEHLER: Vision-Server auf Port %d nicht erreichbar.\n" % PORT)
+        return 2
+    try:
+        print(fragen(bild, frage))
+    except Exception as e:
+        sys.stderr.write("FEHLER bei der Anfrage: %s\n" % e)
+        return 3
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

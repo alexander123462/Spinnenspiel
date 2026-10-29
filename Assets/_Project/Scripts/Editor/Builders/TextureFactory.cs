@@ -156,6 +156,204 @@ namespace Spinnenspiel.EditorTools
                 Mathf.Abs(Mathf.Sin((u * 18f + TileNoise(u, v, 3f, 2, 1f) * 4f) * Mathf.PI)) * 0.6f + TileNoise(u, v, 24f, 3, 6.1f) * 0.4f, 5f);
         }
 
+        /// <summary>WALD7: Moos-Atlas — speckled moss greens (hue ~80..110 deg) with an ALPHA gradient
+        /// over v (v=0 solid at the Stamm-Fuss, fading to transparent toward v=1). The cutout shape
+        /// comes from the texture (noise speckles + fade), so Alpha-Cutout is the right trick here.</summary>
+        public static Texture2D Moos()
+        {
+            return Generate("T_Moos", 512, (u, v) =>
+            {
+                float blotch = TileNoise(u, v, 6f, 4, 77f);          // moos clumps
+                float fine = TileNoise(u, v, 20f, 3, 91f);           // fine structure
+                Color deep = new Color(0.16f, 0.38f, 0.13f);         // hue ~125 desat -> moos dark
+                Color bright = new Color(0.42f, 0.66f, 0.24f);       // hellgruen, hue ~97 deg
+                Color c = Color.Lerp(deep, bright, blotch * 0.7f + fine * 0.3f);
+                float fade = Mathf.Clamp01((1f - v) * 1.5f);         // v=0 solid -> v~0.7 gone (out upward)
+                float speck = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.32f, 0.62f, blotch * 0.6f + fine * 0.4f));
+                return new Color(c.r, c.g, c.b, fade * speck);
+            }, true);
+        }
+
+        // STAMM1: Furchen pro Texturkachel — Grundfrequenz und das 1.7-fache davon.
+        private const int FurrowBase = 10;
+        private const int FurrowSecond = 17;
+        // STAMM1: feine senkrechte Faserstreifen pro Kachel (durchgehend, endend, verzweigend).
+        // Bewusst feiner als die Furchen: die Faserstreifen sollen die Platten nicht zulaufen.
+        private const int FiberCount = 64;
+        // STAMM1: bei diesem Betrag wird der Sinusruecken abgeschnitten -> breite flache Platte
+        // mit schmaler tiefer Furche statt runder Streifen.
+        private const float PlateClamp = 0.32f;
+
+        /// <summary>
+        /// STAMM1: Rinden-Hoehe der Mammutbaum-Rinde (u = Umfang, v = Hoehe wie in den Trunk-UVs).
+        /// Furchen: Grundfrequenz 10 plus zweite Frequenz 17 (=1.7x); Phase UND Position jeder
+        /// Furche sind per Hash variiert, der Abstand ist also unregelmaessig. Flache Platten statt
+        /// runder Sinusstreifen. Dazu feine Faserstreifen, von denen jedes vierte endet (scharfe
+        /// Kante) und jedes vierte verzweigt. In u und v kachelbar (Normalmap wrappt).
+        /// </summary>
+        private static float RedwoodHeight(float u, float v)
+        {
+            float warp = TileNoise(u, v, 2f, 2, 8f) * 3.4f;
+            float off = FurrowShift(u, v, FurrowBase);          // Positionssprung pro Furche
+            float x1 = (u * FurrowBase + warp + off) * Mathf.PI;
+            float x2 = (u * FurrowSecond + warp * 1.7f + off * 1.7f) * Mathf.PI;
+            float plates = 0.62f * PlateRidge(x1, FurrowBase) + 0.38f * PlateRidge(x2, FurrowSecond);
+            return Mathf.Clamp01(plates * 0.55f + FiberField(u, v) * 0.26f
+                                    + TileNoise(u, v, 24f, 2, 61f) * 0.015f);
+        }
+
+        /// <summary>STAMM1: Positions-Versatz pro Furche (stetig interpoliert, modulo der
+        /// Halbperioden pro Kachel -> kachelbar). Macht den Furchenabstand unregelmaessig.</summary>
+        private static float FurrowShift(float u, float v, int furrows)
+        {
+            float t = u * furrows + TileNoise(u, v, 2f, 2, 8f);
+            int k = Mathf.FloorToInt(t);
+            float f = Mathf.SmoothStep(0f, 1f, t - (float)k);
+            int i0 = ((k % furrows) + furrows) % furrows;
+            int i1 = (i0 + 1) % furrows;
+            float h = Mathf.Lerp(WorldLayout.Hash01(i0, 11, 97), WorldLayout.Hash01(i1, 11, 97), f);
+            return (h - 0.5f) * 0.5f;
+        }
+
+        /// <summary>STAMM1: flache Platte — der Betrag des Sinus ist bei 1 abgeschnitten, dadurch
+        /// breite flache Ruecken und schmale tiefe Furchen. Die Phase springt pro Furche (Hash ueb
+        /// den Furchen-Index), zwischen den Furchen stetig interpoliert; der Index laeuft modulo
+        /// der Halbperioden pro Kachel, damit die u-Naht wieder genau passt.</summary>
+        private static float PlateRidge(float x, int furrows)
+        {
+            float t = x / Mathf.PI;
+            int k = Mathf.FloorToInt(t);
+            float f = Mathf.SmoothStep(0f, 1f, t - (float)k);
+            int i0 = ((k % furrows) + furrows) % furrows;
+            int i1 = (i0 + 1) % furrows;
+            float jitter = (Mathf.Lerp(WorldLayout.Hash01(i0, 7, 29), WorldLayout.Hash01(i1, 7, 29), f) - 0.5f) * 0.8f;
+            return Mathf.Min(1f, Mathf.Abs(Mathf.Sin(x + jitter)) / PlateClamp);
+        }
+
+        /// <summary>STAMM1: feine senkrechte Faserstreifen. Jedes vierte endet (Kurz-Faser), ein
+        /// weiteres Viertel verzweigt oberhalb einer zufaelligen Hoehe in zwei Aeste. Ein Kuvert an
+        /// v=0 und v=1 haelt die Textur kachelbar.</summary>
+        private static float FiberField(float u, float v)
+        {
+            float fu = u * FiberCount;
+            int fi = Mathf.FloorToInt(fu);
+            float d = Mathf.Abs(fu - fi - 0.5f);                  // Abstand zur Streifenachse
+            int kind = ((fi % 4) + 4) % 4;                        // 0 endet, 2 verzweigt
+            float presence = 0f;
+
+            if (kind == 0)                                        // Faser endet in der Kachelmitte
+            {
+                float end = 0.18f + 0.6f * WorldLayout.Hash01(fi, 3, 61);
+                float tip = Mathf.Clamp01((end - v) / 0.012f);    // scharfe Kante am Faserende
+                presence = Mathf.Clamp01((0.30f - d) * 6f) * (0.25f + 0.75f * tip);
+            }
+            else if (kind == 2)                                   // Faser verzweigt
+            {
+                float fork = 0.12f + 0.6f * WorldLayout.Hash01(fi, 5, 73);
+                float spread = Mathf.Clamp01((v - fork) / 0.15f) * 0.2f;
+                presence = (v > fork)
+                    ? Mathf.Max(Mathf.Clamp01((0.24f - d + spread) * 6f), Mathf.Clamp01((0.24f - d - spread) * 6f))
+                    : Mathf.Clamp01((0.30f - d) * 6f);
+                presence *= 1f - 0.55f * Mathf.Clamp01((v - fork) / 0.15f);
+            }
+            else presence = Mathf.Clamp01((0.30f - d) * 6f);
+
+            float env = Mathf.Clamp01(Mathf.Min(v, 1f - v) / 0.05f);   // Nahtschutz in v
+            return presence * env * (0.75f + 0.25f * TileNoise(u, v, 32f, 2, 13f));
+        }
+
+        /// <summary>WALD4/STAMM1: Mammutbaum-Rinde, rotbraun. Der Farbton wird gefuehrt ueber HSV
+        /// (12..21 Grad = Ziel 10..25 Grad) statt ueb RGB-Mischungen, damit er nicht ins Graeuliche
+        /// oder Ins gelbliche driftet. Moosfarbe gibt es ausschliesslich im untersten Meter der Rinde
+        /// (v &lt; RedwoodFactory.BarkMossBandV) — in den Trunk-UVs sitzt dort der Fussbereich.</summary>
+        public static Texture2D RedwoodBark()
+        {
+            return Generate("T_RedwoodBark", 512, (u, v) =>
+            {
+                float h = RedwoodHeight(u, v);
+                float patch = TileNoise(u, v, 3f, 3, 21f);
+                Color dark = Color.HSVToRGB(12f / 360f, 0.78f, 0.11f);    // Furche, tiefrotbraun
+                Color mid = Color.HSVToRGB(17f / 360f, 0.66f, 0.30f);     // Platte
+                Color light = Color.HSVToRGB(21f / 360f, 0.52f, 0.46f);   // abgeriebene Plattenkante
+                Color c = h < 0.5f ? Color.Lerp(dark, mid, h * 2f) : Color.Lerp(mid, light, (h - 0.5f) * 2f);
+                c = Color.Lerp(c, Color.HSVToRGB(20f / 360f, 0.14f, 0.34f),
+                               Mathf.Clamp01((patch - 0.62f) * 3f) * 0.55f);   // graue Verwitterung
+
+                float band = RedwoodFactory.BarkMossBandV;
+                if (v < band)
+                {
+                    float mask = Mathf.Clamp01((TileNoise(u, v / band, 6f, 3, 50f) - 0.42f) * 3.2f);
+                    float edge = Mathf.Clamp01(Mathf.Min(v, band - v) / (band * 0.25f));  // weiche Raender
+                    c = Color.Lerp(c, Color.HSVToRGB(96f / 360f, 0.62f, 0.34f),
+                                   Mathf.Clamp01(mask * edge * 1.2f));
+                }
+                return c;
+            }, false);
+        }
+
+        public static Texture2D RedwoodBarkNormal()
+        {
+            return GenerateNormal("T_RedwoodBark_N", 512, RedwoodHeight, 7f);
+        }
+
+        /// <summary>WALD5: Dach-Karte, dichte dunkelgruene Nadel-/Blattbueschel mit Alpha.</summary>
+        public static Texture2D CanopyLeaves()
+        {
+            return Generate("T_CanopyLeaves", 512, (u, v) =>
+            {
+                float alpha = 0f, shade = 0f;
+                for (int i = 0; i < 46; i++)
+                {
+                    float cx = 0.08f + 0.84f * WorldLayout.Hash01(i, 3, 41);
+                    float cy = 0.08f + 0.84f * WorldLayout.Hash01(i, 7, 43);
+                    float angle = WorldLayout.Hash01(i, 5, 47) * Mathf.PI * 2f;
+                    float dx = u - cx, dy = v - cy;
+                    float lx = dx * Mathf.Cos(angle) + dy * Mathf.Sin(angle);
+                    float ly = -dx * Mathf.Sin(angle) + dy * Mathf.Cos(angle);
+                    float leaf = (lx * lx) / (0.11f * 0.11f) + (ly * ly) / (0.03f * 0.03f);
+                    if (leaf < 1f)
+                    {
+                        alpha = 1f;
+                        shade = Mathf.Max(shade, 1f - leaf * 0.4f - Mathf.Abs(ly) * 4f);
+                    }
+                }
+                Color c = Color.Lerp(new Color(0.07f, 0.20f, 0.06f), new Color(0.22f, 0.45f, 0.14f), Mathf.Clamp01(shade));
+                c.a = alpha;
+                return c;
+            }, true);
+        }
+
+        /// <summary>KLEE1/KLEE2: helles Kleeblatt (3 Herz-Lappen) mit Alpha fuer den Cutout-Teppich.
+        /// Die Mitte (0.28..0.72) ist immer undurchsichtig: CloverFactory-UVs liegen dort.
+        /// KLEE2: heller Mittelstreifen mit V-Zeichnung (wie bei echtem Sauerklee), dunklerer Rand.</summary>
+        public static Texture2D CloverLeaf()
+        {
+            return Generate("T_Clover_Leaf", 256, (u, v) =>
+            {
+                float dx = u - 0.5f, dy = v - 0.42f;
+                // Herz-Kontur in Polarkoordinaten (Kerze nach oben).
+                float ang = Mathf.Atan2(dy, dx);
+                float r = Mathf.Sqrt(dx * dx + dy * dy);
+                float theta = Mathf.Abs(ang - Mathf.PI * 0.5f);
+                if (theta > Mathf.PI) theta = 2f * Mathf.PI - theta;
+                float rLeaf = 0.42f * (1f - 0.38f * Mathf.Exp(-(theta * theta) / (0.34f * 0.34f)));
+                float a = r < rLeaf ? 1f : 0f;
+                // KLEE2: V-Zeichnung (Chevron) als heller Streifen um den Blattmittelpunkt.
+                float vLine = Mathf.Abs(dy + 0.55f * Mathf.Abs(dx) - 0.02f);
+                float chevron = Mathf.Exp(-(vLine * vLine) / 0.0016f) * (dy > -0.30f ? 1f : 0.2f);
+                // Heller Mittelstreifen entlang der Hauptachse.
+                float mid = Mathf.Exp(-(dx * dx) / 0.0018f) * (dy > -0.05f ? 1f : 0.35f);
+                // KLEE2: dunklerer Rand zur Blattkontur hin.
+                float edgeDark = 1f - 0.35f * Mathf.Clamp01((r / rLeaf - 0.6f) / 0.4f);
+                float n = Mathf.PerlinNoise(u * 9f, v * 9f);
+                Color c = Color.Lerp(new Color(0.13f, 0.32f, 0.08f), new Color(0.45f, 0.68f, 0.30f), n * 0.7f + 0.15f);
+                c = Color.Lerp(c, new Color(0.62f, 0.80f, 0.48f), Mathf.Clamp01(chevron * 0.8f + mid * 0.5f));
+                c *= edgeDark;
+                c.a = a;
+                return c;
+            }, true);
+        }
+
         /// <summary>Blatt-Atlas: mehrere Blätter mit Alpha auf einer Karte (für Busch- und Baumkarten).</summary>
         public static Texture2D LeafCluster()
         {

@@ -3,7 +3,8 @@
 # Einzelne Fehler werden gemeldet, das Skript bricht nicht ab.
 $ErrorActionPreference = 'Stop'
 $UA   = 'Spinnenspiel/1.0 (Alex, lokal)'
-$base = 'C:\Users\vorau\dev\Spinnenspiel\AssetSource\polyhaven'
+$Root = Split-Path -Parent $PSScriptRoot
+$base = Join-Path $Root 'AssetSource\polyhaven'
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
 # ---------- Listen ----------
@@ -15,7 +16,8 @@ $models1k = @(
 $models2k = @(
   'shrub_02','shrub_03','shrub_04','fir_tree_01','pine_tree_01','fir_sapling',
   'pine_sapling_small','pine_sapling_medium','dead_tree_trunk','dead_tree_trunk_02',
-  'tree_stump_01','tree_stump_02','rock_moss_set_01','rock_moss_set_02','rock_07','rock_09','boulder_01'
+  'tree_stump_01','tree_stump_02','rock_moss_set_01','rock_moss_set_02','rock_07','rock_09','boulder_01',
+  'island_tree_01','island_tree_02','island_tree_03','jacaranda_tree','tree_small_02'
 )
 $textures2k = @(
   'forest_ground_04','sparse_grass','brown_mud_leaves_01','mud_forest','rocky_trail',
@@ -31,7 +33,7 @@ $wc.Headers.Add('User-Agent', $UA)
 
 $manifest   = [System.Collections.Generic.List[object]]::new()
 $failures   = [System.Collections.Generic.List[string]]::new()
-$manifestPath = Join-Path $base 'manifest.csv'
+$manifestPath = if (Test-Path (Join-Path $PSScriptRoot 'polyhaven_manifest.csv')) { Join-Path $PSScriptRoot 'polyhaven_manifest.csv' } else { Join-Path $base 'manifest.csv' }
 New-Item -ItemType Directory -Force -Path $base | Out-Null
 
 function Get-Ph([string]$path) {

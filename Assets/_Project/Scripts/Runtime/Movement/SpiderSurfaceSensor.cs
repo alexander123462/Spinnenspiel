@@ -49,7 +49,7 @@ namespace Spinnenspiel
             bool wallHit = false;
             if (Physics.Raycast(origin, forward, out RaycastHit hitC, wallProbe, mask, QueryTriggerInteraction.Ignore))
             {
-                if (Vector3.Angle(hitC.normal, up) > 35f)
+                if (Vector3.Angle(hitC.normal, up) > 35f && !(hitC.normal.y < -0.1f && Physics.Raycast(origin, Vector3.down, out RaycastHit gh, 1.0f, mask, QueryTriggerInteraction.Ignore) && gh.collider is TerrainCollider))
                 {
                     wallHit = true;
                     pointC = hitC.point;

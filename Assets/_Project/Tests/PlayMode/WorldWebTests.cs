@@ -55,7 +55,7 @@ namespace Spinnenspiel.Tests
 
             // Alle Stämme (GO "Trunk" mit MeshCollider + SurfaceTag) sammeln.
             var trunks = new System.Collections.Generic.List<Transform>();
-            foreach (GameObject go in Object.FindObjectsOfType<GameObject>())
+            foreach (GameObject go in Object.FindObjectsByType<GameObject>(FindObjectsSortMode.None))
             {
                 if (go.name == "Trunk" && go.GetComponent<MeshCollider>() != null && go.GetComponent<SurfaceTag>() != null)
                 {

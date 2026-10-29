@@ -17,7 +17,7 @@ namespace Spinnenspiel.EditorTools
     {
         private static readonly string[] AllIds =
         {
-            "fern_02", "weed_plant_02", "shrub_02", "shrub_03", "shrub_04",
+            "fern_02", "weed_plant_02", "grass_medium_01", "grass_medium_02", "shrub_02", "shrub_03", "shrub_04",
             "nettle_plant", "dandelion_01", "periwinkle_plant", "dry_branches_medium_01",
             "dead_tree_trunk", "dead_tree_trunk_02", "tree_stump_01", "tree_stump_02",
             "rock_07", "rock_09", "stone_01", "rock_moss_set_01", "rock_moss_set_02",
@@ -203,21 +203,7 @@ namespace Spinnenspiel.EditorTools
         /// </summary>
         public static Material CreateFoliageMaterial(string id)
         {
-            Shader shader = Shader.Find("Spinnenspiel/Foliage");
-            if (shader == null)
-            {
-                throw new InvalidOperationException("[Spinnenspiel] Shader nicht gefunden: Spinnenspiel/Foliage");
-            }
-
-            Material material = new Material(shader);
-            material.SetTexture("_BaseMap", BaseTexture(id));
-            material.SetFloat("_AlphaClip", 1f);
-            material.EnableKeyword("_ALPHATEST_ON");
-            material.SetFloat("_Cutoff", 0.4f);
-            material.SetColor("_BaseColor", Color.white);
-            material.SetColor("_TipColor", Color.white);
-            material.SetFloat("_VariationAmount", 0.1f);
-            material.SetFloat("_Smoothness", 0.25f);
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Foliage(BaseTexture(id), null, Color.white, 0.4f);
             material.enableInstancing = true;
 
             AssetUtil.ReplaceAsset(material, MaterialRoot + "/M_" + id + ".mat");
@@ -230,11 +216,9 @@ namespace Spinnenspiel.EditorTools
         /// </summary>
         public static Material CreateSolidMaterial(string id)
         {
-            Material material = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            material.SetTexture("_BaseMap", BaseTexture(id));
-            material.SetTexture("_BumpMap", TextureOf(id, "nor_gl"));
-            material.EnableKeyword("_NORMALMAP");
-            material.SetFloat("_Smoothness", 0.2f);
+            Material material = Spinnenspiel.Rendering.PipelineMaterials.Lit(Color.white, BaseTexture(id));
+            Spinnenspiel.Rendering.PipelineMaterials.SetNormalMap(material, TextureOf(id, "nor_gl"));
+            Spinnenspiel.Rendering.PipelineMaterials.SetSmoothness(material, 0.2f);
             material.enableInstancing = true;
 
             AssetUtil.ReplaceAsset(material, MaterialRoot + "/M_" + id + ".mat");

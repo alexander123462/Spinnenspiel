@@ -1,4 +1,5 @@
-$p = 'C:\Users\vorau\dev\Spinnenspiel\.gitignore'
+$Root = Split-Path -Parent $PSScriptRoot
+$p = Join-Path $Root '.gitignore'
 $c = [IO.File]::ReadAllText($p)
 if ($c -notmatch '(?m)^/AssetSource/\s*$') {
   if ($c -and -not $c.EndsWith([char]10)) { $c += "`n" }
