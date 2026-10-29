@@ -55,3 +55,6 @@ Ursache: ungeloest, Test-Drift: Nacht ist 11 Proben schwarz, danach taghell ohne
 
 ## 2026-10-29 LICHT1c4 (Overseer)
 Ursache 1 (dayLengthMinutes=10000 kippt Nachtkern) von Hermes belegt/behoben; Ursache 2: Nacht schwarz, weil drei Werte kollidieren (Nacht-Nebeldimmung 0.015 vs. J5-Fenster vs. Dach-Schatten). Unity.exe lief (PID 5756) -> keine CI, kein Code-Commit. Entscheidung: Nacht-Nebeldimmung anheben + Licht1cTests-Annahme anpassen. Neuer Punkt LICHT1c6; Code bleibt im Arbeitsbaum.
+
+## 2026-10-29 STAMM1 (Overseer)
+Ursache: kein Fehler in STAMM1 (Stamm1Tests 4/4 gruen); Commit-Gate blockiert durch 5 Rote ausserhalb ROT.md (E1, G6, Nahkampf, T7_Morgennebel, Messung), vermutlich Licht-/Nebel-Look bzw. schwarze Screenshots, nicht Rinde. Unity.exe lief (PID 5756) -> keine CI, kein Code-Commit. Aktion: STAMM1 ersetzt durch STAMM1b (Commit der Rinden-Dateien nach Gegenprobe auf HEAD/ohne Stamm1-Dateien, Rote ggf. in ROT.md); Dateien bleiben namentlich gelistet im Baum.
