@@ -143,6 +143,17 @@ namespace Spinnenspiel
         [Tooltip("Day fog colour from the builder; -1 reads RenderSettings at start")]
         public Color dayFogColor = new Color(-1f, -1f, -1f);
 
+        /// <summary>ROTE1-NEBEL1: Mittag-Lichtpfad des Nebelvolumens (Faktor 1.0 der Kurve)
+        /// vom Builder gesetzt (WaldLook.FogMeanFreePath). Wie bei noonFogDensity/dayFogColor
+        /// ist der Volume-Override ein Prozess-globaler Wert: Start() las ihn einmal aus dem
+        /// geteilten Profil — nach vorangelaufenen PlayMode-Tests kam darin ein bereits
+        /// skalierter Wert zurueck, und jede neue Zyklus-Instanz teilte ihn erneut durch die
+        /// Kurve. Messung r104: Lichtpfad 0,00 m statt 46,7 (Tagebilder fast schwarz,
+        /// StDev noon 12,3). Mit Builder-Wert schreibt der Zyklus den Pfad jede Frame
+        /// ABSOLUT (noonMeanFreePath / Kurve) und selbstheilend. -1 = Einmalablesen wie bisher.</summary>
+        [Tooltip("Noon (factor 1.0) fog meanFreePath from the builder; -1 reads the volume at start")]
+        public float noonFogMeanFreePath = -1f;
+
         /// <summary>FARBE1a: The HDRP PhysicallyBasedSky built by the Builder. The sky renders a
         /// full-bright DAY sky whenever the main light sits above the horizon — and the cycle
         /// parks the "moon" above the horizon at night (J5). Without this link the night frame
@@ -297,7 +308,10 @@ namespace Spinnenspiel
                 }
             }
             // T7: capture the baseline fog distance once so the runtime curve scales it.
-            if (fogVolumeComponent != null && fogVolumeComponent.meanFreePath.overrideState)
+            // ROTE1-NEBEL1: nur ohne Builder-Baseline (noonFogMeanFreePath < 0) — das
+            // Einmalablesen aus dem geteilten Profil erbt sonst Test-Kontamination.
+            if (noonFogMeanFreePath < 0f
+                && fogVolumeComponent != null && fogVolumeComponent.meanFreePath.overrideState)
             {
                 fogBaseMeanFreePath = fogVolumeComponent.meanFreePath.value;
             }
@@ -479,13 +493,16 @@ namespace Spinnenspiel
             // sharpness, see U1), RenderSettings.fogDensity. Scale BOTH so the curve always shows.
             if (fogVolumeComponent != null && fogVolumeComponent.meanFreePath.overrideState)
             {
-                if (fogBaseMeanFreePath <= 0f)
+                // ROTE1-NEBEL1: Builder-Baseline hat Vorrang (prozess-global geteilter
+                // Override; Einmalablesen erbte Kontamination — Pfad 0,00 statt 46,7).
+                float baseP = noonFogMeanFreePath >= 0f ? noonFogMeanFreePath : fogBaseMeanFreePath;
+                if (baseP <= 0f && noonFogMeanFreePath < 0f)
                 {
-                    fogBaseMeanFreePath = fogVolumeComponent.meanFreePath.value;
+                    fogBaseMeanFreePath = baseP = fogVolumeComponent.meanFreePath.value;
                 }
-                if (fogBaseMeanFreePath > 0f)
+                if (baseP > 0f)
                 {
-                    float scaled = fogBaseMeanFreePath / Mathf.Max(factor, 0.01f);
+                    float scaled = baseP / Mathf.Max(factor, 0.01f);
                     fogVolumeComponent.meanFreePath.Override(scaled);
                 }
             }

@@ -225,6 +225,10 @@ namespace Spinnenspiel.EditorTools
             dayCycle.dayFogColor = WaldLook.FogAlbedo;
             // T7 Morgennebel: the cycle drives the fog volume built by WorldLightingBuilder.
             dayCycle.fogVolumeComponent = WorldLightingBuilder.LastBuiltFog;
+            // ROTE1-NEBEL1: Builder-Baseline auch fuer den Lichtpfad (wie noonFogDensity) —
+            // der Zyklus schreibt meanFreePath damit jede Frame absolut statt ein Mal den
+            // kontaminierten Override des geteilten Profils abzulesen.
+            dayCycle.noonFogMeanFreePath = WaldLook.FogMeanFreePath;
             // FARBE1a: the cycle drives the sky brightness (day factor) and the tests pin the
             // exposure via the wired Exposure component.
             dayCycle.skyVolume = WorldLightingBuilder.LastBuiltSky;
